@@ -5,6 +5,14 @@ import { adminEnabled } from "@/lib/admin-config";
 const COOKIE = "vc_admin";
 const ROLE_COOKIE = "vc_admin_role";
 
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: 60 * 60 * 12,
+  secure: Boolean(process.env.VERCEL_ENV),
+};
+
 export { adminEnabled };
 
 const ROLE_LEVEL: Record<Role, number> = {
@@ -47,22 +55,12 @@ export async function requireAdminApi() {
 
 export async function setAdminCookie(role: Role = "OWNER") {
   const store = await cookies();
-  store.set(COOKIE, "1", {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
-  store.set(ROLE_COOKIE, role, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
+  store.set(COOKIE, "1", COOKIE_OPTIONS);
+  store.set(ROLE_COOKIE, role, COOKIE_OPTIONS);
 }
 
 export async function clearAdminCookie() {
   const store = await cookies();
-  store.set(COOKIE, "", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 0 });
-  store.set(ROLE_COOKIE, "", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 0 });
+  store.set(COOKIE, "", { ...COOKIE_OPTIONS, maxAge: 0 });
+  store.set(ROLE_COOKIE, "", { ...COOKIE_OPTIONS, maxAge: 0 });
 }

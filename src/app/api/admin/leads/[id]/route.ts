@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import type { LeadStatus } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
-import { updateLeadStatus } from "@/lib/server/store";
+import { createPurchase, updateLeadStatus } from "@/lib/server/store";
 import { sendEmail } from "@/lib/server/mailer";
 
 export async function PATCH(
@@ -25,6 +25,24 @@ export async function PATCH(
         template: "lead-offer",
         data: { ...lead, offer: lead.offer ?? "an amount" },
       });
+    }
+
+    if (status === "ACCEPTED") {
+      const amount = body.amount ? Number(body.amount) : undefined;
+      if (amount && amount > 0) {
+        createPurchase(
+          {
+            sellerName: lead.name,
+            sellerEmail: lead.email,
+            amount,
+            status: "AGREED",
+            items: [],
+            notes: `From sell-to-us lead: ${lead.brand} ${lead.itemType}, size ${lead.size} (${lead.condition}).`,
+            leadId: lead.id,
+          },
+          "Henry"
+        );
+      }
     }
 
     return Response.json({ ok: true, lead });

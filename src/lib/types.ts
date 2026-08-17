@@ -205,6 +205,43 @@ export interface VisitsData {
   byDay: Record<string, number>;
 }
 
+export interface NewsletterSubscriber {
+  email: string;
+  source: string;
+  consentedAt: string;
+}
+
+export interface StockPurchaseItem {
+  sku: string;
+  name: string;
+  brand: string;
+  cost: number;
+}
+
+export interface StockPurchase {
+  id: string;
+  sellerName: string;
+  sellerEmail: string;
+  amount: number;
+  status: "AGREED" | "PAID";
+  items: StockPurchaseItem[];
+  notes?: string;
+  leadId?: string;
+  createdAt: string;
+  paidAt?: string;
+}
+
+export interface JournalPost {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  body: string[];
+  coverImage?: string;
+  published: boolean;
+  publishedAt: string;
+}
+
 export interface AuditEntry {
   id: string;
   actor: string;
@@ -238,4 +275,7 @@ export interface StoreData {
   discounts: Discount[];
   emailLog: EmailLogEntry[];
   visits: VisitsData;
+  subscribers: NewsletterSubscriber[];
+  purchases: StockPurchase[];
+  posts: JournalPost[];
 }

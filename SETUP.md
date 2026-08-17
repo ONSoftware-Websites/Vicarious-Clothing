@@ -96,22 +96,42 @@ data model. To go live you'll want Supabase:
    per-user 2FA comes with this step, per blueprint section 24.
 
 ### 2.7 Domain & deployment (Vercel)
-1. Add `vicariousclothing.co.uk` as a Vercel project domain.
-2. In Vercel → Settings → Environment Variables, add every variable from
-   `.env.example` (Production AND Preview, using Stripe **test** keys for
-   previews — blueprint section 32).
-3. Deploy `main`. Preview deployments come free with each push.
-4. Point DNS to Vercel; set up SPF/DKIM/DMARC for the email domain.
+Everything needed to deploy is in the repo — `vercel.json` (security
+headers), build config, `robots.txt`/`sitemap.xml`/Open Graph image, and
+serverless-safe data handling. Full step-by-step:
+
+**→ See [DEPLOY.md](./DEPLOY.md) — push to GitHub, import into Vercel,
+set the environment variables, add the domain.**
+
+Short version:
+1. Push this repo to GitHub, import it at vercel.com/new.
+2. Add every variable from `.env.example` in Project Settings →
+   Environment Variables (Stripe **test** keys for Previews).
+3. Add `vicariousclothing.co.uk` as the domain and follow the DNS steps.
+4. Before launch: switch Stripe to live keys, keep test mode until then
+   (blueprint section 32).
 
 ### 2.8 Real inventory & data
 - Delete `.data/store.json` to clear demo products/orders, then add real stock
   through `/admin/inventory` → Add product (the sectioned workflow with
   economics calculator).
+- Stock acquisitions: record every buy at `/admin/purchases` — seller, agreed
+  amount, item costs, paid status. Accepting a sell-to-us lead with an amount
+  creates the purchase record automatically.
+- Newsletter: sign-ups (homepage + checkout opt-in) land in
+  `/admin/newsletter` with consent timestamps; export to CSV for your email
+  platform.
+- Journal: write brand content at `/admin/journal`; it publishes to
+  `/journal` instantly. Keep the condition guide and drop stories coming.
 - Marketplace channels (Vinted/Depop/eBay) are tracked per product at
   `/admin/marketplace` — keep that page open while listing elsewhere; the
   "Sold on …" buttons delist from the website instantly.
 - Discount codes: `/admin/discounts` (percentage, fixed, free delivery,
   category-only, min basket, expiry, usage limits, one-per-email).
+- Every change to a piece is visible in its Item history (product edit
+  page), and everything lands in the dashboard audit log.
+- Run `npm test` before deploying — reservation rules, discount validation
+  and the order flow are covered.
 
 ### 2.9 Analytics
 `/admin/analytics` is live: revenue, net profit (uses your cost prices),
@@ -140,9 +160,9 @@ replace with PostHog/GA when you want real product analytics.
 | Blueprint phase | Feature | Status |
 | --- | --- | --- |
 | 3 | Customer accounts with real auth | Demo browser accounts; Supabase Auth is the swap |
-| 3 | Email marketing broadcasts | Transactional only; connect a provider |
+| 3 | Email marketing broadcasts | Subscriber list + CSV export; connect a sending platform |
 | 4 | Automated marketplace delisting | Manual status layer (per blueprint: platform rules vary) |
-| 4 | Seller payments workflow | Lead pipeline exists; payment on ACCEPTED is manual |
+| 4 | Seller payments workflow | Lead pipeline + purchase records; paying the seller is manual |
 | 5 | Vinted/eBay API integrations | Only when Phase 2 is bulletproof (build discipline) |
 | 6 | EPOS / barcodes / click & collect | Physical retail phase |
 

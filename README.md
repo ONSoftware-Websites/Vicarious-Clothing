@@ -26,6 +26,9 @@ Admin area: `/admin` (password from `.env` — see `.env.example`).
 > **Making it live:** real payments, email sending, the Supabase database,
 > domain setup and the launch checklist are all covered step by step in
 > [SETUP.md](./SETUP.md).
+>
+> **Deploying:** the repo is Vercel-ready (`vercel.json`, sitemap, robots,
+> Open Graph, serverless-safe data layer). Follow [DEPLOY.md](./DEPLOY.md).
 
 ## What's implemented
 
@@ -47,6 +50,8 @@ Admin area: `/admin` (password from `.env` — see `.env.example`).
 | Accounts (profile, orders, addresses, wishlist, preferences) | Done (browser demo auth) |
 | Wishlist with sold-item handling | Done |
 | Sell To Us form → lead pipeline (NEW → REVIEWING → … → PAID) | Done |
+| Journal: storefront listing + article pages, admin editor | Done (`/journal`, `/admin/journal`) |
+| Newsletter capture with consent records, admin list + CSV export | Done (`/admin/newsletter`) |
 | Help & legal pages (delivery, returns, FAQs, size guide, condition guide, terms, privacy, cookies) | Done |
 | Cookie consent: Accept all / Reject optional / Manage | Done |
 | Branded error states (404, just-sold, empty bag, no results) | Done |
@@ -65,10 +70,14 @@ Admin area: `/admin` (password from `.env` — see `.env.example`).
 | Orders with status flow (PAID → PICKING → READY TO DISPATCH → DISPATCHED → DELIVERED) + branches (returns, refund, cancel) | `/admin/orders` |
 | Tracking entry | Order detail |
 | Sell To Us lead pipeline | `/admin/leads` |
+| Stock purchases: sellers, agreed amounts, item costs, paid status; accepted leads record purchases automatically | `/admin/purchases` |
 | Discounts: types, rules, usage, pause/delete | `/admin/discounts` |
 | Marketplace status layer (list/delist per channel, sold-elsewhere) | `/admin/marketplace` |
 | Analytics: revenue, net profit, conversion, return rate, days-to-sell, channel split | `/admin/analytics` |
 | Transactional email log (sent or written to file) | `/admin/emails` |
+| Newsletter subscribers with consent records + CSV export | `/admin/newsletter` |
+| Journal editor (draft/publish) | `/admin/journal` |
+| Per-item history (every change to a SKU) | product edit page |
 | Audit log (actor, action, before/after, timestamp) | `/admin` |
 
 ## Architecture
@@ -127,10 +136,18 @@ Key behaviour:
 /order/[id]                Order confirmation / view order
 /account · /account/*      Profile, orders, addresses, wishlist, preferences
 /sell-to-us                Acquisition form
+/journal · /journal/[slug] Journal articles
 /about                     Brand story
 /help/*                    Contact, delivery, returns, FAQs, size guide, condition guide
 /legal/*                   Terms, privacy, cookies
-/admin · /admin/*          Dashboard, inventory, orders, leads
+/admin · /admin/*          Dashboard, inventory, orders, leads, purchases, discounts,
+                           marketplace, analytics, emails, newsletter, journal
+```
+
+## Tests
+
+```bash
+npm test       # vitest — reservation, discount rules, orders, catalog logic
 ```
 
 ## Scripts
@@ -139,5 +156,6 @@ Key behaviour:
 npm run dev     # develop
 npm run build   # production build
 npm run lint    # eslint
+npm run test    # vitest
 npm run start   # serve production build
 ```

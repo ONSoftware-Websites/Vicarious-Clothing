@@ -1,7 +1,8 @@
 import type { Category, Condition } from "@/lib/types";
 
 export const SITE_NAME = "Vicarious Clothing";
-export const SITE_URL = "https://vicariousclothing.co.uk";
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://vicariousclothing.co.uk";
 export const FREE_DELIVERY_THRESHOLD = 75;
 export const STANDARD_DELIVERY_COST = 3.95;
 export const EXPRESS_DELIVERY_COST = 6.95;

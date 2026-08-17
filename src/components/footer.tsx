@@ -29,7 +29,7 @@ const FOOTER_COLUMNS = [
     links: [
       { label: "About", href: "/about" },
       { label: "Sell To Us", href: "/sell-to-us" },
-      { label: "Journal", href: "/about" },
+      { label: "Journal", href: "/journal" },
       { label: "Instagram", href: "https://instagram.com", external: true },
       { label: "TikTok", href: "https://tiktok.com", external: true },
     ],

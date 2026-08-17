@@ -4,15 +4,28 @@ import { useState, type FormEvent } from "react";
 
 export function NewsletterForm() {
   const [email, setEmail] = useState("");
-  const [done, setDone] = useState(false);
+  const [state, setState] = useState<"idle" | "sending" | "done" | "error">(
+    "idle"
+  );
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
-    setDone(true);
+    setState("sending");
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), source: "homepage" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setState("done");
+    } catch {
+      setState("error");
+    }
   };
 
-  if (done) {
+  if (state === "done") {
     return (
       <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.2em] text-paper/80">
         You&apos;re on the list. See you at the next drop.
@@ -36,10 +49,16 @@ export function NewsletterForm() {
       />
       <button
         type="submit"
-        className="h-14 shrink-0 bg-paper px-7 font-display text-xs font-semibold uppercase tracking-[0.16em] text-ink transition-colors hover:bg-cream"
+        disabled={state === "sending"}
+        className="h-14 shrink-0 bg-paper px-7 font-display text-xs font-semibold uppercase tracking-[0.16em] text-ink transition-colors hover:bg-cream disabled:opacity-50"
       >
-        Join →
+        {state === "sending" ? "…" : "Join →"}
       </button>
+      {state === "error" && (
+        <p className="sr-only" role="alert">
+          That didn&apos;t work — please try again.
+        </p>
+      )}
     </form>
   );
 }

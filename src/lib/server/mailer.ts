@@ -163,8 +163,12 @@ function buildTemplate(
 }
 
 function writeHtmlFile(filename: string, html: string) {
-  fs.mkdirSync(EMAIL_DIR, { recursive: true });
-  fs.writeFileSync(path.join(EMAIL_DIR, filename), html, "utf-8");
+  try {
+    fs.mkdirSync(EMAIL_DIR, { recursive: true });
+    fs.writeFileSync(path.join(EMAIL_DIR, filename), html, "utf-8");
+  } catch {
+    // read-only filesystem — the email is still recorded in the log
+  }
 }
 
 export async function sendEmail(input: {

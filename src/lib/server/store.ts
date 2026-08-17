@@ -4,18 +4,25 @@ import type {
   AuditEntry,
   Discount,
   EmailLogEntry,
+  JournalPost,
+  NewsletterSubscriber,
   Order,
   OrderStatus,
   Product,
   SellToUsLead,
+  StockPurchase,
   StoreData,
 } from "@/lib/types";
 import { RESERVATION_MINUTES } from "@/lib/site";
-import { estimateFees, PACKAGING_COST } from "@/lib/utils";
+import { estimateFees, PACKAGING_COST, seedImage } from "@/lib/utils";
 import { buildSeedProducts } from "@/lib/server/seed";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DATA_FILE = path.join(DATA_DIR, "store.json");
+
+export function persistenceEnabled() {
+  return process.env.VERCEL !== "1" && process.env.DATA_STORE !== "memory";
+}
 
 function buildInitialData(): StoreData {
   const products = buildSeedProducts();
@@ -296,6 +303,103 @@ function buildInitialData(): StoreData {
     },
   ];
 
+  const subscribers: NewsletterSubscriber[] = [
+    {
+      email: "amelia@example.co.uk",
+      source: "seed",
+      consentedAt: "2026-08-10T09:00:00Z",
+    },
+    {
+      email: "toby@example.co.uk",
+      source: "seed",
+      consentedAt: "2026-08-12T18:30:00Z",
+    },
+  ];
+
+  const purchases: StockPurchase[] = [
+    {
+      id: "pur-1",
+      sellerName: "Sarah Jenkins",
+      sellerEmail: "sarah.j@example.com",
+      amount: 18,
+      status: "PAID",
+      items: [
+        {
+          sku: "VC-000381",
+          name: "Detroit Jacket",
+          brand: "Carhartt",
+          cost: 18,
+        },
+      ],
+      notes: "Carhartt Detroit jacket, collected in person.",
+      createdAt: "2026-07-28T14:00:00Z",
+      paidAt: "2026-07-28T14:10:00Z",
+    },
+    {
+      id: "pur-2",
+      sellerName: "Marcus Reid",
+      sellerEmail: "marcus.r@example.com",
+      amount: 35,
+      status: "AGREED",
+      items: [
+        {
+          sku: "VC-000363",
+          name: "Beta LT Shell",
+          brand: "Arc'teryx",
+          cost: 85,
+        },
+      ],
+      notes: "Agreed £35 for the shell plus a beanie.",
+      createdAt: "2026-08-15T17:00:00Z",
+    },
+  ];
+
+  const posts: JournalPost[] = [
+    {
+      id: "post-1",
+      slug: "how-we-grade-condition",
+      title: "How we grade condition",
+      excerpt:
+        "The six-grade scale behind every listing, and why we photograph every defect.",
+      coverImage: seedImage("vc-journal-1", 1200, 750),
+      published: true,
+      publishedAt: "2026-08-10T09:00:00Z",
+      body: [
+        "Every piece that comes into Vicarious gets graded on the same six-point scale before it ever goes near the site. The grade is a summary, not a substitute for disclosure — so alongside the grade, every known defect gets its own photograph and a line in the listing.",
+        "New with Tags means exactly that: unused, tags attached. New without Tags is the same piece minus the card. From Excellent downwards we're describing wear: minimal signs, light signs with no significant defects, noticeable wear with everything disclosed, and Fair — visible wear that's still saleable.",
+        "The honest version: a grade only gets you so far. The real detail lives in the measurements and the photographs. If we wouldn't wear it, it doesn't go up.",
+      ],
+    },
+    {
+      id: "post-2",
+      slug: "why-one-of-one-is-the-point",
+      title: "Why one-of-one is the point",
+      excerpt:
+        "Most of what we sell will never restock. That's not a bug — it's the whole idea.",
+      published: true,
+      publishedAt: "2026-08-03T09:00:00Z",
+      body: [
+        "When a piece on the site sells, that's usually it. No size runs, no restock, no 'more coming soon'. It's a strange thing to build a shop around — and it's exactly why we did.",
+        "One-of-one stock changes how you shop. There's no waiting for the right size to come back; there's just a decision about the one in front of you. It makes every drop feel like what it is: a small pile of good clothes that will not be here tomorrow.",
+        "It also keeps us honest. Nothing stays listed that we wouldn't stand behind, because there's no volume to hide behind either.",
+      ],
+    },
+    {
+      id: "post-3",
+      slug: "what-makes-a-piece-a-vicarious-pick",
+      title: "What makes a piece a Vicarious Pick",
+      excerpt:
+        "The short answer: we'd fight over it. The longer answer involves three checks.",
+      published: true,
+      publishedAt: "2026-07-27T09:00:00Z",
+      body: [
+        "Every so often a piece lands that everyone in the studio wants to keep. When that happens twice in a row, it becomes a Vicarious Pick.",
+        "The checks are simple: does it have a story worth telling, is the condition genuinely good, and would we pay our own price for it? Two out of three isn't enough — all three, every time.",
+        "Picks get the first slot in our editorial edits and usually don't last long. You'll find them tagged on their product pages, and collected under the Picks edit in the shop.",
+      ],
+    },
+  ];
+
   return {
     products,
     orders,
@@ -305,30 +409,62 @@ function buildInitialData(): StoreData {
     discounts,
     emailLog,
     visits: { total: 1247, byDay: {} },
+    subscribers,
+    purchases,
+    posts,
   };
 }
 
 let cache: StoreData | null = null;
 
+function normalize(data: Partial<StoreData>): StoreData {
+  return {
+    products: data.products ?? [],
+    orders: (data.orders ?? []).map((o) => ({
+      ...o,
+      channel: o.channel ?? "website",
+      paymentProvider: o.paymentProvider ?? "demo",
+    })),
+    auditLog: data.auditLog ?? [],
+    leads: data.leads ?? [],
+    orderCounter: data.orderCounter ?? 1056,
+    discounts: data.discounts ?? [],
+    emailLog: data.emailLog ?? [],
+    visits: data.visits ?? { total: 0, byDay: {} },
+    subscribers: data.subscribers ?? [],
+    purchases: data.purchases ?? [],
+    posts: data.posts ?? [],
+  };
+}
+
 function load(): StoreData {
-  if (cache) return cache;
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      cache = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8")) as StoreData;
-      return cache;
+  if (persistenceEnabled()) {
+    try {
+      if (fs.existsSync(DATA_FILE)) {
+        cache = normalize(
+          JSON.parse(fs.readFileSync(DATA_FILE, "utf-8")) as Partial<StoreData>
+        );
+        return cache;
+      }
+    } catch {
+      // corrupt or unreadable file — fall through to fresh seed
     }
-  } catch {
-    // fall through to fresh seed
   }
-  cache = buildInitialData();
-  save();
+  if (!cache) {
+    cache = buildInitialData();
+    save();
+  }
   return cache;
 }
 
 function save() {
-  if (!cache) return;
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(cache, null, 2), "utf-8");
+  if (!cache || !persistenceEnabled()) return;
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(DATA_FILE, JSON.stringify(cache, null, 2), "utf-8");
+  } catch {
+    // read-only filesystem (e.g. Vercel serverless) — keep state in memory
+  }
 }
 
 export function expireReservations(now = Date.now()) {
@@ -876,4 +1012,125 @@ export function productEconomics(product: Product) {
   const profit = price - cost - fees - packaging;
   const margin = price > 0 ? (profit / price) * 100 : 0;
   return { price, cost, fees, packaging, profit, margin };
+}
+
+export function subscribeNewsletter(
+  email: string,
+  source: string
+): NewsletterSubscriber {
+  const data = load();
+  const existing = data.subscribers.find(
+    (s) => s.email.toLowerCase() === email.toLowerCase()
+  );
+  if (existing) {
+    existing.consentedAt = new Date().toISOString();
+    existing.source = source;
+    save();
+    return existing;
+  }
+  const subscriber: NewsletterSubscriber = {
+    email,
+    source,
+    consentedAt: new Date().toISOString(),
+  };
+  data.subscribers.unshift(subscriber);
+  save();
+  return subscriber;
+}
+
+export function listSubscribers(): NewsletterSubscriber[] {
+  return load().subscribers;
+}
+
+export function createPurchase(
+  input: Omit<StockPurchase, "id" | "createdAt">,
+  actor: string
+): StockPurchase {
+  const data = load();
+  const purchase: StockPurchase = {
+    ...input,
+    id: `pur-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    createdAt: new Date().toISOString(),
+  };
+  data.purchases.unshift(purchase);
+  data.auditLog.unshift({
+    id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    actor,
+    action: "recorded stock purchase",
+    detail: `${purchase.id} from ${purchase.sellerName}`,
+    after: `£${purchase.amount.toFixed(2)}`,
+    at: new Date().toISOString(),
+  });
+  save();
+  return purchase;
+}
+
+export function listPurchases(): StockPurchase[] {
+  return load().purchases;
+}
+
+export function markPurchasePaid(id: string, actor: string) {
+  const data = load();
+  const purchase = data.purchases.find((p) => p.id === id);
+  if (!purchase) return undefined;
+  purchase.status = "PAID";
+  purchase.paidAt = new Date().toISOString();
+  data.auditLog.unshift({
+    id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    actor,
+    action: "marked purchase paid",
+    detail: `${purchase.id} ${purchase.sellerName}`,
+    after: `£${purchase.amount.toFixed(2)}`,
+    at: new Date().toISOString(),
+  });
+  save();
+  return purchase;
+}
+
+export function listPosts(includeUnpublished = false): JournalPost[] {
+  return load()
+    .posts.filter((p) => includeUnpublished || p.published)
+    .sort(
+      (a, b) =>
+        new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    );
+}
+
+export function getPostBySlug(slug: string): JournalPost | undefined {
+  return load().posts.find((p) => p.slug === slug && p.published);
+}
+
+export function upsertPost(post: JournalPost, actor: string): JournalPost {
+  const data = load();
+  const index = data.posts.findIndex((p) => p.id === post.id);
+  if (index >= 0) data.posts[index] = post;
+  else data.posts.push(post);
+  data.auditLog.unshift({
+    id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    actor,
+    action: index >= 0 ? "updated journal post" : "created journal post",
+    detail: post.title,
+    at: new Date().toISOString(),
+  });
+  save();
+  return post;
+}
+
+export function deletePost(id: string, actor: string) {
+  const data = load();
+  const post = data.posts.find((p) => p.id === id);
+  if (!post) return;
+  data.posts = data.posts.filter((p) => p.id !== id);
+  data.auditLog.unshift({
+    id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    actor,
+    action: "deleted journal post",
+    detail: post.title,
+    at: new Date().toISOString(),
+  });
+  save();
+}
+
+export function resetStoreForTests() {
+  cache = null;
 }
