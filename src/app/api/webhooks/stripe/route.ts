@@ -1,0 +1,72 @@
+import type { NextRequest } from "next/server";
+import type Stripe from "stripe";
+import { getStripe, getWebhookSecret } from "@/lib/server/payments";
+import {
+  getOrder,
+  markOrderPaid,
+  setOrderPayment,
+  updateOrderStatus,
+} from "@/lib/server/store";
+import { sendEmail } from "@/lib/server/mailer";
+
+export async function POST(request: NextRequest) {
+  const stripe = getStripe();
+  if (!stripe) {
+    return Response.json({ error: "Stripe not configured" }, { status: 400 });
+  }
+
+  const signature = request.headers.get("stripe-signature");
+  const secret = getWebhookSecret();
+  if (!signature || !secret) {
+    return Response.json({ error: "Missing signature or webhook secret" }, { status: 400 });
+  }
+
+  let event: Stripe.Event;
+  try {
+    const payload = await request.text();
+    event = stripe.webhooks.constructEvent(payload, signature, secret);
+  } catch {
+    return Response.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const orderId = session.metadata?.orderId ?? session.client_reference_id;
+      if (!orderId) break;
+
+      if (typeof session.payment_intent === "string") {
+        setOrderPayment(orderId, session.payment_intent, session.url ?? undefined);
+      }
+
+      const order = markOrderPaid(orderId);
+      if (order) {
+        await sendEmail({
+          to: order.email,
+          template: "order-confirmed",
+          data: { order },
+        });
+      }
+      break;
+    }
+    case "checkout.session.expired": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const orderId = session.metadata?.orderId ?? session.client_reference_id;
+      if (!orderId) break;
+      const order = getOrder(orderId);
+      if (order && order.status === "PENDING_PAYMENT") {
+        updateOrderStatus(orderId, "CANCELLED", "Stripe");
+        await sendEmail({
+          to: order.email,
+          template: "order-cancelled",
+          data: { order: { ...order, status: "CANCELLED" } },
+        });
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  return Response.json({ received: true });
+}
