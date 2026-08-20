@@ -3,11 +3,13 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 process.env.DATA_STORE = "memory";
 
 import {
+  cancelPendingOrdersForEmail,
   createOrder,
   evaluateDiscount,
   expireReservations,
   getProductBySku,
   listDiscounts,
+  listOrders,
   markOrderPaid,
   productEconomics,
   releaseProducts,
@@ -110,6 +112,45 @@ describe("order creation", () => {
 
     markOrderPaid(result.order!.id);
     expect(getProductBySku("VC-000402")?.status).toBe("SOLD");
+  });
+
+  it("cancels stale pending orders for an email, leaving paid orders alone", () => {
+    createOrder({
+      email: "repeat@test.co.uk",
+      name: "Repeat Buyer",
+      items: [{ sku: "VC-000388" }],
+      deliveryCost: 0,
+      address: {
+        line1: "4 Test Street",
+        city: "Leeds",
+        postcode: "LS1 1AA",
+        country: "United Kingdom",
+      },
+      status: "PENDING_PAYMENT",
+      paymentProvider: "stripe",
+    });
+    createOrder({
+      email: "repeat@test.co.uk",
+      name: "Repeat Buyer",
+      items: [{ sku: "VC-000395" }],
+      deliveryCost: 0,
+      address: {
+        line1: "4 Test Street",
+        city: "Leeds",
+        postcode: "LS1 1AA",
+        country: "United Kingdom",
+      },
+      status: "PAID",
+      paymentProvider: "demo",
+    });
+
+    cancelPendingOrdersForEmail("repeat@test.co.uk");
+
+    const orders = listOrders("repeat@test.co.uk");
+    const pending = orders.find((o) => o.status === "PENDING_PAYMENT");
+    const paid = orders.find((o) => o.status === "PAID");
+    expect(pending).toBeUndefined();
+    expect(paid).toBeTruthy();
   });
 });
 

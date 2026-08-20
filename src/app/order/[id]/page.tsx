@@ -47,14 +47,12 @@ export default async function OrderPage({
               Payment hasn&apos;t gone through yet. Your pieces are reserved for
               a short while.
             </p>
-            {order.checkoutUrl && (
-              <a
-                href={order.checkoutUrl}
-                className="mt-8 inline-flex h-14 items-center justify-center bg-ink px-9 font-display text-xs font-semibold uppercase tracking-[0.18em] text-paper transition-colors hover:bg-accent"
-              >
-                Complete payment →
-              </a>
-            )}
+            <Link
+              href="/checkout"
+              className="mt-8 inline-flex h-14 items-center justify-center bg-ink px-9 font-display text-xs font-semibold uppercase tracking-[0.18em] text-paper transition-colors hover:bg-accent"
+            >
+              Complete payment →
+            </Link>
           </>
         ) : (
           <>

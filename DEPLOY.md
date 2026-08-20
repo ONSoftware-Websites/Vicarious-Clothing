@@ -39,6 +39,7 @@ Project Settings → Environment Variables. Add these for **Production**
 | `ADMIN_PASSWORD` | Your admin password (change from the example!) | Yes — otherwise `/admin` is open |
 | `NEXT_PUBLIC_SITE_URL` | `https://vicariousclothing.co.uk` (or the `.vercel.app` URL while testing) | Recommended — drives sitemap/robots/OG/email links |
 | `STRIPE_SECRET_KEY` | `sk_test_…` in Preview, `sk_live_…` in Production | No — blank = demo checkout |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_test_…` / `pk_live_…` | Only with Stripe — needed for the on-site card form |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from Stripe (see below) | Only with Stripe |
 | `RESEND_API_KEY` | `re_…` | No — blank = emails logged, not sent |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Only for the Supabase swap-in |
@@ -57,17 +58,21 @@ every read re-syncs from disk.
 
 ## 4. Stripe webhook (only when using Stripe)
 
+The checkout is fully on-site — customers enter card details in the
+Vicarious checkout (Stripe Payment Element styled to the brand), and the
+order is marked paid by the webhook.
+
 1. Stripe Dashboard → Developers → Webhooks → **Add endpoint**.
 2. Endpoint URL: `https://vicariousclothing.co.uk/api/webhooks/stripe`
    (or your `.vercel.app` URL while testing).
-3. Events to send: `checkout.session.completed`,
-   `checkout.session.expired`.
+3. Events to send: `payment_intent.succeeded`,
+   `payment_intent.payment_failed`.
 4. Copy the signing secret into `STRIPE_WEBHOOK_SECRET` in Vercel.
 5. For local testing: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`.
 
-Checkout only works when `NEXT_PUBLIC_SITE_URL` (or the request origin)
-matches the domain Stripe redirects back to — Stripe Checkout handles
-this via the `success_url`/`cancel_url` built from the request origin.
+Both keys are needed for the on-site form: `STRIPE_SECRET_KEY` (server)
+and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (browser). With either missing,
+checkout falls back to demo mode automatically.
 
 ## 5. Domain
 

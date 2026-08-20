@@ -2,10 +2,10 @@ import type { NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe, getWebhookSecret } from "@/lib/server/payments";
 import {
+  cancelPendingOrdersForEmail,
   getOrder,
   markOrderPaid,
   setOrderPayment,
-  updateOrderStatus,
 } from "@/lib/server/store";
 import { sendEmail } from "@/lib/server/mailer";
 
@@ -30,13 +30,40 @@ export async function POST(request: NextRequest) {
   }
 
   switch (event.type) {
+    case "payment_intent.succeeded": {
+      const intent = event.data.object as Stripe.PaymentIntent;
+      const orderId = intent.metadata?.orderId;
+      if (!orderId) break;
+
+      setOrderPayment(orderId, intent.id);
+
+      const order = markOrderPaid(orderId);
+      if (order) {
+        await sendEmail({
+          to: order.email,
+          template: "order-confirmed",
+          data: { order },
+        });
+      }
+      break;
+    }
+    case "payment_intent.payment_failed": {
+      const intent = event.data.object as Stripe.PaymentIntent;
+      const orderId = intent.metadata?.orderId;
+      if (!orderId) break;
+      const order = getOrder(orderId);
+      if (order && order.status === "PENDING_PAYMENT") {
+        cancelPendingOrdersForEmail(order.email);
+      }
+      break;
+    }
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       const orderId = session.metadata?.orderId ?? session.client_reference_id;
       if (!orderId) break;
 
       if (typeof session.payment_intent === "string") {
-        setOrderPayment(orderId, session.payment_intent, session.url ?? undefined);
+        setOrderPayment(orderId, session.payment_intent);
       }
 
       const order = markOrderPaid(orderId);
@@ -55,12 +82,7 @@ export async function POST(request: NextRequest) {
       if (!orderId) break;
       const order = getOrder(orderId);
       if (order && order.status === "PENDING_PAYMENT") {
-        updateOrderStatus(orderId, "CANCELLED", "Stripe");
-        await sendEmail({
-          to: order.email,
-          template: "order-cancelled",
-          data: { order: { ...order, status: "CANCELLED" } },
-        });
+        cancelPendingOrdersForEmail(order.email);
       }
       break;
     }

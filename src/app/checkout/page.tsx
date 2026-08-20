@@ -3,7 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  Elements,
+  PaymentElement,
+  useElements,
+  useStripe,
+} from "@stripe/react-stripe-js";
+import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Container } from "@/components/ui";
 import { useCart } from "@/hooks/use-cart";
 import { useMounted } from "@/hooks/use-local-storage";
@@ -22,10 +29,97 @@ interface CheckoutProduct {
   images: Array<{ src: string; alt?: string }>;
 }
 
+interface PayConfig {
+  mode: "stripe" | "demo";
+  publishableKey: string;
+}
+
 type Step = "contact" | "delivery" | "payment" | "review";
 
 const input =
   "h-12 w-full border border-line bg-paper px-4 text-sm focus:border-ink focus:outline-none";
+
+const ELEMENT_APPEARANCE = {
+  theme: "flat" as const,
+  variables: {
+    colorPrimary: "#0097af",
+    colorText: "#101014",
+    colorBackground: "#ffffff",
+    colorDanger: "#b91c1c",
+    fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif",
+    fontSizeBase: "15px",
+    spacingUnit: "4px",
+    borderRadius: "0px",
+  },
+  rules: {
+    ".Input": {
+      border: "1px solid #e4e2d9",
+      boxShadow: "none",
+      padding: "12px 14px",
+    },
+    ".Input:focus": { border: "1px solid #101014", boxShadow: "none" },
+    ".Label": {
+      fontSize: "10px",
+      letterSpacing: "0.16em",
+      textTransform: "uppercase",
+      color: "#56565e",
+    },
+    ".Tab": { border: "1px solid #e4e2d9", borderRadius: "0px" },
+    ".Tab--selected": { borderColor: "#0097af", color: "#007587" },
+  },
+};
+
+function PayButton({
+  orderId,
+  amount,
+  disabled,
+  onSuccess,
+  onError,
+}: {
+  orderId: string;
+  amount: number;
+  disabled: boolean;
+  onSuccess: () => void;
+  onError: (message: string) => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [busy, setBusy] = useState(false);
+
+  const pay = async () => {
+    if (!stripe || !elements) return;
+    setBusy(true);
+    try {
+      const { error } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/order/${orderId}?paid=1`,
+        },
+        redirect: "if_required",
+      });
+      if (error) {
+        onError(error.message ?? "Payment failed. Please try again.");
+      } else {
+        onSuccess();
+      }
+    } catch {
+      onError("Payment failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      disabled={disabled || busy}
+      onClick={pay}
+      className="flex h-14 items-center justify-center bg-ink px-12 font-display text-xs font-semibold uppercase tracking-[0.18em] text-paper transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:bg-ink-faint"
+    >
+      {busy ? "Processing…" : `Pay ${formatPrice(amount)}`}
+    </button>
+  );
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -34,7 +128,13 @@ export default function CheckoutPage() {
   const [products, setProducts] = useState<Record<string, CheckoutProduct>>({});
   const [step, setStep] = useState<Step>("contact");
   const [placing, setPlacing] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [payConfig, setPayConfig] = useState<PayConfig | null>(null);
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [clientSecret, setClientSecret] = useState("");
+  const [pendingOrderId, setPendingOrderId] = useState("");
 
   const [email, setEmail] = useState("");
   const [marketing, setMarketing] = useState(false);
@@ -50,16 +150,31 @@ export default function CheckoutPage() {
   const [cardName, setCardName] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvc, setCardCvc] = useState("");
-  const [cancelled, setCancelled] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (window.location.search.includes("cancelled=1")) setCancelled(true);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+  const [discountCode, setDiscountCode] = useState("");
+  const [discount, setDiscount] = useState<{
+    code: string;
+    description: string;
+    amount: number;
+    type: string;
+  } | null>(null);
+  const [discountError, setDiscountError] = useState("");
+  const [checkingCode, setCheckingCode] = useState(false);
 
   const skus = useMemo(() => lines.map((l) => l.sku), [lines]);
+  const isStripe = payConfig?.mode === "stripe";
+
+  useEffect(() => {
+    fetch("/api/payments/config")
+      .then((r) => r.json())
+      .then((data: PayConfig) => {
+        setPayConfig(data);
+        if (data.mode === "stripe" && data.publishableKey) {
+          setStripePromise(loadStripe(data.publishableKey));
+        }
+      })
+      .catch(() => setPayConfig({ mode: "demo", publishableKey: "" }));
+  }, []);
 
   useEffect(() => {
     if (!mounted) return;
@@ -107,6 +222,23 @@ export default function CheckoutPage() {
     };
   }, [skus]);
 
+  const emailRef = useRef("");
+  useEffect(() => {
+    emailRef.current = email;
+  }, [email]);
+
+  useEffect(() => {
+    return () => {
+      if (emailRef.current) {
+        fetch("/api/checkout/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailRef.current }),
+        }).catch(() => {});
+      }
+    };
+  }, []);
+
   const items = lines
     .map((line) => ({ line, product: products[line.sku] }))
     .filter((x) => x.product);
@@ -122,15 +254,10 @@ export default function CheckoutPage() {
         ? EXPRESS_DELIVERY_COST
         : STANDARD_DELIVERY_COST;
 
-  const [discountCode, setDiscountCode] = useState("");
-  const [discount, setDiscount] = useState<{
-    code: string;
-    description: string;
-    amount: number;
-    type: string;
-  } | null>(null);
-  const [discountError, setDiscountError] = useState("");
-  const [checkingCode, setCheckingCode] = useState(false);
+  const discountAmount = discount?.amount ?? 0;
+  const deliveryCost =
+    discount?.type === "free_delivery" ? 0 : baseDeliveryCost;
+  const total = Math.max(0, subtotal - discountAmount) + deliveryCost;
 
   const applyCode = async () => {
     if (!discountCode.trim()) return;
@@ -162,12 +289,49 @@ export default function CheckoutPage() {
     }
   };
 
-  const discountAmount = discount?.amount ?? 0;
-  const deliveryCost =
-    discount?.type === "free_delivery" ? 0 : baseDeliveryCost;
-  const total = Math.max(0, subtotal - discountAmount) + deliveryCost;
+  const prepareStripeOrder = async () => {
+    setPreparing(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          name,
+          items: items.map(({ line }) => ({ sku: line.sku })),
+          deliveryCost,
+          address: { line1, line2, city, postcode, country },
+          discountCode: discount?.code,
+        }),
+      });
+      const data = await res.json();
+      if (res.status === 409) {
+        setError("SOMEONE GOT THERE FIRST. A piece in your bag has just sold.");
+        setProducts((prev) => {
+          const next = { ...prev };
+          for (const sku of data.gone ?? []) {
+            if (next[sku]) next[sku] = { ...next[sku], status: "SOLD" };
+          }
+          return next;
+        });
+        return;
+      }
+      if (!res.ok || !data.clientSecret) {
+        setError(data.error ?? "Something went wrong. Please try again.");
+        return;
+      }
+      setClientSecret(data.clientSecret);
+      setPendingOrderId(data.order.id);
+      setStep("payment");
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setPreparing(false);
+    }
+  };
 
-  const placeOrder = async () => {
+  const placeOrderDemo = async () => {
     setPlacing(true);
     setError(null);
     try {
@@ -199,10 +363,6 @@ export default function CheckoutPage() {
         setError(data.error ?? "Something went wrong placing your order. Please try again.");
         return;
       }
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
       clear();
       router.push(`/order/${data.order.id}`);
     } catch {
@@ -218,18 +378,36 @@ export default function CheckoutPage() {
   const canContinue =
     (step === "contact" && email.includes("@")) ||
     (step === "delivery" && name && line1 && city && postcode) ||
-    (step === "payment" && card.length >= 12 && cardName && cardExpiry && cardCvc && terms) ||
+    (step === "payment" &&
+      (isStripe ||
+        (card.length >= 12 && cardName && cardExpiry && cardCvc && terms))) ||
     step === "review";
 
-  const submitStep = (e: FormEvent) => {
+  const submitStep = async (e: FormEvent) => {
     e.preventDefault();
     if (!canContinue) return;
-    if (step === "review") {
-      placeOrder();
+    if (step === "contact") {
+      setStep("delivery");
+      window.scrollTo(0, 0);
       return;
     }
-    setStep(steps[stepIndex + 1]);
-    window.scrollTo(0, 0);
+    if (step === "delivery") {
+      if (isStripe) {
+        await prepareStripeOrder();
+        return;
+      }
+      setStep("payment");
+      window.scrollTo(0, 0);
+      return;
+    }
+    if (step === "payment") {
+      setStep("review");
+      window.scrollTo(0, 0);
+      return;
+    }
+    if (step === "review" && !isStripe) {
+      await placeOrderDemo();
+    }
   };
 
   const loading =
@@ -245,234 +423,196 @@ export default function CheckoutPage() {
     );
   }
 
-  return (
-    <Container className="py-10 sm:py-14">
-      <h1 className="mb-8 border-b border-line pb-6 font-display text-3xl font-semibold uppercase tracking-tight sm:text-4xl">
-        Checkout
-      </h1>
-
-      <ol className="mb-10 flex flex-wrap gap-x-8 gap-y-2 font-mono text-[11px] uppercase tracking-[0.18em]">
-        {steps.map((s, i) => (
-          <li
-            key={s}
-            className={
-              i === stepIndex
-                ? "flex items-center gap-2 text-accent-deep"
-                : i < stepIndex
-                  ? "flex items-center gap-2 text-ink"
-                  : "flex items-center gap-2 text-ink-faint"
-            }
-          >
-            <span>0{i + 1}</span> {s}
-            {i < steps.length - 1 && <span className="ml-8 text-ink-faint" aria-hidden>→</span>}
-          </li>
-        ))}
-      </ol>
-
-      {cancelled && (
-        <div className="mb-8 border border-line bg-cream p-5">
-          <p className="font-display text-sm font-semibold uppercase tracking-[0.14em]">
-            Payment not completed
-          </p>
-          <p className="mt-1 text-sm text-ink-soft">
-            You can pick up where you left off — your pieces are still reserved
-            for a short while.
-          </p>
-        </div>
+  const stepsContent = (
+    <form onSubmit={submitStep} className="lg:col-span-2" noValidate>
+      {step === "contact" && (
+        <section aria-label="Contact">
+          <h2 className="mb-5 font-display text-lg font-semibold uppercase tracking-tight">
+            Contact
+          </h2>
+          <div>
+            <label htmlFor="co-email" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+              Email
+            </label>
+            <input
+              id="co-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={input}
+              autoComplete="email"
+              placeholder="you@example.com"
+            />
+          </div>
+          <label className="mt-6 flex cursor-pointer items-start gap-3 text-sm text-ink-soft">
+            <input
+              type="checkbox"
+              checked={marketing}
+              onChange={(e) => setMarketing(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[#0097af]"
+            />
+            <span>
+              Email me about new drops. Optional — order updates will be
+              sent to this address regardless.
+            </span>
+          </label>
+        </section>
       )}
 
-      {error && (
-        <div className="mb-8 border border-red-200 bg-red-50 p-5">
-          <p className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-red-800">
-            {error}
-          </p>
-          <p className="mt-1 text-sm text-ink-soft">
-            Remove the sold piece from your bag and continue.
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
-        <form onSubmit={submitStep} className="lg:col-span-2" noValidate>
-          {step === "contact" && (
-            <section aria-label="Contact">
-              <h2 className="mb-5 font-display text-lg font-semibold uppercase tracking-tight">
-                Contact
-              </h2>
-              <div>
-                <label htmlFor="co-email" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                  Email
-                </label>
-                <input
-                  id="co-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={input}
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                />
-              </div>
-              <label className="mt-6 flex cursor-pointer items-start gap-3 text-sm text-ink-soft">
-                <input
-                  type="checkbox"
-                  checked={marketing}
-                  onChange={(e) => setMarketing(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-[#0097af]"
-                />
-                <span>
-                  Email me about new drops. Optional — order updates will be
-                  sent to this address regardless.
-                </span>
+      {step === "delivery" && (
+        <section aria-label="Delivery">
+          <h2 className="mb-5 font-display text-lg font-semibold uppercase tracking-tight">
+            Delivery
+          </h2>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label htmlFor="co-name" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                Full name
               </label>
-            </section>
-          )}
+              <input
+                id="co-name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={input}
+                autoComplete="name"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="co-line1" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                Address line 1
+              </label>
+              <input
+                id="co-line1"
+                required
+                value={line1}
+                onChange={(e) => setLine1(e.target.value)}
+                className={input}
+                autoComplete="address-line1"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="co-line2" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                Address line 2 (optional)
+              </label>
+              <input
+                id="co-line2"
+                value={line2}
+                onChange={(e) => setLine2(e.target.value)}
+                className={input}
+                autoComplete="address-line2"
+              />
+            </div>
+            <div>
+              <label htmlFor="co-city" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                City
+              </label>
+              <input
+                id="co-city"
+                required
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className={input}
+                autoComplete="address-level2"
+              />
+            </div>
+            <div>
+              <label htmlFor="co-postcode" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                Postcode
+              </label>
+              <input
+                id="co-postcode"
+                required
+                value={postcode}
+                onChange={(e) => setPostcode(e.target.value)}
+                className={input}
+                autoComplete="postal-code"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="co-country" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                Country
+              </label>
+              <input
+                id="co-country"
+                value={country}
+                readOnly
+                className={`${input} bg-cream text-ink-faint`}
+              />
+            </div>
+          </div>
 
-          {step === "delivery" && (
-            <section aria-label="Delivery">
-              <h2 className="mb-5 font-display text-lg font-semibold uppercase tracking-tight">
-                Delivery
-              </h2>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label htmlFor="co-name" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                    Full name
-                  </label>
-                  <input
-                    id="co-name"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className={input}
-                    autoComplete="name"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="co-line1" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                    Address line 1
-                  </label>
-                  <input
-                    id="co-line1"
-                    required
-                    value={line1}
-                    onChange={(e) => setLine1(e.target.value)}
-                    className={input}
-                    autoComplete="address-line1"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="co-line2" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                    Address line 2 (optional)
-                  </label>
-                  <input
-                    id="co-line2"
-                    value={line2}
-                    onChange={(e) => setLine2(e.target.value)}
-                    className={input}
-                    autoComplete="address-line2"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="co-city" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                    City
-                  </label>
-                  <input
-                    id="co-city"
-                    required
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className={input}
-                    autoComplete="address-level2"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="co-postcode" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                    Postcode
-                  </label>
-                  <input
-                    id="co-postcode"
-                    required
-                    value={postcode}
-                    onChange={(e) => setPostcode(e.target.value)}
-                    className={input}
-                    autoComplete="postal-code"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="co-country" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                    Country
-                  </label>
-                  <input
-                    id="co-country"
-                    value={country}
-                    readOnly
-                    className={`${input} bg-cream text-ink-faint`}
-                  />
-                </div>
-              </div>
-
-              <fieldset className="mt-8">
-                <legend className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.18em]">
-                  Delivery method
-                </legend>
-                <div className="space-y-3">
-                  {[
-                    {
-                      key: "standard" as const,
-                      title: "Standard — Royal Mail Tracked 48",
-                      price: subtotal >= FREE_DELIVERY_THRESHOLD ? "Free" : formatPrice(STANDARD_DELIVERY_COST),
-                      note: "2–3 working days",
-                    },
-                    {
-                      key: "express" as const,
-                      title: "Express — Royal Mail Tracked 24",
-                      price: formatPrice(EXPRESS_DELIVERY_COST),
-                      note: "Next working day when ordered before 2pm",
-                    },
-                  ].map((option) => (
-                    <label
-                      key={option.key}
-                      className={
-                        delivery === option.key
-                          ? "flex cursor-pointer items-center justify-between border border-ink bg-cream p-4"
-                          : "flex cursor-pointer items-center justify-between border border-line p-4 hover:border-ink-faint"
-                      }
-                    >
-                      <span className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          name="delivery"
-                          checked={delivery === option.key}
-                          onChange={() => setDelivery(option.key)}
-                          className="h-4 w-4 accent-[#0097af]"
-                        />
-                        <span>
-                          <span className="block font-display text-sm font-medium">
-                            {option.title}
-                          </span>
-                          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-                            {option.note}
-                          </span>
-                        </span>
+          <fieldset className="mt-8">
+            <legend className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.18em]">
+              Delivery method
+            </legend>
+            <div className="space-y-3">
+              {[
+                {
+                  key: "standard" as const,
+                  title: "Standard — Royal Mail Tracked 48",
+                  price: subtotal >= FREE_DELIVERY_THRESHOLD ? "Free" : formatPrice(STANDARD_DELIVERY_COST),
+                  note: "2–3 working days",
+                },
+                {
+                  key: "express" as const,
+                  title: "Express — Royal Mail Tracked 24",
+                  price: formatPrice(EXPRESS_DELIVERY_COST),
+                  note: "Next working day when ordered before 2pm",
+                },
+              ].map((option) => (
+                <label
+                  key={option.key}
+                  className={
+                    delivery === option.key
+                      ? "flex cursor-pointer items-center justify-between border border-ink bg-cream p-4"
+                      : "flex cursor-pointer items-center justify-between border border-line p-4 hover:border-ink-faint"
+                  }
+                >
+                  <span className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="delivery"
+                      checked={delivery === option.key}
+                      onChange={() => setDelivery(option.key)}
+                      className="h-4 w-4 accent-[#0097af]"
+                    />
+                    <span>
+                      <span className="block font-display text-sm font-medium">
+                        {option.title}
                       </span>
-                      <span className="font-mono text-sm">{option.price}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            </section>
-          )}
+                      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+                        {option.note}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="font-mono text-sm">{option.price}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        </section>
+      )}
 
-          {step === "payment" && (
-            <section aria-label="Payment">
-              <h2 className="mb-2 font-display text-lg font-semibold uppercase tracking-tight">
-                Payment
-              </h2>
+      {step === "payment" && (
+        <section aria-label="Payment">
+          <h2 className="mb-2 font-display text-lg font-semibold uppercase tracking-tight">
+            Payment
+          </h2>
+          {isStripe ? (
+            <>
               <p className="mb-6 text-xs leading-relaxed text-ink-faint">
-                Payments are processed by an established payment provider.
-                Vicarious never stores your card details. This checkout is in
-                test mode — no payment will be taken.
+                Payments are processed securely by Stripe. Vicarious never
+                stores your card details.
+              </p>
+              <PaymentElement />
+            </>
+          ) : (
+            <>
+              <p className="mb-6 text-xs leading-relaxed text-ink-faint">
+                This checkout is in demo mode — no payment will be taken. Add
+                your Stripe keys in the environment to enable real payments.
               </p>
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div className="sm:col-span-2">
@@ -548,85 +688,179 @@ export default function CheckoutPage() {
                   .
                 </span>
               </label>
-            </section>
+            </>
           )}
+        </section>
+      )}
 
-          {step === "review" && (
-            <section aria-label="Review">
-              <h2 className="mb-5 font-display text-lg font-semibold uppercase tracking-tight">
-                Review your order
-              </h2>
-              <div className="space-y-6">
-                <div className="border border-line p-5">
-                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
-                    Contact
-                  </p>
-                  <p className="text-sm">{email}</p>
-                  {marketing && (
-                    <p className="mt-1 text-xs text-ink-faint">Opted in to new drop emails</p>
-                  )}
-                </div>
-                <div className="border border-line p-5">
-                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
-                    Delivery address
-                  </p>
-                  <p className="text-sm leading-relaxed">
-                    {name}
+      {step === "review" && (
+        <section aria-label="Review">
+          <h2 className="mb-5 font-display text-lg font-semibold uppercase tracking-tight">
+            Review your order
+          </h2>
+          <div className="space-y-6">
+            <div className="border border-line p-5">
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
+                Contact
+              </p>
+              <p className="text-sm">{email}</p>
+              {marketing && (
+                <p className="mt-1 text-xs text-ink-faint">Opted in to new drop emails</p>
+              )}
+            </div>
+            <div className="border border-line p-5">
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
+                Delivery address
+              </p>
+              <p className="text-sm leading-relaxed">
+                {name}
+                <br />
+                {line1}
+                {line2 && (
+                  <>
                     <br />
-                    {line1}
-                    {line2 && (
-                      <>
-                        <br />
-                        {line2}
-                      </>
-                    )}
-                    <br />
-                    {city}, {postcode}
-                    <br />
-                    {country}
-                  </p>
-                  <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-                    {delivery === "express" ? "Express — Tracked 24" : "Standard — Tracked 48"}
-                  </p>
-                </div>
-                <div className="border border-line p-5">
-                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
-                    Payment
-                  </p>
+                    {line2}
+                  </>
+                )}
+                <br />
+                {city}, {postcode}
+                <br />
+                {country}
+              </p>
+              <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+                {delivery === "express" ? "Express — Tracked 24" : "Standard — Tracked 48"}
+              </p>
+            </div>
+            <div className="border border-line p-5">
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
+                Payment
+              </p>
+              {isStripe ? (
+                <>
+                  <p className="text-sm">Card payment via Stripe</p>
+                  <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-ink-soft">
+                    <input
+                      type="checkbox"
+                      checked={terms}
+                      onChange={(e) => setTerms(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-[#0097af]"
+                    />
+                    <span>
+                      I agree to the{" "}
+                      <Link href="/legal/terms" className="text-accent-deep underline underline-offset-2">
+                        terms and conditions
+                      </Link>{" "}
+                      and have read the{" "}
+                      <Link href="/legal/privacy" className="text-accent-deep underline underline-offset-2">
+                        privacy policy
+                      </Link>
+                      .
+                    </span>
+                  </label>
+                </>
+              ) : (
+                <>
                   <p className="text-sm">
                     Card ending {card.slice(-4)} · {cardName}
                   </p>
-                  <p className="mt-1 text-xs text-ink-faint">Test mode — no payment taken</p>
-                </div>
-              </div>
-            </section>
-          )}
+                  <p className="mt-1 text-xs text-ink-faint">Demo mode — no payment taken</p>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
-          <div className="mt-10 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {stepIndex > 0 ? (
-              <button
-                type="button"
-                onClick={() => setStep(steps[stepIndex - 1])}
-                className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-soft underline underline-offset-4 hover:text-accent-deep"
-              >
-                ← Back
-              </button>
-            ) : (
-              <span />
-            )}
-            <button
-              type="submit"
-              disabled={!canContinue || placing}
-              className="flex h-14 items-center justify-center bg-ink px-12 font-display text-xs font-semibold uppercase tracking-[0.18em] text-paper transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:bg-ink-faint"
-            >
-              {placing
+      <div className="mt-10 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {stepIndex > 0 ? (
+          <button
+            type="button"
+            onClick={() => setStep(steps[stepIndex - 1])}
+            className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-soft underline underline-offset-4 hover:text-accent-deep"
+          >
+            ← Back
+          </button>
+        ) : (
+          <span />
+        )}
+        {step === "review" && isStripe ? (
+          <PayButton
+            orderId={pendingOrderId}
+            amount={total}
+            disabled={!terms || placing}
+            onSuccess={() => {
+              clear();
+              router.push(`/order/${pendingOrderId}?paid=1`);
+            }}
+            onError={(message) => setError(message)}
+          />
+        ) : (
+          <button
+            type="submit"
+            disabled={!canContinue || placing || preparing}
+            className="flex h-14 items-center justify-center bg-ink px-12 font-display text-xs font-semibold uppercase tracking-[0.18em] text-paper transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:bg-ink-faint"
+          >
+            {preparing
+              ? "Preparing payment…"
+              : placing
                 ? "Placing order…"
                 : step === "review"
                   ? `Pay ${formatPrice(total)}`
                   : "Continue →"}
-            </button>
-          </div>
-        </form>
+          </button>
+        )}
+      </div>
+    </form>
+  );
+
+  return (
+    <Container className="py-10 sm:py-14">
+      <h1 className="mb-8 border-b border-line pb-6 font-display text-3xl font-semibold uppercase tracking-tight sm:text-4xl">
+        Checkout
+      </h1>
+
+      <ol className="mb-10 flex flex-wrap gap-x-8 gap-y-2 font-mono text-[11px] uppercase tracking-[0.18em]">
+        {steps.map((s, i) => (
+          <li
+            key={s}
+            className={
+              i === stepIndex
+                ? "flex items-center gap-2 text-accent-deep"
+                : i < stepIndex
+                  ? "flex items-center gap-2 text-ink"
+                  : "flex items-center gap-2 text-ink-faint"
+            }
+          >
+            <span>0{i + 1}</span> {s}
+            {i < steps.length - 1 && <span className="ml-8 text-ink-faint" aria-hidden>→</span>}
+          </li>
+        ))}
+      </ol>
+
+      {error && (
+        <div className="mb-8 border border-red-200 bg-red-50 p-5">
+          <p className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-red-800">
+            {error}
+          </p>
+          {error.includes("SOLD") && (
+            <p className="mt-1 text-sm text-ink-soft">
+              Remove the sold piece from your bag and continue.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
+        {isStripe && clientSecret ? (
+          <Elements
+            stripe={stripePromise}
+            options={{ clientSecret, appearance: ELEMENT_APPEARANCE }}
+          >
+            {stepsContent}
+          </Elements>
+        ) : (
+          stepsContent
+        )}
 
         <aside className="lg:col-span-1">
           <div className="border border-line bg-cream p-6 lg:sticky lg:top-24">

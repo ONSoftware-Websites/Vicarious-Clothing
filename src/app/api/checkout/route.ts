@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
-import type Stripe from "stripe";
 import type { Order } from "@/lib/types";
 import {
+  cancelPendingOrdersForEmail,
   createOrder,
   evaluateDiscount,
   getProductBySku,
@@ -71,6 +71,37 @@ export async function POST(request: NextRequest) {
 
     const stripe = stripeEnabled() ? getStripe() : null;
 
+    if (!stripe) {
+      const orderResult = createOrder({
+        email: String(email),
+        name: String(name),
+        items: skus.map((sku) => ({ sku })),
+        deliveryCost: finalDelivery,
+        address: addressData,
+        discountCode: discountCode ? String(discountCode) : undefined,
+        channel: "website",
+        status: "PAID",
+        paymentProvider: "demo",
+      });
+
+      if (orderResult.gone?.length) {
+        return Response.json({ gone: orderResult.gone }, { status: 409 });
+      }
+      if (!orderResult.order) {
+        return Response.json({ error: "Could not create order" }, { status: 500 });
+      }
+
+      const order = orderResult.order;
+      await sendEmail({
+        to: order.email,
+        template: "order-confirmed",
+        data: { order },
+      });
+      return Response.json({ order, mode: "demo" }, { status: 201 });
+    }
+
+    cancelPendingOrdersForEmail(String(email));
+
     const orderResult = createOrder({
       email: String(email),
       name: String(name),
@@ -79,8 +110,8 @@ export async function POST(request: NextRequest) {
       address: addressData,
       discountCode: discountCode ? String(discountCode) : undefined,
       channel: "website",
-      status: stripe ? "PENDING_PAYMENT" : "PAID",
-      paymentProvider: stripe ? "stripe" : "demo",
+      status: "PENDING_PAYMENT",
+      paymentProvider: "stripe",
     });
 
     if (orderResult.gone?.length) {
@@ -92,73 +123,25 @@ export async function POST(request: NextRequest) {
 
     const order = orderResult.order;
 
-    if (!stripe) {
-      await sendEmail({
-        to: order.email,
-        template: "order-confirmed",
-        data: { order },
-      });
-      return Response.json({ order, mode: "demo" }, { status: 201 });
-    }
-
-    const origin = request.nextUrl.origin;
-    const lineItemsForStripe = lineItems.map((i) => ({
-      price_data: {
-        currency: "gbp",
-        unit_amount: Math.round(i.price * 100),
-        product_data: {
-          name: `${i.brand} ${i.name}`,
-          images: i.image ? [i.image] : [],
-        },
+    const intent = await stripe.paymentIntents.create({
+      amount: Math.round(order.total * 100),
+      currency: "gbp",
+      automatic_payment_methods: { enabled: true },
+      receipt_email: order.email,
+      description: `Vicarious Clothing order ${order.id}`,
+      statement_descriptor: "VICARIOUS CLOTHING",
+      metadata: {
+        orderId: order.id,
+        items: order.items.map((i) => `${i.brand} ${i.name}`).join(", ").slice(0, 450),
       },
-      quantity: 1,
-    }));
+    });
 
-    if (finalDelivery > 0) {
-      lineItemsForStripe.push({
-        price_data: {
-          currency: "gbp",
-          unit_amount: Math.round(finalDelivery * 100),
-          product_data: { name: "Delivery", images: [] },
-        },
-        quantity: 1,
-      });
-    }
+    setOrderPayment(order.id, intent.id);
 
-    const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      mode: "payment",
-      line_items: lineItemsForStripe,
-      customer_email: order.email,
-      client_reference_id: order.id,
-      metadata: { orderId: order.id },
-      success_url: `${origin}/order/${order.id}?paid=1`,
-      cancel_url: `${origin}/checkout?cancelled=1`,
-    };
-
-    if (discount && discount.amount > 0) {
-      let coupon: Stripe.Coupon;
-      if (discount.type === "percentage") {
-        const percent = discount.amount > 0 && subtotal > 0 ? Math.min(100, Math.round((discount.amount / subtotal) * 100)) : 0;
-        coupon = await stripe.coupons.create({
-          percent_off: percent,
-          duration: "once",
-          name: discount.code,
-        });
-      } else {
-        coupon = await stripe.coupons.create({
-          amount_off: Math.round(discount.amount * 100),
-          currency: "gbp",
-          duration: "once",
-          name: discount.code,
-        });
-      }
-      sessionParams.discounts = [{ coupon: coupon.id }];
-    }
-
-    const session = await stripe.checkout.sessions.create(sessionParams);
-    setOrderPayment(order.id, "", session.url ?? undefined);
-
-    return Response.json({ order, mode: "stripe", url: session.url }, { status: 201 });
+    return Response.json(
+      { order, mode: "stripe", clientSecret: intent.client_secret },
+      { status: 201 }
+    );
   } catch (err) {
     console.error("Checkout error:", err);
     return Response.json({ error: "Checkout failed" }, { status: 500 });

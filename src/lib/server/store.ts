@@ -746,6 +746,22 @@ export function markOrderPaid(id: string): Order | undefined {
   return order;
 }
 
+export function cancelPendingOrdersForEmail(email: string) {
+  const data = load();
+  let changed = false;
+  for (const order of data.orders) {
+    if (
+      order.status === "PENDING_PAYMENT" &&
+      order.email.toLowerCase() === email.toLowerCase()
+    ) {
+      order.status = "CANCELLED";
+      order.updatedAt = new Date().toISOString();
+      changed = true;
+    }
+  }
+  if (changed) save();
+}
+
 export function setOrderPayment(
   id: string,
   paymentIntentId: string,

@@ -48,23 +48,34 @@ Create these on your domain (Google Workspace/Zoho/etc.):
 `henry@`, `hello@`, `orders@`, `support@`, `notifications@vicariousclothing.co.uk`.
 `notifications@` is used as the sender for transactional mail.
 
-### 2.4 Real payments (Stripe)
+### 2.4 Real payments (Stripe — custom on-site checkout)
+The checkout is a custom UI: customers enter card details on the Vicarious
+site (Stripe Payment Element, styled to the brand), no redirect to a
+Stripe page. Card data never touches your server.
+
+**No Stripe catalogue needed:** payments are amount-based Payment Intents.
+You never create products or prices in Stripe — each sale just charges the
+order total, with the order ID, the piece names and the brand statement
+descriptor attached for your dashboard and the customer's bank statement.
+
 1. Create a Stripe account, stay in **test mode**.
-2. Copy your test secret key into `.env`:
+2. Copy both keys into `.env`:
    ```
    STRIPE_SECRET_KEY=sk_test_...
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
    ```
 3. For local testing, forward webhooks:
    ```
    stripe listen --forward-to localhost:3000/api/webhooks/stripe
    ```
    Paste the printed `whsec_...` into `.env` as `STRIPE_WEBHOOK_SECRET`.
-4. Checkout now redirects to a real Stripe Checkout page (test cards like
-   `4242 4242 4242 4242`). On payment success the webhook marks the order
-   PAID and items SOLD. Admin refunds also issue real Stripe refunds.
-5. Before launch: switch to live keys, add the production webhook endpoint in
-   the Stripe dashboard (`https://vicariousclothing.co.uk/api/webhooks/stripe`,
-   event: `checkout.session.completed` + `checkout.session.expired`).
+4. The payment step now shows the real card form (test cards like
+   `4242 4242 4242 4242`). On success the webhook marks the order PAID and
+   items SOLD. Admin refunds issue real Stripe refunds. Without keys, the
+   checkout automatically runs in demo mode.
+5. Before launch: switch to live keys, add the production webhook endpoint
+   in the Stripe dashboard (`https://vicariousclothing.co.uk/api/webhooks/stripe`,
+   events: `payment_intent.succeeded` + `payment_intent.payment_failed`).
 
 ### 2.5 Real email sending (Resend)
 1. Sign up at resend.com, verify your domain (DNS records provided by them).
