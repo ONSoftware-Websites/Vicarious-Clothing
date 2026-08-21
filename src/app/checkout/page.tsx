@@ -738,6 +738,9 @@ export default function CheckoutPage() {
               {isStripe ? (
                 <>
                   <p className="text-sm">Card payment via Stripe</p>
+                  <div className="mt-4">
+                    <PaymentElement />
+                  </div>
                   <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-ink-soft">
                     <input
                       type="checkbox"
