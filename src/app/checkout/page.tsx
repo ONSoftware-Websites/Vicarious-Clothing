@@ -14,6 +14,7 @@ import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Container } from "@/components/ui";
 import { useCart } from "@/hooks/use-cart";
 import { useMounted } from "@/hooks/use-local-storage";
+import { useAccount } from "@/hooks/use-account";
 import { FREE_DELIVERY_THRESHOLD, STANDARD_DELIVERY_COST, EXPRESS_DELIVERY_COST } from "@/lib/site";
 import { conditionLabel, formatPrice } from "@/lib/utils";
 
@@ -141,6 +142,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { lines, clear } = useCart();
   const mounted = useMounted();
+  const { profile } = useAccount();
   const [products, setProducts] = useState<Record<string, CheckoutProduct>>({});
   const [step, setStep] = useState<Step>("contact");
   const [placing, setPlacing] = useState(false);
@@ -196,6 +198,11 @@ export default function CheckoutPage() {
       })
       .catch(() => setPayConfig({ mode: "demo", publishableKey: "" }));
   }, []);
+
+  useEffect(() => {
+    if (profile?.email) setEmail((e) => e || profile.email);
+    if (profile?.name) setName((n) => n || profile.name);
+  }, [profile]);
 
   useEffect(() => {
     if (!mounted) return;

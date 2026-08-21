@@ -318,6 +318,7 @@ export async function upsertProduct(
   }
 
   await logAudit(db, actor, detail.includes("created") ? "created product" : "updated product", detail);
+  await db.from("inventory_history").insert({ sku: product.sku, actor, action: detail.includes("created") ? "created product" : "updated product", detail, at: new Date().toISOString() }).then(() => {});
   return product;
 }
 

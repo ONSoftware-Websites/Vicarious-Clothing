@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AccountShell } from "@/components/account-shell";
+import { useAccount } from "@/hooks/use-account";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import type { Address } from "@/lib/types";
 
@@ -19,32 +20,47 @@ function parse(raw: string | null): Address[] {
 }
 
 export default function AddressesPage() {
-  const [addresses, setAddresses] = useLocalStorage<Address[]>(
-    KEY,
-    EMPTY,
-    parse,
-    JSON.stringify
-  );
+  const { user } = useAccount();
+  const [localAddresses, setLocalAddresses] = useLocalStorage<Address[]>(KEY, EMPTY, parse, JSON.stringify);
+  const [remoteAddresses, setRemoteAddresses] = useState<(Address & { id?: string })[] | null>(null);
+  const isRemote = !!user && remoteAddresses !== null;
+  const addresses = isRemote ? remoteAddresses! : localAddresses;
+  const setAddresses = isRemote ? (v: Address[]) => setRemoteAddresses(v as never) : setLocalAddresses;
+
   const [line1, setLine1] = useState("");
   const [line2, setLine2] = useState("");
   const [city, setCity] = useState("");
   const [postcode, setPostcode] = useState("");
 
-  const add = (e: FormEvent) => {
+  useEffect(() => {
+    if (!user) { setRemoteAddresses(null); return; }
+    fetch("/api/account/addresses").then(r => r.json()).then(d => setRemoteAddresses(d.addresses ?? [])).catch(() => setRemoteAddresses([]));
+  }, [user?.id]);
+
+  const add = async (e: FormEvent) => {
     e.preventDefault();
     if (!line1 || !city || !postcode) return;
-    setAddresses([
-      ...addresses,
-      { line1, line2: line2 || undefined, city, postcode, country: "United Kingdom" },
-    ]);
-    setLine1("");
-    setLine2("");
-    setCity("");
-    setPostcode("");
+    const addr = { line1, line2: line2 || undefined, city, postcode, country: "United Kingdom" };
+    if (isRemote) {
+      const res = await fetch("/api/account/addresses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(addr) });
+      if (res.ok) {
+        const { address } = await res.json();
+        setRemoteAddresses([...(remoteAddresses ?? []), address]);
+      }
+    } else {
+      setLocalAddresses([...localAddresses, addr]);
+    }
+    setLine1(""); setLine2(""); setCity(""); setPostcode("");
   };
 
-  const remove = (i: number) => {
-    setAddresses(addresses.filter((_, idx) => idx !== i));
+  const remove = async (i: number) => {
+    const target = addresses[i] as Address & { id?: string };
+    if (isRemote && target?.id) {
+      await fetch(`/api/account/addresses?id=${target.id}`, { method: "DELETE" });
+      setRemoteAddresses(remoteAddresses!.filter((_, idx) => idx !== i));
+    } else {
+      setLocalAddresses(localAddresses.filter((_, idx) => idx !== i));
+    }
   };
 
   return (

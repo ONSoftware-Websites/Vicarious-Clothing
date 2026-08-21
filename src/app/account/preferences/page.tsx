@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AccountShell } from "@/components/account-shell";
+import { useAccount } from "@/hooks/use-account";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 
 const KEY = "vc_marketing_pref";
@@ -11,16 +12,24 @@ function parse(raw: string | null): boolean {
 }
 
 export default function PreferencesPage() {
-  const [marketing, setMarketing] = useLocalStorage<boolean>(
-    KEY,
-    false,
-    parse,
-    String
-  );
+  const { user } = useAccount();
+  const [localMarketing, setLocalMarketing] = useLocalStorage<boolean>(KEY, false, parse, String);
+  const [remoteMarketing, setRemoteMarketing] = useState<boolean | null>(null);
+  const marketing = remoteMarketing !== null ? remoteMarketing : localMarketing;
   const [saved, setSaved] = useState(false);
 
-  const save = (value: boolean) => {
-    setMarketing(value);
+  useEffect(() => {
+    if (!user) { setRemoteMarketing(null); return; }
+    fetch("/api/account/preferences").then(r => r.json()).then(d => setRemoteMarketing(Boolean(d.marketing))).catch(() => setRemoteMarketing(false));
+  }, [user?.id]);
+
+  const save = async (value: boolean) => {
+    if (user) {
+      const res = await fetch("/api/account/preferences", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ marketing: value }) });
+      if (res.ok) setRemoteMarketing(value);
+    } else {
+      setLocalMarketing(value);
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -75,8 +84,7 @@ export default function PreferencesPage() {
             Security
           </p>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-            Password and sign-in methods are part of the Phase 2 build. For
-            now, this demo account lives in your browser.
+            Signed in with Supabase Auth. Use <a href="/auth/reset" className="text-accent-deep underline underline-offset-2">reset password</a> to change your password. Google sign-in is available on the login page.
           </p>
         </div>
       </div>
