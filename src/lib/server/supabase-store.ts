@@ -243,6 +243,14 @@ export async function upsertProduct(
   });
   if (productError) throw new Error(productError.message);
 
+  // Ensure location exists (FK) — auto-create ad-hoc locations like "A-04"
+  if (product.location) {
+    await db.from("inventory_locations").upsert(
+      { id: product.location, label: product.location },
+      { onConflict: "id" }
+    );
+  }
+
   const { error: invError } = await db.from("inventory_items").upsert({
     sku: product.sku,
     status: product.status,
@@ -253,7 +261,24 @@ export async function upsertProduct(
     purchase_date: product.purchaseDate ?? null,
     updated_at: new Date().toISOString(),
   });
-  if (invError) throw new Error(invError.message);
+  if (invError) {
+    // If location FK still fails, retry without location to avoid draft lock
+    if (invError.message.includes("inventory_locations") || invError.message.includes("foreign key")) {
+      const { error: retryErr } = await db.from("inventory_items").upsert({
+        sku: product.sku,
+        status: product.status,
+        location_id: null,
+        reserved_until: product.reservedUntil ?? null,
+        sold_at: product.soldAt ?? null,
+        acquisition_source: product.acquisitionSource ?? null,
+        purchase_date: product.purchaseDate ?? null,
+        updated_at: new Date().toISOString(),
+      });
+      if (retryErr) throw new Error(retryErr.message);
+    } else {
+      throw new Error(invError.message);
+    }
+  }
 
   await db.from("product_images").delete().eq("product_sku", product.sku);
   if (product.images.length) {
