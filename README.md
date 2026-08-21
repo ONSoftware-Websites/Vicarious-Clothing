@@ -115,10 +115,10 @@ Key behaviour:
   every email is written as HTML in `.data/emails/` and logged in
   `/admin/emails`.
 - **Supabase** — run `supabase/schema.sql` in a new project, set
-  `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`, then replace
-  the internals of `src/lib/server/store.ts` (same function signatures).
-  Supabase Auth replaces the demo account, and `profiles.role` gives you the
-  STAFF/MANAGER/ADMIN/OWNER roles from blueprint section 24.
+  `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`, then let the app
+  use the built-in Supabase adapter automatically. The service-role key is
+  server-only, and `profiles.role` gives you the STAFF/MANAGER/ADMIN/OWNER
+  roles from blueprint section 24.
 - **Real photography** — swap product image URLs in `.data/store.json` (or
   the Supabase seed) with studio shots, ideally WebP/AVIF.
 

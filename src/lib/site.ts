@@ -1,8 +1,19 @@
 import type { Category, Condition } from "@/lib/types";
 
 export const SITE_NAME = "Vicarious Clothing";
-export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://vicariousclothing.co.uk";
+const DEFAULT_SITE_URL = "https://vicariousclothing.co.uk";
+
+function normalizeSiteUrl(value: string | undefined) {
+  if (!value) return DEFAULT_SITE_URL;
+  const candidate = value.includes("://") ? value : `https://${value}`;
+  try {
+    return new URL(candidate).toString().replace(/\/$/, "");
+  } catch {
+    return DEFAULT_SITE_URL;
+  }
+}
+
+export const SITE_URL = normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 export const FREE_DELIVERY_THRESHOLD = 75;
 export const STANDARD_DELIVERY_COST = 3.95;
 export const EXPRESS_DELIVERY_COST = 6.95;
