@@ -97,6 +97,10 @@ const TOP_MEASUREMENTS: [string, string][] = [
 ];
 
 export function buildSeedProducts(): Product[] {
+  // Production uses Supabase — demo seed is opt-in via SEED_DEMO.
+  // Set SEED_DEMO=false on Vercel to start with an empty catalogue.
+  // Tests set DATA_STORE=memory and rely on this seed, so default is demo.
+  if (process.env.SEED_DEMO === "false") return [];
   return [
     build({
       sku: "VC-000381",

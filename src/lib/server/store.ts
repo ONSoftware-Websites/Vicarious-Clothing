@@ -28,6 +28,24 @@ export function persistenceEnabled() {
 }
 
 function buildInitialData(): StoreData {
+  // When SEED_DEMO=false (set this on Vercel for live) return empty collections.
+  // Supabase is the source of truth in production — local seed is only for
+  // dev and for vitest (which sets DATA_STORE=memory).
+  if (process.env.SEED_DEMO === "false") {
+    return {
+      products: [],
+      orders: [],
+      auditLog: [],
+      leads: [],
+      orderCounter: 1000,
+      discounts: [],
+      emailLog: [],
+      visits: { total: 0, byDay: {} },
+      subscribers: [],
+      purchases: [],
+      posts: [],
+    };
+  }
   const products = buildSeedProducts();
   const now = Date.now();
 
