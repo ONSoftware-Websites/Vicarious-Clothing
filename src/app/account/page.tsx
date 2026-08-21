@@ -9,22 +9,27 @@ import { formatDate, formatPrice } from "@/lib/utils";
 import type { Order } from "@/lib/types";
 
 export default function AccountPage() {
-  const { profile } = useAccount();
+  const { profile, loading: accountLoading } = useAccount();
   const { count: wishCount } = useWishlist();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const email = profile?.email ?? "";
 
   useEffect(() => {
-    if (!profile) {
+    if (accountLoading) return;
+    if (!email) {
+      setOrders([]);
       setLoading(false);
       return;
     }
+    let cancelled = false;
     setLoading(true);
-    fetch(`/api/orders?email=${encodeURIComponent(profile.email)}`)
+    fetch(`/api/orders?email=${encodeURIComponent(email)}`)
       .then((r) => r.json())
-      .then((data) => setOrders(data.orders ?? []))
-      .finally(() => setLoading(false));
-  }, [profile]);
+      .then((data) => { if (!cancelled) setOrders(data.orders ?? []); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [email, accountLoading]);
 
   return (
     <AccountShell>

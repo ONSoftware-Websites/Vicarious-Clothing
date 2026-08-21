@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseBrowser } from "@/lib/supabase/browser";
 
@@ -31,12 +31,12 @@ export function useAccount() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const profile: AccountProfile | null = user
+  const profile: AccountProfile | null = useMemo(() => user
     ? {
         name: (user.user_metadata?.name as string) || user.email?.split("@")[0] || "User",
         email: user.email || "",
       }
-    : null;
+    : null, [user]);
 
   const signOut = useCallback(async () => {
     const supabase = createSupabaseBrowser();
