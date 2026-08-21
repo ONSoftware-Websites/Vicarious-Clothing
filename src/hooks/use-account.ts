@@ -14,11 +14,17 @@ export function useAccount() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createSupabaseBrowser();
+    let supabase: ReturnType<typeof createSupabaseBrowser> | null = null;
+    try {
+      supabase = createSupabaseBrowser();
+    } catch {
+      setLoading(false);
+      return;
+    }
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user ?? null);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null);
     });

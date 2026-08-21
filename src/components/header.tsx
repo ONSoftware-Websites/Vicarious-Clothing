@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useShopUi } from "@/hooks/use-shop-ui";
 import { useCart } from "@/hooks/use-cart";
 import { useWishlist } from "@/hooks/use-wishlist";
+import { useAccount } from "@/hooks/use-account";
 import { NAV_LINKS } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -58,10 +59,20 @@ function IconMenu() {
   );
 }
 
+function IconUser() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4 18C4 14.5 7.5 12 12 12C16.5 12 20 14.5 20 18" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 export function Header() {
   const { openSearch, openBag, toggleMenu, menuOpen, closeAll } = useShopUi();
   const { count } = useCart();
   const { count: wishCount } = useWishlist();
+  const { profile } = useAccount();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
 
@@ -133,6 +144,14 @@ export function Header() {
           >
             <IconSearch />
           </button>
+          <Link
+            href="/account"
+            className="relative hidden h-10 w-10 items-center justify-center transition-colors hover:text-accent-deep sm:flex"
+            aria-label={profile ? `Account, ${profile.name}` : "Sign in"}
+          >
+            <IconUser />
+            {profile && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-accent-deep" />}
+          </Link>
           <Link
             href="/account/wishlist"
             className="relative hidden h-10 w-10 items-center justify-center transition-colors hover:text-accent-deep sm:flex"
