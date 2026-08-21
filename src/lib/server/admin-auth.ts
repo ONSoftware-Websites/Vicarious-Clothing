@@ -25,12 +25,11 @@ const ROLE_LEVEL: Record<Role, number> = {
 
 export function checkPassword(password: string) {
   const expected = process.env.ADMIN_PASSWORD;
-  if (!expected) return true;
+  if (!expected) return false;
   return password === expected;
 }
 
 export async function isAdminSession() {
-  if (!adminEnabled()) return true;
   const store = await cookies();
   return store.get(COOKIE)?.value === "1";
 }
@@ -47,7 +46,7 @@ export async function requireRole(minRole: Role) {
 }
 
 export async function requireAdminApi() {
-  if (adminEnabled() && !(await isAdminSession())) {
+  if (!(await isAdminSession())) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   return null;

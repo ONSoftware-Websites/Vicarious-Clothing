@@ -4,6 +4,12 @@ import { checkPassword, COOKIE, ROLE_COOKIE, COOKIE_OPTIONS } from "@/lib/server
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    if (!process.env.ADMIN_PASSWORD) {
+      return NextResponse.json(
+        { error: "Admin password not configured on server — set ADMIN_PASSWORD" },
+        { status: 503 }
+      );
+    }
     if (!checkPassword(String(body.password ?? ""))) {
       return NextResponse.json({ error: "Wrong password" }, { status: 401 });
     }
