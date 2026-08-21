@@ -1,48 +1,48 @@
 "use client";
 
-import { useCallback } from "react";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useCallback, useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { createSupabaseBrowser } from "@/lib/supabase/browser";
 
 export interface AccountProfile {
   name: string;
   email: string;
 }
 
-const KEY = "vc_account";
-const EMPTY: AccountProfile | null = null;
-
-function parse(raw: string | null): AccountProfile | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as AccountProfile;
-    return parsed && parsed.email ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function serialize(value: AccountProfile | null): string {
-  return JSON.stringify(value);
-}
-
 export function useAccount() {
-  const [profile, setProfile] = useLocalStorage<AccountProfile | null>(
-    KEY,
-    EMPTY,
-    parse,
-    serialize
-  );
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const signIn = useCallback(
-    (name: string, email: string) => {
-      setProfile({ name, email });
-    },
-    [setProfile]
-  );
+  useEffect(() => {
+    const supabase = createSupabaseBrowser();
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user ?? null);
+      setLoading(false);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
-  const signOut = useCallback(() => {
-    setProfile(null);
-  }, [setProfile]);
+  const profile: AccountProfile | null = user
+    ? {
+        name: (user.user_metadata?.name as string) || user.email?.split("@")[0] || "User",
+        email: user.email || "",
+      }
+    : null;
 
-  return { profile, signIn, signOut };
+  const signOut = useCallback(async () => {
+    const supabase = createSupabaseBrowser();
+    await supabase.auth.signOut();
+    setUser(null);
+  }, []);
+
+  // Legacy demo signIn (no-op, kept for compat - real sign-in is via /auth/login)
+  const signIn = useCallback(async (name: string, email: string) => {
+    // For live, redirect to /auth/login instead of localStorage
+    if (typeof window !== "undefined") window.location.href = "/auth/login";
+  }, []);
+
+  return { profile, user, loading, signIn, signOut };
 }

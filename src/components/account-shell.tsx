@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Container } from "@/components/ui";
 import { useAccount } from "@/hooks/use-account";
-import { useMounted } from "@/hooks/use-local-storage";
 
 const ACCOUNT_LINKS = [
   { href: "/account", label: "Profile" },
@@ -16,14 +15,10 @@ const ACCOUNT_LINKS = [
 ];
 
 export function AccountShell({ children }: { children: ReactNode }) {
-  const { profile, signIn, signOut } = useAccount();
-  const mounted = useMounted();
+  const { profile, loading, signOut } = useAccount();
   const pathname = usePathname();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
 
-  if (!mounted) {
+  if (loading) {
     return (
       <Container className="py-24 text-center">
         <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
@@ -34,67 +29,32 @@ export function AccountShell({ children }: { children: ReactNode }) {
   }
 
   if (!profile) {
-    const submit = (e: FormEvent) => {
-      e.preventDefault();
-      if (!name.trim() || !email.includes("@")) {
-        setError("Enter your name and a valid email.");
-        return;
-      }
-      signIn(name.trim(), email.trim());
-      fetch("/api/account/welcome", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim() }),
-      }).catch(() => {});
-    };
-
     return (
       <Container className="py-14 sm:py-20">
-        <div className="mx-auto max-w-md">
+        <div className="mx-auto max-w-md text-center">
           <h1 className="mb-2 font-display text-3xl font-semibold uppercase tracking-tight">
             Account
           </h1>
           <p className="mb-8 text-sm text-ink-soft">
-            Accounts are optional here — you can shop without one. Sign in to
-            see orders, addresses and your wishlist.
+            Sign in to see your orders, addresses and wishlist. Guest checkout is still available.
           </p>
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label htmlFor="acc-name" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                Name
-              </label>
-              <input
-                id="acc-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="h-12 w-full border border-line bg-paper px-4 text-sm focus:border-ink focus:outline-none"
-                autoComplete="name"
-              />
-            </div>
-            <div>
-              <label htmlFor="acc-email" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                Email
-              </label>
-              <input
-                id="acc-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-12 w-full border border-line bg-paper px-4 text-sm focus:border-ink focus:outline-none"
-                autoComplete="email"
-              />
-            </div>
-            {error && <p className="text-sm text-red-700">{error}</p>}
-            <button
-              type="submit"
-              className="flex h-13 w-full items-center justify-center bg-ink font-display text-xs font-semibold uppercase tracking-[0.18em] text-paper transition-colors hover:bg-accent"
+          <div className="flex flex-col gap-3">
+            <Link
+              href="/auth/login"
+              className="flex h-12 w-full items-center justify-center bg-ink font-display text-xs font-semibold uppercase tracking-[0.18em] text-paper hover:bg-accent"
             >
-              Continue
-            </button>
-            <p className="text-center font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-              Demo sign-in — no password needed yet
-            </p>
-          </form>
+              Sign in
+            </Link>
+            <Link
+              href="/auth/signup"
+              className="flex h-12 w-full items-center justify-center border border-ink font-display text-xs font-medium uppercase tracking-[0.16em] hover:bg-ink hover:text-paper"
+            >
+              Create account
+            </Link>
+          </div>
+          <p className="mt-6 text-center font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+            <Link href="/shop" className="text-accent-deep underline underline-offset-2">Continue shopping</Link> without an account
+          </p>
         </div>
       </Container>
     );
