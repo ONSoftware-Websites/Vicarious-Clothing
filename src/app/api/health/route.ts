@@ -25,6 +25,7 @@ export async function GET() {
     "journal_posts",
     "newsletter_subscribers",
     "discounts",
+    "email_log",
   ] as const;
 
   for (const table of tables) {
