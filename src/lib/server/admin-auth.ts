@@ -2,15 +2,15 @@ import { cookies } from "next/headers";
 import type { Role } from "@/lib/types";
 import { adminEnabled } from "@/lib/admin-config";
 
-const COOKIE = "vc_admin";
-const ROLE_COOKIE = "vc_admin_role";
+export const COOKIE = "vc_admin";
+export const ROLE_COOKIE = "vc_admin_role";
 
-const COOKIE_OPTIONS = {
+export const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "lax" as const,
   path: "/",
   maxAge: 60 * 60 * 12,
-  secure: Boolean(process.env.VERCEL_ENV),
+  secure: process.env.NODE_ENV === "production",
 };
 
 export { adminEnabled };

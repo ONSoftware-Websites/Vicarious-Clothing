@@ -1,15 +1,17 @@
-import type { NextRequest } from "next/server";
-import { checkPassword, setAdminCookie } from "@/lib/server/admin-auth";
+import { NextRequest, NextResponse } from "next/server";
+import { checkPassword, COOKIE, ROLE_COOKIE, COOKIE_OPTIONS } from "@/lib/server/admin-auth";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     if (!checkPassword(String(body.password ?? ""))) {
-      return Response.json({ error: "Wrong password" }, { status: 401 });
+      return NextResponse.json({ error: "Wrong password" }, { status: 401 });
     }
-    await setAdminCookie();
-    return Response.json({ ok: true });
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(COOKIE, "1", COOKIE_OPTIONS);
+    response.cookies.set(ROLE_COOKIE, "OWNER", COOKIE_OPTIONS);
+    return response;
   } catch {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
