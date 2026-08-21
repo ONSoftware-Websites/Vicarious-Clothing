@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { JournalPost } from "@/lib/types";
+import { ImageDropzone } from "@/components/admin/image-dropzone";
 
 const input =
   "h-11 w-full border border-line bg-paper px-3 text-sm focus:border-ink focus:outline-none";
@@ -77,13 +78,13 @@ export function JournalForm({ editing }: { editing?: JournalPost }) {
             />
           </div>
           <div>
-            <label htmlFor="jr-cover" className={label}>Cover image URL</label>
-            <input
-              id="jr-cover"
-              value={form.coverImage}
-              onChange={(e) => setForm((f) => ({ ...f, coverImage: e.target.value }))}
-              className={input}
-              placeholder="https://… (leave blank for placeholder)"
+            <label className={label}>Cover image</label>
+            <ImageDropzone
+              images={form.coverImage ? [{ src: form.coverImage }] : []}
+              onChange={(imgs) => setForm((f) => ({ ...f, coverImage: imgs[0]?.src ?? "" }))}
+              bucket="journal-images"
+              single
+              max={1}
             />
           </div>
         </div>

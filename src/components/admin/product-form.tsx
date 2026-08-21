@@ -15,6 +15,7 @@ import {
   formatPrice,
   PACKAGING_COST,
 } from "@/lib/utils";
+import { ImageDropzone } from "@/components/admin/image-dropzone";
 
 const input =
   "h-11 w-full border border-line bg-paper px-3 text-sm focus:border-ink focus:outline-none";
@@ -70,10 +71,7 @@ function toForm(p?: Product): FormProduct {
     compareAtPrice: p?.compareAtPrice ? String(p.compareAtPrice) : "",
     cost: p?.cost !== undefined ? String(p.cost) : "",
     floorPrice: p?.floorPrice !== undefined ? String(p.floorPrice) : "",
-    images:
-      p?.images.length
-        ? p.images
-        : Array.from({ length: 5 }, () => ({ src: "" })),
+    images: p?.images ?? [],
     status: p?.status ?? "DRAFT",
     location: p?.location ?? "",
     acquisitionSource: p?.acquisitionSource ?? "",
@@ -130,12 +128,6 @@ export function ProductForm({ product }: { product?: Product }) {
     } else if (value) {
       set("measurements", [...form.measurements, { label, value }]);
     }
-  };
-
-  const setImage = (i: number, src: string) => {
-    const images = [...form.images];
-    images[i] = { src };
-    set("images", images);
   };
 
   const economics = useMemo(() => {
@@ -533,26 +525,8 @@ export function ProductForm({ product }: { product?: Product }) {
           </Section>
 
           <Section title="Images">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {form.images.map((img, i) => (
-                <div key={i}>
-                  <label htmlFor={`pf-img-${i}`} className={label}>
-                    Image {i + 1} URL
-                  </label>
-                  <input
-                    id={`pf-img-${i}`}
-                    value={img.src}
-                    onChange={(e) => setImage(i, e.target.value)}
-                    className={input}
-                    placeholder="https://…"
-                  />
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-ink-faint">
-              Later this becomes a proper drag-and-drop upload to Supabase
-              Storage. URLs work for now.
-            </p>
+            <ImageDropzone images={form.images} onChange={(images) => set("images", images)} bucket="product-images" max={10} />
+            <p className="mt-3 text-xs text-ink-faint">Drag & drop or click — uploads to Supabase Storage (product-images bucket). First image is the cover. Reorder with ← →.</p>
           </Section>
 
           <Section title="Storage">
