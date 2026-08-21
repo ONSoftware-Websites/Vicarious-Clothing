@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PurchaseActions } from "@/components/admin/purchase-actions";
 import { PurchaseForm } from "@/components/admin/purchase-form";
 import { listPurchases } from "@/lib/server/store";
 import { formatDate, formatPrice } from "@/lib/utils";
@@ -63,15 +64,18 @@ export default async function PurchasesPage() {
                 </td>
                 <td className="px-4 py-4 font-mono text-xs">{formatPrice(p.amount)}</td>
                 <td className="px-4 py-4">
-                  <span
-                    className={
-                      p.status === "PAID"
-                        ? "border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-emerald-800"
-                        : "border border-amber-200 bg-amber-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-amber-800"
-                    }
-                  >
-                    {p.status}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span
+                      className={
+                        p.status === "PAID"
+                          ? "inline-flex w-fit border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-emerald-800"
+                          : "inline-flex w-fit border border-amber-200 bg-amber-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-amber-800"
+                      }
+                    >
+                      {p.status}
+                    </span>
+                    <PurchaseActions id={p.id} paid={p.status === "PAID"} />
+                  </div>
                 </td>
                 <td className="max-w-xs px-4 py-4 text-xs leading-relaxed text-ink-soft">
                   {p.notes ?? "—"}

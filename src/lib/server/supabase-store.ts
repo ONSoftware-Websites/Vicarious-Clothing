@@ -562,7 +562,10 @@ export async function createOrder(
   if (itemsError) throw new Error(itemsError.message);
 
   if (status === "PAID") await markSoldByOrder(db, skus);
-  // For PENDING_PAYMENT: items already reserved by checkout API; no re-reservation needed
+  else if (status === "PENDING_PAYMENT") {
+    const until = new Date(Date.now() + RESERVATION_MINUTES * 60 * 1000).toISOString();
+    await db.from("inventory_items").update({ status: "RESERVED", reserved_until: until }).in("sku", skus).eq("status", "AVAILABLE");
+  }
 
   if (input.discountCode && discount) {
     await recordDiscountUsage(db, input.discountCode, input.email);
@@ -631,6 +634,16 @@ export async function setOrderPayment(
 }
 
 export async function cancelPendingOrdersForEmail(db: SupabaseClient, email: string) {
+  const { data: pending, error: fetchError } = await db.from("orders").select("id").eq("status", "PENDING_PAYMENT").eq("email", email.toLowerCase());
+  if (fetchError) throw new Error(fetchError.message);
+  const ids = (pending ?? []).map((r) => String((r as Record<string, unknown>).id));
+  if (ids.length) {
+    const { data: items } = await db.from("order_items").select("sku").in("order_id", ids);
+    const skus = [...new Set((items ?? []).map((r) => String((r as Record<string, unknown>).sku)))];
+    if (skus.length) {
+      await db.from("inventory_items").update({ status: "AVAILABLE", reserved_until: null }).in("sku", skus).eq("status", "RESERVED");
+    }
+  }
   const { error } = await db
     .from("orders")
     .update({ status: "CANCELLED", updated_at: new Date().toISOString() })

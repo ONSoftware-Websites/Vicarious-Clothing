@@ -50,11 +50,13 @@ export function useCart() {
 
   const setQty = useCallback(
     (sku: string, qty: number) => {
-      setLines(
-        lines
-          .map((l) => (l.sku === sku ? { ...l, qty: Math.max(1, qty) } : l))
-          .filter((l) => l.qty > 0)
-      );
+      // Each SKU is a one-of-one piece — quantity is always 1; 0 removes
+      const nextQty = qty <= 0 ? 0 : 1;
+      if (nextQty === 0) {
+        setLines(lines.filter((l) => l.sku !== sku));
+        return;
+      }
+      setLines(lines.map((l) => (l.sku === sku ? { ...l, qty: 1 } : l)));
     },
     [lines, setLines]
   );

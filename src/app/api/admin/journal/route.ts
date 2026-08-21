@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
           : new Date().toISOString(),
       };
 
-      upsertPost(full, "Henry");
+      await upsertPost(full, "Henry");
       return Response.json({ ok: true, post: full });
     }
 

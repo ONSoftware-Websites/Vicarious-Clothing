@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    setOrderPayment(order.id, intent.id);
+    await setOrderPayment(order.id, intent.id);
 
     return Response.json(
       { order, mode: "stripe", clientSecret: intent.client_secret },

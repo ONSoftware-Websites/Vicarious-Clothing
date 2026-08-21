@@ -142,8 +142,9 @@ export default function BagPage() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => setQty(line.sku, line.qty + 1)}
-                          className="h-9 w-9 hover:bg-cream"
+                          disabled
+                          title="One-of-one — one per bag"
+                          className="h-9 w-9 cursor-not-allowed opacity-30"
                           aria-label="Increase quantity"
                         >
                           +

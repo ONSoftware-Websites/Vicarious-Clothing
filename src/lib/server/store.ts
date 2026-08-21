@@ -705,8 +705,17 @@ async function localCreateOrder(input: CreateOrderInput) {
 
   if (status === "PAID") {
     await localMarkSoldByOrder(items.map((i) => i.sku));
+  } else if (status === "PENDING_PAYMENT") {
+    const until = new Date(Date.now() + RESERVATION_MINUTES * 60 * 1000).toISOString();
+    for (const { sku } of items) {
+      const product = data.products.find((p) => p.sku === sku);
+      if (product && product.status === "AVAILABLE") {
+        product.status = "RESERVED";
+        product.reservedUntil = until;
+      }
+    }
+    save();
   }
-  // For PENDING_PAYMENT: items already reserved by checkout API; no re-reservation needed
 
   if (input.discountCode && discount) {
     await localRecordDiscountUsage(input.discountCode, input.email);
@@ -747,6 +756,7 @@ async function localMarkOrderPaid(id: string){
 async function localCancelPendingOrdersForEmail(email: string) {
   const data = load();
   let changed = false;
+  const skusToRelease: string[] = [];
   for (const order of data.orders) {
     if (
       order.status === "PENDING_PAYMENT" &&
@@ -754,10 +764,20 @@ async function localCancelPendingOrdersForEmail(email: string) {
     ) {
       order.status = "CANCELLED";
       order.updatedAt = new Date().toISOString();
+      for (const item of order.items) skusToRelease.push(item.sku);
       changed = true;
     }
   }
-  if (changed) save();
+  if (changed) {
+    for (const sku of skusToRelease) {
+      const product = data.products.find((p) => p.sku === sku);
+      if (product && product.status === "RESERVED") {
+        product.status = "AVAILABLE";
+        product.reservedUntil = undefined;
+      }
+    }
+    save();
+  }
 }
 
 async function localSetOrderPayment(

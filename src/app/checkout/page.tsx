@@ -152,6 +152,10 @@ export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState("");
   const [pendingOrderId, setPendingOrderId] = useState("");
   const checkoutFinishedRef = useRef(false);
+  const pendingOrderRef = useRef("");
+  useEffect(() => {
+    pendingOrderRef.current = pendingOrderId;
+  }, [pendingOrderId]);
 
   const [email, setEmail] = useState("");
   const [marketing, setMarketing] = useState(false);
@@ -216,6 +220,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (skus.length === 0) return;
+    if (pendingOrderRef.current || checkoutFinishedRef.current) return;
     let cancelled = false;
     fetch("/api/reserve", {
       method: "POST",
@@ -231,6 +236,7 @@ export default function CheckoutPage() {
       .catch(() => {});
     return () => {
       cancelled = true;
+      if (checkoutFinishedRef.current || pendingOrderRef.current) return;
       fetch("/api/release", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -246,6 +252,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     return () => {
+      if (checkoutFinishedRef.current || pendingOrderRef.current) return;
       if (emailRef.current) {
         fetch("/api/checkout/cancel", {
           method: "POST",

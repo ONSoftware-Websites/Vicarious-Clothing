@@ -15,7 +15,11 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     fetch(`/api/orders?email=${encodeURIComponent(profile.email)}`)
       .then((r) => r.json())
       .then((data) => setOrders(data.orders ?? []))
