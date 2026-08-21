@@ -31,11 +31,22 @@ export default function LoginPage() {
   };
 
   const google = async () => {
-    const supabase = createSupabaseBrowser();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
+    setError("");
+    try {
+      const supabase = createSupabaseBrowser();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) throw new Error(error.message);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("not enabled") || msg.includes("Unsupported provider")) {
+        setError("Google login isn’t enabled yet — use email/password or enable Google in Supabase Dashboard → Auth → Providers → Google.");
+      } else {
+        setError(msg);
+      }
+    }
   };
 
   return (
