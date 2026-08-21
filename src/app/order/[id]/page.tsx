@@ -31,11 +31,34 @@ export default async function OrderPage({
   const raw = await searchParams;
   const justPaid = raw.paid === "1";
   const pending = order.status === "PENDING_PAYMENT";
+  const paymentJustCaptured = justPaid && pending;
 
   return (
     <Container className="py-12 sm:py-16">
       <div className="mx-auto max-w-2xl text-center">
-        {pending ? (
+        {paymentJustCaptured ? (
+          <>
+            <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-accent-deep">
+              Order {order.id}
+            </p>
+            <h1 className="mt-4 font-display text-4xl font-semibold uppercase tracking-tight sm:text-6xl">
+              Payment received.
+            </h1>
+            <p className="mt-4 text-ink-soft">
+              We&apos;re confirming the order and updating stock now. Your
+              receipt and dispatch updates will land in your inbox.
+            </p>
+            <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-700">
+              Thanks for shopping with us.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <Button href="/account/orders">View order</Button>
+              <Button href="/shop" variant="outline">
+                Keep browsing
+              </Button>
+            </div>
+          </>
+        ) : pending ? (
           <>
             <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-amber-700">
               Order {order.id}

@@ -90,16 +90,32 @@ function PayButton({
     if (!stripe || !elements) return;
     setBusy(true);
     try {
-      const { error } = await stripe.confirmPayment({
+      const result = await stripe.confirmPayment({
         elements,
         confirmParams: {
           return_url: `${window.location.origin}/order/${orderId}?paid=1`,
         },
         redirect: "if_required",
       });
-      if (error) {
-        onError(error.message ?? "Payment failed. Please try again.");
+      if (result.error) {
+        onError(result.error.message ?? "Payment failed. Please try again.");
       } else {
+        const finalize = await fetch("/api/checkout/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId,
+            paymentIntentId: result.paymentIntent?.id,
+          }),
+        });
+        if (!finalize.ok) {
+          const data = await finalize.json().catch(() => ({}));
+          onError(
+            data.error ??
+              "Payment was taken, but we could not finish the order right away. Please refresh the order page in a moment."
+          );
+          return;
+        }
         onSuccess();
       }
     } catch {
@@ -135,6 +151,7 @@ export default function CheckoutPage() {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState("");
   const [pendingOrderId, setPendingOrderId] = useState("");
+  const checkoutFinishedRef = useRef(false);
 
   const [email, setEmail] = useState("");
   const [marketing, setMarketing] = useState(false);
@@ -178,7 +195,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!mounted) return;
-    if (lines.length === 0) {
+    if (lines.length === 0 && !checkoutFinishedRef.current) {
       router.replace("/bag");
       return;
     }
@@ -318,7 +335,7 @@ export default function CheckoutPage() {
         return;
       }
       if (!res.ok || !data.clientSecret) {
-        setError(data.error ?? "Something went wrong. Please try again.");
+      setError(data.error ?? "Something went wrong. Please try again.");
         return;
       }
       setClientSecret(data.clientSecret);
@@ -363,8 +380,9 @@ export default function CheckoutPage() {
         setError(data.error ?? "Something went wrong placing your order. Please try again.");
         return;
       }
+      checkoutFinishedRef.current = true;
       clear();
-      router.push(`/order/${data.order.id}`);
+      router.replace(`/order/${data.order.id}?paid=1`);
     } catch {
       setError("Something went wrong placing your order. Please try again.");
     } finally {
@@ -787,16 +805,17 @@ export default function CheckoutPage() {
           <span />
         )}
         {step === "review" && isStripe ? (
-          <PayButton
-            orderId={pendingOrderId}
-            amount={total}
-            disabled={!terms || placing}
-            onSuccess={() => {
-              clear();
-              router.push(`/order/${pendingOrderId}?paid=1`);
-            }}
-            onError={(message) => setError(message)}
-          />
+        <PayButton
+          orderId={pendingOrderId}
+          amount={total}
+          disabled={!terms || placing}
+          onSuccess={() => {
+            checkoutFinishedRef.current = true;
+            clear();
+            router.replace(`/order/${pendingOrderId}?paid=1`);
+          }}
+          onError={(message) => setError(message)}
+        />
         ) : (
           <button
             type="submit"

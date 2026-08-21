@@ -35,10 +35,11 @@ export async function POST(request: NextRequest) {
       const orderId = intent.metadata?.orderId;
       if (!orderId) break;
 
+      const existing = await getOrder(orderId);
       await setOrderPayment(orderId, intent.id);
 
       const order = await markOrderPaid(orderId);
-      if (order) {
+      if (order && existing?.status === "PENDING_PAYMENT") {
         await sendEmail({
           to: order.email,
           template: "order-confirmed",
@@ -66,8 +67,9 @@ export async function POST(request: NextRequest) {
         await setOrderPayment(orderId, session.payment_intent);
       }
 
+      const existing = await getOrder(orderId);
       const order = await markOrderPaid(orderId);
-      if (order) {
+      if (order && existing?.status === "PENDING_PAYMENT") {
         await sendEmail({
           to: order.email,
           template: "order-confirmed",
