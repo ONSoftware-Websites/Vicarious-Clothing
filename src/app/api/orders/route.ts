@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       ? channelValue
       : "website";
 
-    const result = createOrder({
+    const result = await createOrder({
       email: String(email),
       name: String(name),
       items: items.map((i: { sku?: unknown }) => ({ sku: String(i.sku) })),
@@ -59,6 +59,6 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get("email") ?? undefined;
-  const orders = listOrders(email);
+  const orders = await listOrders(email);
   return Response.json({ orders });
 }

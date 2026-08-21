@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: false, error: "Enter a code." }, { status: 400 });
     }
 
-    const result = evaluateDiscount(code, { subtotal, email, itemSkus: skus });
+    const result = await evaluateDiscount(code, { subtotal, email, itemSkus: skus });
     if (!result.ok) {
       return Response.json({ ok: false, error: result.error }, { status: 400 });
     }

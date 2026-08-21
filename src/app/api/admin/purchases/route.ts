@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const action = String(body.action ?? "save");
 
     if (action === "paid") {
-      const purchase = markPurchasePaid(String(body.id), "Henry");
+      const purchase = await markPurchasePaid(String(body.id), "Henry");
       if (!purchase) return Response.json({ error: "Not found" }, { status: 404 });
       return Response.json({ ok: true, purchase });
     }
@@ -27,19 +27,20 @@ export async function POST(request: NextRequest) {
         return Response.json({ error: "Missing required fields" }, { status: 400 });
       }
 
-      const items = (Array.isArray(purchase.items) ? purchase.items : [])
-        .map((i: { sku?: string; cost?: number }) => {
-          const sku = String(i.sku ?? "");
-          const cost = Number(i.cost ?? 0);
-          const product = getProductBySku(sku);
-          return {
-            sku,
-            name: product?.name ?? sku,
-            brand: product?.brand ?? "",
-            cost,
-          };
-        })
-        .filter((i) => i.sku);
+      const items = [];
+      for (const raw of Array.isArray(purchase.items) ? purchase.items : []) {
+        const item = raw as { sku?: string; cost?: number };
+        const sku = String(item.sku ?? "");
+        const cost = Number(item.cost ?? 0);
+        const product = await getProductBySku(sku);
+        if (!sku) continue;
+        items.push({
+          sku,
+          name: product?.name ?? sku,
+          brand: product?.brand ?? "",
+          cost,
+        });
+      }
 
       const full: StockPurchase = {
         id: purchase.id ?? `pur-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
         paidAt: purchase.paidAt,
       };
 
-      const saved = createPurchase(
+      const saved = await createPurchase(
         {
           sellerName: full.sellerName,
           sellerEmail: full.sellerEmail,
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
         "Henry"
       );
 
-      if (full.status === "PAID") markPurchasePaid(saved.id, "Henry");
+      if (full.status === "PAID") await markPurchasePaid(saved.id, "Henry");
 
       return Response.json({ ok: true, purchase: saved });
     }

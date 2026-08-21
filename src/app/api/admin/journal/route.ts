@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const action = String(body.action ?? "save");
 
     if (action === "delete") {
-      deletePost(String(body.id), "Henry");
+      await deletePost(String(body.id), "Henry");
       return Response.json({ ok: true });
     }
 

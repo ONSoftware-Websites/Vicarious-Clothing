@@ -35,9 +35,9 @@ export async function POST(request: NextRequest) {
       const orderId = intent.metadata?.orderId;
       if (!orderId) break;
 
-      setOrderPayment(orderId, intent.id);
+      await setOrderPayment(orderId, intent.id);
 
-      const order = markOrderPaid(orderId);
+      const order = await markOrderPaid(orderId);
       if (order) {
         await sendEmail({
           to: order.email,
@@ -51,9 +51,9 @@ export async function POST(request: NextRequest) {
       const intent = event.data.object as Stripe.PaymentIntent;
       const orderId = intent.metadata?.orderId;
       if (!orderId) break;
-      const order = getOrder(orderId);
+      const order = await getOrder(orderId);
       if (order && order.status === "PENDING_PAYMENT") {
-        cancelPendingOrdersForEmail(order.email);
+        await cancelPendingOrdersForEmail(order.email);
       }
       break;
     }
@@ -63,10 +63,10 @@ export async function POST(request: NextRequest) {
       if (!orderId) break;
 
       if (typeof session.payment_intent === "string") {
-        setOrderPayment(orderId, session.payment_intent);
+        await setOrderPayment(orderId, session.payment_intent);
       }
 
-      const order = markOrderPaid(orderId);
+      const order = await markOrderPaid(orderId);
       if (order) {
         await sendEmail({
           to: order.email,
@@ -80,9 +80,9 @@ export async function POST(request: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session;
       const orderId = session.metadata?.orderId ?? session.client_reference_id;
       if (!orderId) break;
-      const order = getOrder(orderId);
+      const order = await getOrder(orderId);
       if (order && order.status === "PENDING_PAYMENT") {
-        cancelPendingOrdersForEmail(order.email);
+        await cancelPendingOrdersForEmail(order.email);
       }
       break;
     }

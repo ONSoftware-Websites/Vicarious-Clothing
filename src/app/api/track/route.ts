@@ -1,6 +1,6 @@
 import { recordVisit } from "@/lib/server/store";
 
 export async function POST() {
-  recordVisit();
+  await recordVisit();
   return Response.json({ ok: true });
 }

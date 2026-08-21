@@ -42,19 +42,22 @@ Project Settings → Environment Variables. Add these for **Production**
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_test_…` / `pk_live_…` | Only with Stripe — needed for the on-site card form |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from Stripe (see below) | Only with Stripe |
 | `RESEND_API_KEY` | `re_…` | No — blank = emails logged, not sent |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Only for the Supabase swap-in |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | Only for the Supabase swap-in |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Only for Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key (server-only) | Only for Supabase |
 
 **Important about the demo data store:** on Vercel the filesystem is
 read-only, so the file-backed store automatically switches to in-memory
 mode. That means the site works fully for previewing, but data resets on
 redeploys/cold starts, is **not shared across serverless instances**, and
 admin edits may not show on storefront pages (each instance keeps its own
-copy). That's fine for previewing — **production data belongs in Supabase**
-(run `supabase/schema.sql`, set the two variables, and swap the internals
-of `src/lib/server/store.ts`, keeping the same function signatures).
-Locally and on a single-server host, the file store is fully consistent —
-every read re-syncs from disk.
+copy). That's fine for previewing — **production data belongs in Supabase**:
+
+1. Create the Supabase project, then in the SQL editor run
+   `supabase/schema.sql`, followed by `supabase/seed.sql` if you want the
+   demo catalogue.
+2. Add `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` to Vercel
+   and redeploy — the store switches to Supabase automatically. No code
+   changes needed.
 
 ## 4. Stripe webhook (only when using Stripe)
 

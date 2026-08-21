@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Newsletter" };
 
-export default function NewsletterPage() {
-  const subscribers = listSubscribers();
+export default async function NewsletterPage() {
+  const subscribers = await listSubscribers();
 
   return (
     <div>

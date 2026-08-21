@@ -18,7 +18,7 @@ export default async function InventoryPage({
   const q = typeof raw.q === "string" ? raw.q.toLowerCase() : "";
   const status = typeof raw.status === "string" ? raw.status : "";
 
-  const products = listProducts().filter((p) => {
+  const products = await (await listProducts()).filter((p) => {
     if (status && p.status !== status) return false;
     if (q && ![p.sku, p.name, p.brand, p.location ?? ""].join(" ").toLowerCase().includes(q)) {
       return false;

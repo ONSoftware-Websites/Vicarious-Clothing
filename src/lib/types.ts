@@ -246,7 +246,7 @@ export interface AuditEntry {
   id: string;
   actor: string;
   action: string;
-  detail: string;
+  detail?: string;
   before?: string;
   after?: string;
   at: string;

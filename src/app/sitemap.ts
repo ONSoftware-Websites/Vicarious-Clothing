@@ -5,7 +5,7 @@ import { slugify } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -29,14 +29,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
   ];
 
-  const journalRoutes: MetadataRoute.Sitemap = listPosts().map((post) => ({
+  const journalRoutes: MetadataRoute.Sitemap = (await listPosts()).map((post) => ({
     url: `${SITE_URL}/journal/${post.slug}`,
     changeFrequency: "monthly" as const,
     priority: 0.4,
     lastModified: new Date(post.publishedAt),
   }));
 
-  const products = listProducts().filter((p) => p.status !== "DRAFT");
+  const products = (await listProducts()).filter((p) => p.status !== "DRAFT");
 
   const categoryRoutes: MetadataRoute.Sitemap = SHOP_CATEGORIES.map(
     (category) => ({

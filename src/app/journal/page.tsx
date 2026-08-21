@@ -13,8 +13,8 @@ export const metadata: Metadata = {
     "Stories from Vicarious Clothing — how we grade condition, why one-of-one matters, and what makes a Vicarious Pick.",
 };
 
-export default function JournalPage() {
-  const posts = listPosts();
+export default async function JournalPage() {
+  const posts = await listPosts();
 
   return (
     <Container className="py-12 sm:py-16">

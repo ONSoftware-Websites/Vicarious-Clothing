@@ -16,7 +16,7 @@ export async function PATCH(
     const body = await request.json();
     const status = String(body.status).toUpperCase() as LeadStatus;
     const offer = body.offer ? String(body.offer) : undefined;
-    const lead = updateLeadStatus(id, status, offer);
+    const lead = await updateLeadStatus(id, status, offer);
     if (!lead) return Response.json({ error: "Not found" }, { status: 404 });
 
     if (status === "OFFER_SENT") {
@@ -30,7 +30,7 @@ export async function PATCH(
     if (status === "ACCEPTED") {
       const amount = body.amount ? Number(body.amount) : undefined;
       if (amount && amount > 0) {
-        createPurchase(
+        await createPurchase(
           {
             sellerName: lead.name,
             sellerEmail: lead.email,

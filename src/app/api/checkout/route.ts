@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     );
     const lineItems = [];
     for (const sku of skus) {
-      const product = getProductBySku(sku);
+      const product = await getProductBySku(sku);
       if (!product) {
         return Response.json({ error: `Unknown SKU ${sku}` }, { status: 400 });
       }
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     let discount: Order["discount"];
     if (discountCode) {
-      const result = evaluateDiscount(String(discountCode), {
+      const result = await evaluateDiscount(String(discountCode), {
         subtotal,
         email: String(email),
         itemSkus: skus,
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       country: String(address.country ?? ""),
     };
 
-    const reservation = reserveProducts(skus);
+    const reservation = await reserveProducts(skus);
     if (reservation.gone.length) {
       return Response.json({ gone: reservation.gone }, { status: 409 });
     }
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const stripe = stripeEnabled() ? getStripe() : null;
 
     if (!stripe) {
-      const orderResult = createOrder({
+      const orderResult = await createOrder({
         email: String(email),
         name: String(name),
         items: skus.map((sku) => ({ sku })),
@@ -100,9 +100,9 @@ export async function POST(request: NextRequest) {
       return Response.json({ order, mode: "demo" }, { status: 201 });
     }
 
-    cancelPendingOrdersForEmail(String(email));
+    await cancelPendingOrdersForEmail(String(email));
 
-    const orderResult = createOrder({
+    const orderResult = await createOrder({
       email: String(email),
       name: String(name),
       items: skus.map((sku) => ({ sku })),
@@ -129,7 +129,6 @@ export async function POST(request: NextRequest) {
       automatic_payment_methods: { enabled: true },
       receipt_email: order.email,
       description: `Vicarious Clothing order ${order.id}`,
-      statement_descriptor: "VICARIOUS CLOTHING",
       metadata: {
         orderId: order.id,
         items: order.items.map((i) => `${i.brand} ${i.name}`).join(", ").slice(0, 450),

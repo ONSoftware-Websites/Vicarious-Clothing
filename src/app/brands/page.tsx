@@ -12,8 +12,8 @@ export const metadata: Metadata = {
     "The brands we keep going back to at Vicarious Clothing — Carhartt, Nike, Stussy, Levi's, Patagonia and more, all pre-owned and checked.",
 };
 
-export default function BrandsPage() {
-  const products = listProducts().filter((p) => p.status !== "DRAFT");
+export default async function BrandsPage() {
+  const products = (await listProducts()).filter((p) => p.status !== "DRAFT");
   const brands = new Map<string, number>();
   for (const p of products) {
     brands.set(p.brand, (brands.get(p.brand) ?? 0) + 1);

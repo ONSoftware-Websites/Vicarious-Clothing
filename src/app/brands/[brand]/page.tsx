@@ -13,7 +13,7 @@ export async function generateMetadata({
   params: Promise<{ brand: string }>;
 }): Promise<Metadata> {
   const { brand } = await params;
-  const product = listProducts().find(
+  const product = (await listProducts()).find(
     (p) => slugify(p.brand) === brand && p.status !== "DRAFT"
   );
   if (!product) return {};
@@ -29,7 +29,7 @@ export default async function BrandPage({
   params: Promise<{ brand: string }>;
 }) {
   const { brand } = await params;
-  const products = listProducts()
+  const products = (await listProducts())
     .filter((p) => p.status !== "DRAFT")
     .filter((p) => slugify(p.brand) === brand);
 

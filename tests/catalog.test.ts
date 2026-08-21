@@ -22,22 +22,22 @@ beforeEach(() => {
   resetStoreForTests();
 });
 
-const ALL = () => listProducts().filter((p) => p.status !== "DRAFT");
+const ALL = async () => (await listProducts()).filter((p) => p.status !== "DRAFT");
 
-describe("filterProducts", () => {
-  it("filters by category", () => {
-    const jackets = filterProducts(ALL(), { category: "jackets" });
+describe("filterProducts", async () => {
+  it("filters by category", async () => {
+    const jackets = filterProducts(await ALL(), { category: "jackets" });
     expect(jackets.length).toBeGreaterThan(0);
     expect(jackets.every((p) => p.category === "jackets")).toBe(true);
   });
 
-  it("filters by price range", () => {
-    const result = filterProducts(ALL(), { minPrice: 10, maxPrice: 20 });
+  it("filters by price range", async () => {
+    const result = filterProducts(await ALL(), { minPrice: 10, maxPrice: 20 });
     expect(result.every((p) => p.price >= 10 && p.price <= 20)).toBe(true);
   });
 
-  it("searches across title, brand, sku and tags", () => {
-    const result = filterProducts(ALL(), { q: "carhartt" });
+  it("searches across title, brand, sku and tags", async () => {
+    const result = filterProducts(await ALL(), { q: "carhartt" });
     expect(result.length).toBeGreaterThan(0);
     expect(
       result.every(
@@ -48,34 +48,34 @@ describe("filterProducts", () => {
       )
     ).toBe(true);
 
-    const bySku = filterProducts(ALL(), { q: "VC-000381" });
+    const bySku = filterProducts(await ALL(), { q: "VC-000381" });
     expect(bySku.map((p) => p.sku)).toEqual(["VC-000381"]);
   });
 
-  it("sorts by newest and by price", () => {
-    const newest = filterProducts(ALL(), {}, "newest");
+  it("sorts by newest and by price", async () => {
+    const newest = filterProducts(await ALL(), {}, "newest");
     const times = newest.map((p) => new Date(p.listedAt).getTime());
     for (let i = 1; i < times.length; i++) {
       expect(times[i]).toBeLessThanOrEqual(times[i - 1]);
     }
 
-    const cheapest = filterProducts(ALL(), {}, "price-asc");
+    const cheapest = filterProducts(await ALL(), {}, "price-asc");
     const prices = cheapest.map((p) => p.price);
     for (let i = 1; i < prices.length; i++) {
       expect(prices[i]).toBeGreaterThanOrEqual(prices[i - 1]);
     }
   });
 
-  it("hides non-available stock when onlyAvailable is set", () => {
-    const result = filterProducts(ALL(), { onlyAvailable: true });
+  it("hides non-available stock when onlyAvailable is set", async () => {
+    const result = filterProducts(await ALL(), { onlyAvailable: true });
     expect(result.every((p) => p.status !== "SOLD")).toBe(true);
     expect(result.some((p) => p.sku === "VC-000365")).toBe(false);
   });
 });
 
-describe("facets", () => {
-  it("extracts brands, sizes, conditions and price bounds", () => {
-    const facets = getFacets(ALL());
+describe("facets", async () => {
+  it("extracts brands, sizes, conditions and price bounds", async () => {
+    const facets = getFacets(await ALL());
     expect(facets.brands).toContain("Carhartt");
     expect(facets.brands).toContain("Nike");
     expect(facets.sizes.length).toBeGreaterThan(0);
@@ -84,9 +84,9 @@ describe("facets", () => {
   });
 });
 
-describe("recently sold", () => {
-  it("returns sold pieces with soldAt dates, newest first", () => {
-    const sold = getRecentlySold(ALL(), 10);
+describe("recently sold", async () => {
+  it("returns sold pieces with soldAt dates, newest first", async () => {
+    const sold = getRecentlySold(await ALL(), 10);
     expect(sold.length).toBeGreaterThan(0);
     expect(sold.every((p) => p.status === "SOLD" && p.soldAt)).toBe(true);
     const times = sold.map((p) => new Date(p.soldAt!).getTime());
@@ -96,10 +96,10 @@ describe("recently sold", () => {
   });
 });
 
-describe("similar products", () => {
-  it("suggests available pieces from the same category or brand, excluding self", () => {
-    const product = getProductBySku("VC-000381")!;
-    const similar = getSimilar(product, 4);
+describe("similar products", async () => {
+  it("suggests available pieces from the same category or brand, excluding self", async () => {
+    const product = (await getProductBySku("VC-000381"))!;
+    const similar = await getSimilar(product, 4);
     expect(similar.length).toBeGreaterThan(0);
     expect(similar.every((p) => p.sku !== product.sku)).toBe(true);
     expect(

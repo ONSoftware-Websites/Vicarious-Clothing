@@ -26,36 +26,36 @@ beforeEach(() => {
   resetStoreForTests();
 });
 
-describe("inventory reservation", () => {
-  it("reserves available stock and rejects already-reserved stock", () => {
-    const first = reserveProducts(["VC-000381"]);
+describe("inventory reservation", async () => {
+  it("reserves available stock and rejects already-reserved stock", async () => {
+    const first = await reserveProducts(["VC-000381"]);
     expect(first.ok).toEqual(["VC-000381"]);
     expect(first.gone).toEqual([]);
-    expect(getProductBySku("VC-000381")?.status).toBe("RESERVED");
+    expect((await getProductBySku("VC-000381"))?.status).toBe("RESERVED");
 
-    const second = reserveProducts(["VC-000381"]);
+    const second = await reserveProducts(["VC-000381"]);
     expect(second.gone).toEqual(["VC-000381"]);
   });
 
-  it("releases reservations", () => {
-    reserveProducts(["VC-000381"]);
-    releaseProducts(["VC-000381"]);
-    expect(getProductBySku("VC-000381")?.status).toBe("AVAILABLE");
+  it("releases reservations", async () => {
+    await reserveProducts(["VC-000381"]);
+    await releaseProducts(["VC-000381"]);
+    expect((await getProductBySku("VC-000381"))?.status).toBe("AVAILABLE");
   });
 
-  it("expires stale reservations lazily", () => {
-    reserveProducts(["VC-000381"]);
-    const product = getProductBySku("VC-000381");
+  it("expires stale reservations lazily", async () => {
+    await reserveProducts(["VC-000381"]);
+    const product = await getProductBySku("VC-000381");
     expect(product).toBeTruthy();
     product!.reservedUntil = new Date(Date.now() - 1000).toISOString();
-    expireReservations();
-    expect(getProductBySku("VC-000381")?.status).toBe("AVAILABLE");
+    await expireReservations();
+    expect((await getProductBySku("VC-000381"))?.status).toBe("AVAILABLE");
   });
 });
 
-describe("order creation", () => {
-  it("creates a PAID order, marks stock sold, and blocks a second buyer", () => {
-    const result = createOrder({
+describe("order creation", async () => {
+  it("creates a PAID order, marks stock sold, and blocks a second buyer", async () => {
+    const result = await createOrder({
       email: "buyer@test.co.uk",
       name: "Test Buyer",
       items: [{ sku: "VC-000381" }],
@@ -73,9 +73,9 @@ describe("order creation", () => {
     expect(result.order!.id).toMatch(/^VC-\d+$/);
     expect(result.order!.status).toBe("PAID");
     expect(result.order!.total).toBe(67.95);
-    expect(getProductBySku("VC-000381")?.status).toBe("SOLD");
+    expect((await getProductBySku("VC-000381"))?.status).toBe("SOLD");
 
-    const race = createOrder({
+    const race = await createOrder({
       email: "second@test.co.uk",
       name: "Second Buyer",
       items: [{ sku: "VC-000381" }],
@@ -91,8 +91,8 @@ describe("order creation", () => {
     expect(race.order).toBeUndefined();
   });
 
-  it("keeps stock reserved for PENDING_PAYMENT and sells on capture", () => {
-    const result = createOrder({
+  it("keeps stock reserved for PENDING_PAYMENT and sells on capture", async () => {
+    const result = await createOrder({
       email: "pending@test.co.uk",
       name: "Pending Buyer",
       items: [{ sku: "VC-000402" }],
@@ -108,14 +108,14 @@ describe("order creation", () => {
     });
 
     expect(result.order!.status).toBe("PENDING_PAYMENT");
-    expect(getProductBySku("VC-000402")?.status).toBe("RESERVED");
+    expect((await getProductBySku("VC-000402"))?.status).toBe("RESERVED");
 
-    markOrderPaid(result.order!.id);
-    expect(getProductBySku("VC-000402")?.status).toBe("SOLD");
+    await markOrderPaid(result.order!.id);
+    expect((await getProductBySku("VC-000402"))?.status).toBe("SOLD");
   });
 
-  it("cancels stale pending orders for an email, leaving paid orders alone", () => {
-    createOrder({
+  it("cancels stale pending orders for an email, leaving paid orders alone", async () => {
+    await createOrder({
       email: "repeat@test.co.uk",
       name: "Repeat Buyer",
       items: [{ sku: "VC-000388" }],
@@ -129,7 +129,7 @@ describe("order creation", () => {
       status: "PENDING_PAYMENT",
       paymentProvider: "stripe",
     });
-    createOrder({
+    await createOrder({
       email: "repeat@test.co.uk",
       name: "Repeat Buyer",
       items: [{ sku: "VC-000395" }],
@@ -144,9 +144,9 @@ describe("order creation", () => {
       paymentProvider: "demo",
     });
 
-    cancelPendingOrdersForEmail("repeat@test.co.uk");
+    await cancelPendingOrdersForEmail("repeat@test.co.uk");
 
-    const orders = listOrders("repeat@test.co.uk");
+    const orders = await listOrders("repeat@test.co.uk");
     const pending = orders.find((o) => o.status === "PENDING_PAYMENT");
     const paid = orders.find((o) => o.status === "PAID");
     expect(pending).toBeUndefined();
@@ -154,9 +154,9 @@ describe("order creation", () => {
   });
 });
 
-describe("discounts", () => {
-  it("applies a percentage discount to the basket", () => {
-    const result = evaluateDiscount("WELCOME10", {
+describe("discounts", async () => {
+  it("applies a percentage discount to the basket", async () => {
+    const result = await evaluateDiscount("WELCOME10", {
       subtotal: 64,
       email: "fresh@test.co.uk",
       itemSkus: ["VC-000381"],
@@ -166,8 +166,8 @@ describe("discounts", () => {
     expect(result.discount?.type).toBe("percentage");
   });
 
-  it("enforces the minimum basket", () => {
-    const result = evaluateDiscount("WELCOME10", {
+  it("enforces the minimum basket", async () => {
+    const result = await evaluateDiscount("WELCOME10", {
       subtotal: 10,
       email: "fresh@test.co.uk",
       itemSkus: ["VC-000381"],
@@ -176,8 +176,8 @@ describe("discounts", () => {
     expect(result.error).toContain("£30");
   });
 
-  it("caps fixed discounts at the subtotal", () => {
-    const result = evaluateDiscount("FIVEROFF", {
+  it("caps fixed discounts at the subtotal", async () => {
+    const result = await evaluateDiscount("FIVEROFF", {
       subtotal: 41,
       email: "fixed@test.co.uk",
       itemSkus: ["VC-000381"],
@@ -186,8 +186,8 @@ describe("discounts", () => {
     expect(result.discount?.amount).toBe(5);
   });
 
-  it("blocks codes already used by an email", () => {
-    const result = evaluateDiscount("FIVEROFF", {
+  it("blocks codes already used by an email", async () => {
+    const result = await evaluateDiscount("FIVEROFF", {
       subtotal: 50,
       email: "henry@example.com",
       itemSkus: ["VC-000381"],
@@ -195,10 +195,10 @@ describe("discounts", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("blocks expired codes", () => {
-    const discount = listDiscounts().find((d) => d.code === "JACKETS15");
+  it("blocks expired codes", async () => {
+    const discount = (await listDiscounts()).find((d) => d.code === "JACKETS15");
     discount!.expiresAt = new Date(Date.now() - 1000).toISOString();
-    const result = evaluateDiscount("JACKETS15", {
+    const result = await evaluateDiscount("JACKETS15", {
       subtotal: 50,
       email: "expired@test.co.uk",
       itemSkus: ["VC-000381"],
@@ -206,15 +206,15 @@ describe("discounts", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("restricts category-specific codes to matching pieces", () => {
-    const jacket = evaluateDiscount("JACKETS15", {
+  it("restricts category-specific codes to matching pieces", async () => {
+    const jacket = await evaluateDiscount("JACKETS15", {
       subtotal: 50,
       email: "cats@test.co.uk",
       itemSkus: ["VC-000381"],
     });
     expect(jacket.ok).toBe(true);
 
-    const hoodie = evaluateDiscount("JACKETS15", {
+    const hoodie = await evaluateDiscount("JACKETS15", {
       subtotal: 50,
       email: "cats@test.co.uk",
       itemSkus: ["VC-000412"],
@@ -222,8 +222,8 @@ describe("discounts", () => {
     expect(hoodie.ok).toBe(false);
   });
 
-  it("free delivery discount carries zero amount", () => {
-    const result = evaluateDiscount("FREESHIP", {
+  it("free delivery discount carries zero amount", async () => {
+    const result = await evaluateDiscount("FREESHIP", {
       subtotal: 20,
       email: "freeship@test.co.uk",
       itemSkus: ["VC-000434"],
@@ -234,9 +234,9 @@ describe("discounts", () => {
   });
 });
 
-describe("product economics", () => {
-  it("computes profit and margin from cost, fees and packaging", () => {
-    const product = getProductBySku("VC-000381")!;
+describe("product economics", async () => {
+  it("computes profit and margin from cost, fees and packaging", async () => {
+    const product = (await getProductBySku("VC-000381"))!;
     const econ = productEconomics(product);
     expect(econ.cost).toBe(18);
     expect(econ.price).toBe(64);
@@ -246,10 +246,10 @@ describe("product economics", () => {
   });
 });
 
-describe("newsletter", () => {
-  it("stores consent with a timestamp and deduplicates", () => {
-    const first = subscribeNewsletter("new@test.co.uk", "homepage");
-    const again = subscribeNewsletter("new@test.co.uk", "checkout");
+describe("newsletter", async () => {
+  it("stores consent with a timestamp and deduplicates", async () => {
+    const first = await subscribeNewsletter("new@test.co.uk", "homepage");
+    const again = await subscribeNewsletter("new@test.co.uk", "checkout");
     expect(first.consentedAt).toBeTruthy();
     expect(again).toBeTruthy();
   });

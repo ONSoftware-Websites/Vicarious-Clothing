@@ -16,6 +16,8 @@ import type {
 import { RESERVATION_MINUTES } from "@/lib/site";
 import { estimateFees, PACKAGING_COST, seedImage } from "@/lib/utils";
 import { buildSeedProducts } from "@/lib/server/seed";
+import { getSupabase } from "@/lib/server/supabase";
+import * as supabaseStore from "@/lib/server/supabase-store";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DATA_FILE = path.join(DATA_DIR, "store.json");
@@ -467,7 +469,7 @@ function save() {
   }
 }
 
-export function expireReservations(now = Date.now()) {
+async function localExpireReservations(now = Date.now()) {
   const data = load();
   let changed = false;
   for (const product of data.products) {
@@ -484,26 +486,26 @@ export function expireReservations(now = Date.now()) {
   if (changed) save();
 }
 
-export function listProducts(): Product[] {
-  expireReservations();
+async function localListProducts(){
+  await localExpireReservations();
   return load().products;
 }
 
-export function getProductBySku(sku: string): Product | undefined {
-  expireReservations();
+async function localGetProductBySku(sku: string){
+  await localExpireReservations();
   return load().products.find((p) => p.sku.toLowerCase() === sku.toLowerCase());
 }
 
-export function getProductBySlug(slug: string): Product | undefined {
-  expireReservations();
+async function localGetProductBySlug(slug: string){
+  await localExpireReservations();
   return load().products.find((p) => p.slug === slug);
 }
 
-export function upsertProduct(
+async function localUpsertProduct(
   product: Product,
   actor: string,
   detail: string
-): Product {
+){
   const data = load();
   const index = data.products.findIndex((p) => p.sku === product.sku);
   if (index >= 0) {
@@ -522,7 +524,7 @@ export function upsertProduct(
   return product;
 }
 
-export function setProductStatus(sku: string, status: Product["status"]) {
+async function localSetProductStatus(sku: string, status: Product["status"]) {
   const data = load();
   const product = data.products.find((p) => p.sku === sku);
   if (!product) return;
@@ -532,7 +534,7 @@ export function setProductStatus(sku: string, status: Product["status"]) {
   save();
 }
 
-export function nextSku(): string {
+async function localNextSku(){
   const data = load();
   const max = data.products.reduce((m, p) => {
     const n = Number.parseInt(p.sku.replace(/\D/g, ""), 10);
@@ -541,11 +543,11 @@ export function nextSku(): string {
   return `VC-${String(max + 1).padStart(6, "0")}`;
 }
 
-export function duplicateProduct(sku: string, actor: string) {
+async function localDuplicateProduct(sku: string, actor: string) {
   const data = load();
   const source = data.products.find((p) => p.sku === sku);
   if (!source) return undefined;
-  const newSku = nextSku();
+  const newSku = await localNextSku();
   const copy: Product = {
     ...structuredClone(source),
     sku: newSku,
@@ -567,8 +569,8 @@ export function duplicateProduct(sku: string, actor: string) {
   return copy;
 }
 
-export function reserveProducts(skus: string[]): { ok: string[]; gone: string[] } {
-  expireReservations();
+async function localReserveProducts(skus: string[]) {
+  await localExpireReservations();
   const data = load();
   const until = new Date(
     Date.now() + RESERVATION_MINUTES * 60 * 1000
@@ -589,7 +591,7 @@ export function reserveProducts(skus: string[]): { ok: string[]; gone: string[] 
   return { ok, gone };
 }
 
-export function releaseProducts(skus: string[]) {
+async function localReleaseProducts(skus: string[]) {
   const data = load();
   let changed = false;
   for (const sku of skus) {
@@ -603,7 +605,7 @@ export function releaseProducts(skus: string[]) {
   if (changed) save();
 }
 
-export function markSoldByOrder(skus: string[]) {
+async function localMarkSoldByOrder(skus: string[]) {
   const data = load();
   for (const sku of skus) {
     const product = data.products.find((p) => p.sku === sku);
@@ -627,12 +629,8 @@ export interface CreateOrderInput {
   checkoutUrl?: string;
 }
 
-export function createOrder(input: CreateOrderInput): {
-  order?: Order;
-  gone?: string[];
-  error?: string;
-} {
-  expireReservations();
+async function localCreateOrder(input: CreateOrderInput) {
+  await localExpireReservations();
   const data = load();
   const items = [];
   const gone: string[] = [];
@@ -665,7 +663,7 @@ export function createOrder(input: CreateOrderInput): {
 
   let discount: Order["discount"];
   if (input.discountCode) {
-    const result = evaluateDiscount(input.discountCode, {
+    const result = await localEvaluateDiscount(input.discountCode, {
       subtotal,
       email: input.email,
       itemSkus: items.map((i) => i.sku),
@@ -705,13 +703,13 @@ export function createOrder(input: CreateOrderInput): {
   data.orderCounter += 1;
 
   if (status === "PAID") {
-    markSoldByOrder(items.map((i) => i.sku));
+    await localMarkSoldByOrder(items.map((i) => i.sku));
   } else {
-    reserveProducts(items.map((i) => i.sku));
+    await localReserveProducts(items.map((i) => i.sku));
   }
 
   if (input.discountCode && discount) {
-    recordDiscountUsage(input.discountCode, input.email);
+    await localRecordDiscountUsage(input.discountCode, input.email);
   }
 
   data.auditLog.unshift({
@@ -726,14 +724,14 @@ export function createOrder(input: CreateOrderInput): {
   return { order };
 }
 
-export function markOrderPaid(id: string): Order | undefined {
+async function localMarkOrderPaid(id: string){
   const data = load();
   const order = data.orders.find((o) => o.id.toUpperCase() === id.toUpperCase());
   if (!order) return undefined;
   if (order.status === "PAID") return order;
   order.status = "PAID";
   order.updatedAt = new Date().toISOString();
-  markSoldByOrder(order.items.map((i) => i.sku));
+  await localMarkSoldByOrder(order.items.map((i) => i.sku));
   data.auditLog.unshift({
     id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     actor: order.name,
@@ -746,7 +744,7 @@ export function markOrderPaid(id: string): Order | undefined {
   return order;
 }
 
-export function cancelPendingOrdersForEmail(email: string) {
+async function localCancelPendingOrdersForEmail(email: string) {
   const data = load();
   let changed = false;
   for (const order of data.orders) {
@@ -762,7 +760,7 @@ export function cancelPendingOrdersForEmail(email: string) {
   if (changed) save();
 }
 
-export function setOrderPayment(
+async function localSetOrderPayment(
   id: string,
   paymentIntentId: string,
   checkoutUrl?: string
@@ -789,10 +787,10 @@ export interface DiscountResult {
   error?: string;
 }
 
-export function evaluateDiscount(
+async function localEvaluateDiscount(
   code: string,
   context: DiscountContext
-): DiscountResult {
+){
   const data = load();
   const discount = data.discounts.find(
     (d) => d.code.toLowerCase() === code.trim().toLowerCase()
@@ -852,7 +850,7 @@ export function evaluateDiscount(
   };
 }
 
-export function recordDiscountUsage(code: string, email: string) {
+async function localRecordDiscountUsage(code: string, email: string) {
   const data = load();
   const discount = data.discounts.find(
     (d) => d.code.toLowerCase() === code.toLowerCase()
@@ -865,14 +863,14 @@ export function recordDiscountUsage(code: string, email: string) {
   save();
 }
 
-export function listDiscounts(): Discount[] {
+async function localListDiscounts(){
   return load().discounts;
 }
 
-export function upsertDiscount(
+async function localUpsertDiscount(
   discount: Discount,
   actor: string
-): Discount {
+){
   const data = load();
   const index = data.discounts.findIndex((d) => d.id === discount.id);
   if (index >= 0) data.discounts[index] = discount;
@@ -888,7 +886,7 @@ export function upsertDiscount(
   return discount;
 }
 
-export function deleteDiscount(id: string, actor: string) {
+async function localDeleteDiscount(id: string, actor: string) {
   const data = load();
   const discount = data.discounts.find((d) => d.id === id);
   if (!discount) return;
@@ -903,18 +901,18 @@ export function deleteDiscount(id: string, actor: string) {
   save();
 }
 
-export function logEmail(entry: Omit<EmailLogEntry, "id">) {
+async function localLogEmail(entry: Omit<EmailLogEntry, "id">) {
   const data = load();
   data.emailLog.unshift({ ...entry, id: `email-${Date.now()}-${Math.floor(Math.random() * 1000)}` });
   data.emailLog = data.emailLog.slice(0, 200);
   save();
 }
 
-export function listEmails(limit = 100): EmailLogEntry[] {
+async function localListEmails(limit = 100){
   return load().emailLog.slice(0, limit);
 }
 
-export function recordVisit() {
+async function localRecordVisit() {
   const data = load();
   const day = new Date().toISOString().slice(0, 10);
   data.visits.total += 1;
@@ -922,7 +920,7 @@ export function recordVisit() {
   save();
 }
 
-export function getVisits() {
+async function localGetVisits() {
   const data = load();
   return {
     total: data.visits.total,
@@ -930,17 +928,17 @@ export function getVisits() {
   };
 }
 
-export function getOrder(id: string): Order | undefined {
+async function localGetOrder(id: string){
   return load().orders.find((o) => o.id.toUpperCase() === id.toUpperCase());
 }
 
-export function listOrders(email?: string): Order[] {
+async function localListOrders(email?: string){
   const orders = load().orders;
   if (email) return orders.filter((o) => o.email.toLowerCase() === email.toLowerCase());
   return orders;
 }
 
-export function updateOrderStatus(id: string, status: OrderStatus, actor: string) {
+async function localUpdateOrderStatus(id: string, status: OrderStatus, actor: string) {
   const data = load();
   const order = data.orders.find((o) => o.id.toUpperCase() === id.toUpperCase());
   if (!order) return undefined;
@@ -960,7 +958,7 @@ export function updateOrderStatus(id: string, status: OrderStatus, actor: string
   return order;
 }
 
-export function setOrderTracking(
+async function localSetOrderTracking(
   id: string,
   carrier: string,
   tracking: string,
@@ -983,9 +981,9 @@ export function setOrderTracking(
   return order;
 }
 
-export function createLead(
+async function localCreateLead(
   input: Omit<SellToUsLead, "id" | "status" | "createdAt">
-): SellToUsLead {
+){
   const data = load();
   const lead: SellToUsLead = {
     ...input,
@@ -998,11 +996,11 @@ export function createLead(
   return lead;
 }
 
-export function listLeads(): SellToUsLead[] {
+async function localListLeads(){
   return load().leads;
 }
 
-export function updateLeadStatus(
+async function localUpdateLeadStatus(
   id: string,
   status: SellToUsLead["status"],
   offer?: string
@@ -1016,11 +1014,11 @@ export function updateLeadStatus(
   return lead;
 }
 
-export function listAuditLog(limit = 30): AuditEntry[] {
+async function localListAuditLog(limit = 30){
   return load().auditLog.slice(0, limit);
 }
 
-export function productEconomics(product: Product) {
+function localProductEconomics(product: Product) {
   const price = product.price;
   const cost = product.cost ?? 0;
   const fees = estimateFees(price);
@@ -1030,10 +1028,10 @@ export function productEconomics(product: Product) {
   return { price, cost, fees, packaging, profit, margin };
 }
 
-export function subscribeNewsletter(
+async function localSubscribeNewsletter(
   email: string,
   source: string
-): NewsletterSubscriber {
+){
   const data = load();
   const existing = data.subscribers.find(
     (s) => s.email.toLowerCase() === email.toLowerCase()
@@ -1054,14 +1052,14 @@ export function subscribeNewsletter(
   return subscriber;
 }
 
-export function listSubscribers(): NewsletterSubscriber[] {
+async function localListSubscribers(){
   return load().subscribers;
 }
 
-export function createPurchase(
+async function localCreatePurchase(
   input: Omit<StockPurchase, "id" | "createdAt">,
   actor: string
-): StockPurchase {
+){
   const data = load();
   const purchase: StockPurchase = {
     ...input,
@@ -1081,11 +1079,11 @@ export function createPurchase(
   return purchase;
 }
 
-export function listPurchases(): StockPurchase[] {
+async function localListPurchases(){
   return load().purchases;
 }
 
-export function markPurchasePaid(id: string, actor: string) {
+async function localMarkPurchasePaid(id: string, actor: string) {
   const data = load();
   const purchase = data.purchases.find((p) => p.id === id);
   if (!purchase) return undefined;
@@ -1103,7 +1101,7 @@ export function markPurchasePaid(id: string, actor: string) {
   return purchase;
 }
 
-export function listPosts(includeUnpublished = false): JournalPost[] {
+async function localListPosts(includeUnpublished = false){
   return load()
     .posts.filter((p) => includeUnpublished || p.published)
     .sort(
@@ -1112,11 +1110,11 @@ export function listPosts(includeUnpublished = false): JournalPost[] {
     );
 }
 
-export function getPostBySlug(slug: string): JournalPost | undefined {
+async function localGetPostBySlug(slug: string){
   return load().posts.find((p) => p.slug === slug && p.published);
 }
 
-export function upsertPost(post: JournalPost, actor: string): JournalPost {
+async function localUpsertPost(post: JournalPost, actor: string){
   const data = load();
   const index = data.posts.findIndex((p) => p.id === post.id);
   if (index >= 0) data.posts[index] = post;
@@ -1132,7 +1130,7 @@ export function upsertPost(post: JournalPost, actor: string): JournalPost {
   return post;
 }
 
-export function deletePost(id: string, actor: string) {
+async function localDeletePost(id: string, actor: string) {
   const data = load();
   const post = data.posts.find((p) => p.id === id);
   if (!post) return;
@@ -1147,6 +1145,279 @@ export function deletePost(id: string, actor: string) {
   save();
 }
 
-export function resetStoreForTests() {
+function localResetStoreForTests() {
   cache = null;
 }
+// ---------------------------------------------------------------
+// Public API — dispatches to Supabase when configured, otherwise
+// the local file/memory backend.
+// ---------------------------------------------------------------
+
+export async function expireReservations() {
+  const db = getSupabase();
+  if (db) return supabaseStore.expireReservations(db);
+  return localExpireReservations();
+}
+
+export async function listProducts(): Promise<Product[]> {
+  const db = getSupabase();
+  if (db) return supabaseStore.listProducts(db);
+  return localListProducts();
+}
+
+export async function getProductBySku(sku: string): Promise<Product | undefined> {
+  const db = getSupabase();
+  if (db) return supabaseStore.getProductBySku(db, sku);
+  return localGetProductBySku(sku);
+}
+
+export async function getProductBySlug(slug: string): Promise<Product | undefined> {
+  const db = getSupabase();
+  if (db) return supabaseStore.getProductBySlug(db, slug);
+  return localGetProductBySlug(slug);
+}
+
+export async function upsertProduct(product: Product, actor: string, detail: string): Promise<Product> {
+  const db = getSupabase();
+  if (db) return supabaseStore.upsertProduct(db, product, actor, detail);
+  return localUpsertProduct(product, actor, detail);
+}
+
+export async function setProductStatus(sku: string, status: Product["status"]) {
+  const db = getSupabase();
+  if (db) return supabaseStore.setProductStatus(db, sku, status);
+  return localSetProductStatus(sku, status);
+}
+
+export async function nextSku(): Promise<string> {
+  const db = getSupabase();
+  if (db) return supabaseStore.nextSku(db);
+  return localNextSku();
+}
+
+export async function duplicateProduct(sku: string, actor: string): Promise<Product | undefined> {
+  const db = getSupabase();
+  if (db) return supabaseStore.duplicateProduct(db, sku, actor);
+  return localDuplicateProduct(sku, actor);
+}
+
+export async function reserveProducts(skus: string[]): Promise<{ ok: string[]; gone: string[] }> {
+  const db = getSupabase();
+  if (db) return supabaseStore.reserveProducts(db, skus);
+  return localReserveProducts(skus);
+}
+
+export async function releaseProducts(skus: string[]) {
+  const db = getSupabase();
+  if (db) return supabaseStore.releaseProducts(db, skus);
+  return localReleaseProducts(skus);
+}
+
+export async function markSoldByOrder(skus: string[]) {
+  const db = getSupabase();
+  if (db) return supabaseStore.markSoldByOrder(db, skus);
+  return localMarkSoldByOrder(skus);
+}
+
+export async function createOrder(
+  input: CreateOrderInput
+): Promise<{ order?: Order; gone?: string[]; error?: string }> {
+  const db = getSupabase();
+  if (db) return supabaseStore.createOrder(db, input);
+  return localCreateOrder(input);
+}
+
+export async function markOrderPaid(id: string): Promise<Order | undefined> {
+  const db = getSupabase();
+  if (db) return supabaseStore.markOrderPaid(db, id);
+  return localMarkOrderPaid(id);
+}
+
+export async function setOrderPayment(id: string, paymentIntentId: string, checkoutUrl?: string) {
+  const db = getSupabase();
+  if (db) return supabaseStore.setOrderPayment(db, id, paymentIntentId);
+  return localSetOrderPayment(id, paymentIntentId, checkoutUrl);
+}
+
+export async function cancelPendingOrdersForEmail(email: string) {
+  const db = getSupabase();
+  if (db) return supabaseStore.cancelPendingOrdersForEmail(db, email);
+  return localCancelPendingOrdersForEmail(email);
+}
+
+export async function evaluateDiscount(
+  code: string,
+  context: DiscountContext
+): Promise<DiscountResult> {
+  const db = getSupabase();
+  if (db) return supabaseStore.evaluateDiscount(db, code, context);
+  return localEvaluateDiscount(code, context);
+}
+
+export async function recordDiscountUsage(code: string, email: string) {
+  const db = getSupabase();
+  if (db) return supabaseStore.recordDiscountUsage(db, code, email);
+  return localRecordDiscountUsage(code, email);
+}
+
+export async function listDiscounts(): Promise<Discount[]> {
+  const db = getSupabase();
+  if (db) return supabaseStore.listDiscounts(db);
+  return localListDiscounts();
+}
+
+export async function upsertDiscount(discount: Discount, actor: string): Promise<Discount> {
+  const db = getSupabase();
+  if (db) return supabaseStore.upsertDiscount(db, discount, actor);
+  return localUpsertDiscount(discount, actor);
+}
+
+export async function deleteDiscount(id: string, actor: string) {
+  const db = getSupabase();
+  if (db) return supabaseStore.deleteDiscount(db, id, actor);
+  return localDeleteDiscount(id, actor);
+}
+
+export async function logEmail(entry: Omit<EmailLogEntry, "id">) {
+  const db = getSupabase();
+  if (db) return supabaseStore.logEmail(db, entry);
+  return localLogEmail(entry);
+}
+
+export async function listEmails(limit = 100): Promise<EmailLogEntry[]> {
+  const db = getSupabase();
+  if (db) return supabaseStore.listEmails(db, limit);
+  return localListEmails(limit);
+}
+
+export async function recordVisit() {
+  const db = getSupabase();
+  if (db) return supabaseStore.recordVisit(db);
+  return localRecordVisit();
+}
+
+export async function getVisits() {
+  const db = getSupabase();
+  if (db) return supabaseStore.getVisits(db);
+  return localGetVisits();
+}
+
+export async function getOrder(id: string): Promise<Order | undefined> {
+  const db = getSupabase();
+  if (db) return supabaseStore.getOrder(db, id);
+  return localGetOrder(id);
+}
+
+export async function listOrders(email?: string): Promise<Order[]> {
+  const db = getSupabase();
+  if (db) return supabaseStore.listOrders(db, email);
+  return localListOrders(email);
+}
+
+export async function updateOrderStatus(id: string, status: OrderStatus, actor: string) {
+  const db = getSupabase();
+  if (db) return supabaseStore.updateOrderStatus(db, id, status, actor);
+  return localUpdateOrderStatus(id, status, actor);
+}
+
+export async function setOrderTracking(id: string, carrier: string, tracking: string, actor: string) {
+  const db = getSupabase();
+  if (db) return supabaseStore.setOrderTracking(db, id, carrier, tracking, actor);
+  return localSetOrderTracking(id, carrier, tracking, actor);
+}
+
+export async function createLead(
+  input: Omit<SellToUsLead, "id" | "status" | "createdAt">
+): Promise<SellToUsLead> {
+  const db = getSupabase();
+  if (db) return supabaseStore.createLead(db, input);
+  return localCreateLead(input);
+}
+
+export async function listLeads(): Promise<SellToUsLead[]> {
+  const db = getSupabase();
+  if (db) return supabaseStore.listLeads(db);
+  return localListLeads();
+}
+
+export async function updateLeadStatus(
+  id: string,
+  status: SellToUsLead["status"],
+  offer?: string
+): Promise<SellToUsLead | undefined> {
+  const db = getSupabase();
+  if (db) return supabaseStore.updateLeadStatus(db, id, status, offer);
+  return localUpdateLeadStatus(id, status, offer);
+}
+
+export async function listAuditLog(limit = 30): Promise<AuditEntry[]> {
+  const db = getSupabase();
+  if (db) return supabaseStore.listAuditLog(db, limit);
+  return localListAuditLog(limit);
+}
+
+export function productEconomics(product: Product) {
+  return localProductEconomics(product);
+}
+
+export async function subscribeNewsletter(email: string, source: string): Promise<NewsletterSubscriber> {
+  const db = getSupabase();
+  if (db) return supabaseStore.subscribeNewsletter(db, email, source);
+  return localSubscribeNewsletter(email, source);
+}
+
+export async function listSubscribers(): Promise<NewsletterSubscriber[]> {
+  const db = getSupabase();
+  if (db) return supabaseStore.listSubscribers(db);
+  return localListSubscribers();
+}
+
+export async function createPurchase(
+  input: Omit<StockPurchase, "id" | "createdAt">,
+  actor: string
+): Promise<StockPurchase> {
+  const db = getSupabase();
+  if (db) return supabaseStore.createPurchase(db, input, actor);
+  return localCreatePurchase(input, actor);
+}
+
+export async function listPurchases(): Promise<StockPurchase[]> {
+  const db = getSupabase();
+  if (db) return supabaseStore.listPurchases(db);
+  return localListPurchases();
+}
+
+export async function markPurchasePaid(id: string, actor: string) {
+  const db = getSupabase();
+  if (db) return supabaseStore.markPurchasePaid(db, id, actor);
+  return localMarkPurchasePaid(id, actor);
+}
+
+export async function listPosts(includeUnpublished = false): Promise<JournalPost[]> {
+  const db = getSupabase();
+  if (db) return supabaseStore.listPosts(db, includeUnpublished);
+  return localListPosts(includeUnpublished);
+}
+
+export async function getPostBySlug(slug: string): Promise<JournalPost | undefined> {
+  const db = getSupabase();
+  if (db) return supabaseStore.getPostBySlug(db, slug);
+  return localGetPostBySlug(slug);
+}
+
+export async function upsertPost(post: JournalPost, actor: string): Promise<JournalPost> {
+  const db = getSupabase();
+  if (db) return supabaseStore.upsertPost(db, post, actor);
+  return localUpsertPost(post, actor);
+}
+
+export async function deletePost(id: string, actor: string) {
+  const db = getSupabase();
+  if (db) return supabaseStore.deletePost(db, id, actor);
+  return localDeletePost(id, actor);
+}
+
+export function resetStoreForTests() {
+  localResetStoreForTests();
+}
+

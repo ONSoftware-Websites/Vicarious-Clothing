@@ -10,8 +10,8 @@ import { seedImage } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default function Home() {
-  const products = listProducts();
+export default async function Home() {
+  const products = await listProducts();
   const newIn = getNewIn(products, 8);
   const picks = getPicks(products, 4);
   const recentlySold = getRecentlySold(products, 6);

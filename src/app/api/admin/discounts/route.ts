@@ -16,15 +16,15 @@ export async function POST(request: NextRequest) {
     const action = String(body.action ?? "save");
 
     if (action === "delete") {
-      deleteDiscount(String(body.id), "Henry");
+      await deleteDiscount(String(body.id), "Henry");
       return Response.json({ ok: true });
     }
 
     if (action === "toggle") {
-      const existing = listDiscounts().find((d) => d.id === String(body.id));
+      const existing = (await listDiscounts()).find((d) => d.id === String(body.id));
       if (!existing) return Response.json({ error: "Not found" }, { status: 404 });
       const updated: Discount = { ...existing, active: !existing.active };
-      upsertDiscount(updated, "Henry");
+      await upsertDiscount(updated, "Henry");
       return Response.json({ ok: true, discount: updated });
     }
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       const value = type === "free_delivery" ? 0 : Number(discount.value ?? 0);
 
       const existing = discount.id
-        ? listDiscounts().find((d) => d.id === discount.id)
+        ? (await listDiscounts()).find((d) => d.id === discount.id)
         : undefined;
 
       const full: Discount = {
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         createdAt: existing?.createdAt ?? new Date().toISOString(),
       };
 
-      upsertDiscount(full, "Henry");
+      await upsertDiscount(full, "Henry");
       return Response.json({ ok: true, discount: full });
     }
 

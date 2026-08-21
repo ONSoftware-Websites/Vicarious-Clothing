@@ -8,8 +8,8 @@ export async function GET(request: NextRequest) {
     .filter(Boolean);
 
   const products = skus.length
-    ? listProducts().filter((p) => skus.includes(p.sku))
-    : listProducts().filter((p) => p.status !== "DRAFT");
+    ? (await listProducts()).filter((p) => skus.includes(p.sku))
+    : (await listProducts()).filter((p) => p.status !== "DRAFT");
 
   return Response.json({
     products: products.map((p) => ({

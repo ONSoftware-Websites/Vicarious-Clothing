@@ -5,7 +5,7 @@ export async function GET() {
   const authError = await requireAdminApi();
   if (authError) return authError;
 
-  const subscribers = listSubscribers();
+  const subscribers = await listSubscribers();
   const rows = [
     ["email", "source", "consented_at"],
     ...subscribers.map((s) => [s.email, s.source, s.consentedAt]),

@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Marketplace" };
 
-export default function MarketplacePage() {
-  const products = listProducts().filter((p) => p.status !== "DRAFT");
+export default async function MarketplacePage() {
+  const products = await (await listProducts()).filter((p) => p.status !== "DRAFT");
 
   const counts = MARKETPLACES.map((channel: Marketplace) => ({
     channel,

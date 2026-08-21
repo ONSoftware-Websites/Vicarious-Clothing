@@ -20,14 +20,14 @@ export interface ShopParams {
   collection?: string;
 }
 
-export function ShopView({
+export async function ShopView({
   category,
   params,
 }: {
   category?: Category | "new-in" | "sale";
   params: ShopParams;
 }) {
-  const allProducts = listProducts().filter((p) => p.status !== "DRAFT");
+  const allProducts = (await listProducts()).filter((p) => p.status !== "DRAFT");
   const facets = getFacets(allProducts);
 
   const filters = {

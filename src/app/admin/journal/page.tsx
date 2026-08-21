@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Journal" };
 
-export default function AdminJournalPage() {
-  const posts = listPosts(true);
+export default async function AdminJournalPage() {
+  const posts = await listPosts(true);
 
   return (
     <div className="space-y-8">

@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const action = String(body.action ?? "save");
 
     if (action === "duplicate") {
-      const copy = duplicateProduct(String(body.sku), "Henry");
+      const copy = await duplicateProduct(String(body.sku), "Henry");
       if (!copy) return Response.json({ error: "Not found" }, { status: 404 });
       return Response.json({ ok: true, sku: copy.sku });
     }
@@ -29,21 +29,21 @@ export async function POST(request: NextRequest) {
       if (!["AVAILABLE", "SOLD", "ARCHIVED", "DRAFT"].includes(status)) {
         return Response.json({ error: "Invalid status" }, { status: 400 });
       }
-      setProductStatus(String(body.sku), status as Product["status"]);
+      await setProductStatus(String(body.sku), status as Product["status"]);
       return Response.json({ ok: true });
     }
 
     if (action === "discount") {
       const sku = String(body.sku);
       const newPrice = Number(body.price);
-      const product = getProductBySku(sku);
+      const product = await getProductBySku(sku);
       if (!product) return Response.json({ error: "Not found" }, { status: 404 });
       const updated: Product = {
         ...product,
         compareAtPrice: product.price,
         price: newPrice,
       };
-      upsertProduct(
+      await upsertProduct(
         updated,
         "Henry",
         `${sku} discounted to £${newPrice.toFixed(2)}`
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       if (!["LISTED", "NOT_LISTED"].includes(status)) {
         return Response.json({ error: "Invalid status" }, { status: 400 });
       }
-      const product = getProductBySku(sku);
+      const product = await getProductBySku(sku);
       if (!product) return Response.json({ error: "Not found" }, { status: 404 });
       const updated: Product = {
         ...product,
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
           m.channel === channel ? { ...m, status: status as never } : m
         ),
       };
-      upsertProduct(
+      await upsertProduct(
         updated,
         "Henry",
         `${sku} ${channel}: ${status}`
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (action === "sold_elsewhere") {
       const sku = String(body.sku);
       const channel = String(body.channel);
-      const product = getProductBySku(sku);
+      const product = await getProductBySku(sku);
       if (!product) return Response.json({ error: "Not found" }, { status: 404 });
       const updated: Product = {
         ...product,
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
             : m
         ),
       };
-      upsertProduct(
+      await upsertProduct(
         updated,
         "Henry",
         `${sku} sold on ${channel} — website delisted`
@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
         return Response.json({ error: "Missing required fields" }, { status: 400 });
       }
 
-      const existing = product.sku ? getProductBySku(product.sku) : undefined;
-      const sku = existing ? existing.sku : nextSku();
+      const existing = product.sku ? await getProductBySku(product.sku) : undefined;
+      const sku = existing ? existing.sku : await nextSku();
       const slug = existing
         ? existing.slug
         : `${sku.toLowerCase()}-${slugify(product.brand)}-${slugify(product.name)}`;
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
         featured: Boolean(product.featured),
       };
 
-      upsertProduct(
+      await upsertProduct(
         full,
         "Henry",
         existing ? `${sku} updated` : `${sku} created`

@@ -20,7 +20,7 @@ export default async function SearchPage({
   const raw = await searchParams;
   const q = typeof raw.q === "string" ? raw.q : "";
 
-  const products = listProducts().filter((p) => p.status !== "DRAFT");
+  const products = (await listProducts()).filter((p) => p.status !== "DRAFT");
   const results = q
     ? filterProducts(products, { q, onlyAvailable: false }, "newest")
     : [];

@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     if (!email || !email.includes("@")) {
       return Response.json({ error: "Missing email" }, { status: 400 });
     }
-    cancelPendingOrdersForEmail(email);
+    await cancelPendingOrdersForEmail(email);
     return Response.json({ ok: true });
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 });

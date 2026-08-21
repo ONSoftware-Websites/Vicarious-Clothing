@@ -114,8 +114,8 @@ export function getRecentlySold(products: Product[], limit = 6) {
     .slice(0, limit);
 }
 
-export function getSimilar(product: Product, limit = 4) {
-  const products = listProducts();
+export async function getSimilar(product: Product, limit = 4) {
+  const products = await listProducts();
   return products
     .filter(
       (p) =>

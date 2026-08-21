@@ -64,7 +64,11 @@ descriptor attached for your dashboard and the customer's bank statement.
    STRIPE_SECRET_KEY=sk_test_...
    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
    ```
-3. For local testing, forward webhooks:
+3. Set the bank-statement name once in the Stripe dashboard
+   (Settings → Account details → Statement descriptor, e.g.
+   `VICARIOUS CLOTHING` — max 22 characters). Customers see this on
+   their statement next to every charge.
+4. For local testing, forward webhooks:
    ```
    stripe listen --forward-to localhost:3000/api/webhooks/stripe
    ```
@@ -92,19 +96,39 @@ The app currently uses a file-backed store designed 1:1 with the blueprint
 data model. To go live you'll want Supabase:
 
 1. Create a project at supabase.com.
-2. In the SQL editor, run the whole of `supabase/schema.sql`
-   (tables, enums, RLS policies, indexes — mirrors blueprint section 23).
-3. Add to `.env`:
+2. In the SQL editor, run the whole of `supabase/schema.sql`, then
+   `supabase/seed.sql` if you want to start with the demo catalogue
+   (products, discounts, journal posts).
+3. Add to `.env` (or Vercel):
    ```
    NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+   SUPABASE_SERVICE_ROLE_KEY=eyJ...
    ```
-4. Replace the internals of `src/lib/server/store.ts` with Supabase queries
-   (the function signatures stay the same — every page and API keeps working).
-5. Enable Supabase Auth (email/password now; Google/Apple later) and use the
-   `profiles.role` column for STAFF/MANAGER/ADMIN/OWNER. The admin gate
-   already enforces roles server-side via `src/lib/server/admin-auth.ts` —
-   per-user 2FA comes with this step, per blueprint section 24.
+   The store switches to Supabase automatically when both are set — every
+   page, admin screen and API already reads through the same interface.
+   The service-role key bypasses row-level security and must never be
+   exposed to the browser (it isn't — server only).
+4. Local sanity checks before deploying:
+   ```
+   node supabase/validate-schema.mjs   # schema builds, seeds, joins
+   node supabase/validate-seed.mjs     # demo data loads + writes seed.sql
+   ```
+5. Supabase Auth replaces the demo accounts later (the `profiles` table
+   and the STAFF/MANAGER/ADMIN/OWNER role column are already in place,
+   with the admin gate enforcing roles server-side).
+
+### 2.6.1 Reset the database
+
+If you need to return the Supabase database to a blank slate, run the
+`supabase/reset.sql` script in the SQL editor. This removes every table,
+enum, trigger and function created by `schema.sql` and `seed.sql`,
+leaving only the Supabase Auth infrastructure. After running the reset,
+re‑run `schema.sql` to rebuild, or `seed.sql` to rebuild with the demo
+catalogue.
+
+The reset script is also validated with `node supabase/validate-reset.mjs`
+(PGlite): it confirms all tables are dropped, enums are removed, and the
+schema can be re‑applied cleanly.
 
 ### 2.7 Domain & deployment (Vercel)
 Everything needed to deploy is in the repo — `vercel.json` (security

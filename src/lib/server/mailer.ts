@@ -196,7 +196,7 @@ export async function sendEmail(input: {
         }),
       });
       if (res.ok) {
-        logEmail({
+        await logEmail({
           to: input.to,
           subject,
           template: input.template,
@@ -215,7 +215,7 @@ export async function sendEmail(input: {
 
   const filename = `${Date.now()}-${input.template}-${input.to.replace(/[^a-z0-9@.-]/gi, "_")}.html`;
   writeHtmlFile(filename, html);
-  logEmail({
+  await logEmail({
     to: input.to,
     subject,
     template: input.template,

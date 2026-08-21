@@ -28,11 +28,11 @@ function Stat({
   );
 }
 
-export default function AdminDashboardPage() {
-  const products = listProducts();
-  const orders = listOrders();
-  const leads = listLeads();
-  const auditLog = listAuditLog(12);
+export default async function AdminDashboardPage() {
+  const products = await listProducts();
+  const orders = await listOrders();
+  const leads = await listLeads();
+  const auditLog = await listAuditLog(12);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

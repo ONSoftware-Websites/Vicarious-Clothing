@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Sell To Us" };
 
-export default function AdminLeadsPage() {
-  const leads = listLeads();
+export default async function AdminLeadsPage() {
+  const leads = await listLeads();
 
   return (
     <div>

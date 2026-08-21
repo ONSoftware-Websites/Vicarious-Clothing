@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     if (!name || !email || !brand || !itemType || !size || !condition) {
       return Response.json({ error: "Missing required fields" }, { status: 400 });
     }
-    const lead = createLead({
+    const lead = await createLead({
       name: String(name),
       email: String(email),
       brand: String(brand),

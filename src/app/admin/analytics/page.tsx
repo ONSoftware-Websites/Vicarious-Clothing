@@ -31,10 +31,10 @@ function Metric({
   );
 }
 
-export default function AnalyticsPage() {
-  const orders = listOrders();
-  const products = listProducts();
-  const visits = getVisits();
+export default async function AnalyticsPage() {
+  const orders = await listOrders();
+  const products = await listProducts();
+  const visits = await getVisits();
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);

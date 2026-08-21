@@ -20,7 +20,7 @@ export async function PATCH(
       const status = String(body.status).toUpperCase() as OrderStatus;
 
       if (status === "REFUNDED") {
-        const existing = getOrder(id);
+        const existing = await getOrder(id);
         if (existing && existing.paymentIntentId) {
           const stripe = getStripe();
           if (stripe) {
@@ -35,7 +35,7 @@ export async function PATCH(
         }
       }
 
-      const order = updateOrderStatus(id, status, "Henry");
+      const order = await updateOrderStatus(id, status, "Henry");
       if (!order) return Response.json({ error: "Not found" }, { status: 404 });
 
       const emailTemplates: Partial<Record<OrderStatus, "order-dispatched" | "order-delivered" | "order-refunded" | "order-cancelled">> = {
@@ -53,7 +53,7 @@ export async function PATCH(
     }
 
     if (body.carrier || body.tracking) {
-      const order = setOrderTracking(
+      const order = await setOrderTracking(
         id,
         String(body.carrier ?? ""),
         String(body.tracking ?? ""),

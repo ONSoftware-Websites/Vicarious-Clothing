@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Discounts" };
 
-export default function DiscountsPage() {
-  const discounts = listDiscounts();
+export default async function DiscountsPage() {
+  const discounts = await listDiscounts();
 
   return (
     <div className="space-y-8">

@@ -21,10 +21,10 @@ export default async function EditProductPage({
   params: Promise<{ sku: string }>;
 }) {
   const { sku } = await params;
-  const product = getProductBySku(sku);
+  const product = await getProductBySku(sku);
   if (!product) notFound();
 
-  const history = listAuditLog(500).filter(
+  const history = (await listAuditLog(500)).filter(
     (entry) => entry.detail?.toUpperCase().includes(sku.toUpperCase())
   );
 
