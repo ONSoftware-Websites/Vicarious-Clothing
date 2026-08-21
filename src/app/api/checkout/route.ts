@@ -5,7 +5,6 @@ import {
   createOrder,
   evaluateDiscount,
   getProductBySku,
-  reserveProducts,
   setOrderPayment,
 } from "@/lib/server/store";
 import { getStripe, stripeEnabled } from "@/lib/server/payments";
@@ -63,11 +62,6 @@ export async function POST(request: NextRequest) {
       postcode: String(address.postcode ?? ""),
       country: String(address.country ?? ""),
     };
-
-    const reservation = await reserveProducts(skus);
-    if (reservation.gone.length) {
-      return Response.json({ gone: reservation.gone }, { status: 409 });
-    }
 
     const stripe = stripeEnabled() ? getStripe() : null;
 
