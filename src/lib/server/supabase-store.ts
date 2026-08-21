@@ -70,10 +70,11 @@ function str(value: unknown, fallback = ""): string {
 async function fetchBySku<T extends Row>(
   db: SupabaseClient,
   table: string,
-  skus: string[]
+  skus: string[],
+  column = "sku"
 ): Promise<T[]> {
   if (skus.length === 0) return [];
-  const { data, error } = await db.from(table).select("*").in("sku", skus);
+  const { data, error } = await db.from(table).select("*").in(column, skus);
   if (error) throw new Error(error.message);
   return (data ?? []) as T[];
 }
@@ -148,7 +149,7 @@ async function loadProductData(
       if (error) throw new Error(error.message);
       return (data ?? []) as Row[];
     })(),
-    fetchBySku(db, "product_measurements", skus),
+    fetchBySku(db, "product_measurements", skus, "product_sku"),
     (async () => {
       const { data, error } = await db
         .from("product_marketplace")

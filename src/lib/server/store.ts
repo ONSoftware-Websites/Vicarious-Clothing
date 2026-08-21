@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   AuditEntry,
   Discount,
@@ -1152,96 +1153,107 @@ function localResetStoreForTests() {
 // the local file/memory backend.
 // ---------------------------------------------------------------
 
+let supabaseDisabled = false;
+
+function disableSupabase(scope: string, error: unknown) {
+  supabaseDisabled = true;
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn(
+    `[store] Supabase failed in ${scope}; falling back to local data: ${message}`
+  );
+}
+
+async function withStoreFallback<T>(
+  scope: string,
+  db: SupabaseClient | null,
+  supabaseAction: ((db: SupabaseClient) => Promise<unknown>) | null,
+  localAction: () => Promise<T>
+): Promise<T> {
+  if (!supabaseDisabled && db && supabaseAction) {
+    try {
+      return (await supabaseAction(db)) as T;
+    } catch (error) {
+      disableSupabase(scope, error);
+    }
+  }
+  return localAction();
+}
+
 export async function expireReservations() {
   const db = getSupabase();
-  if (db) return supabaseStore.expireReservations(db);
-  return localExpireReservations();
+  return withStoreFallback("expireReservations", db, (client) => supabaseStore.expireReservations(client), localExpireReservations);
 }
 
 export async function listProducts(): Promise<Product[]> {
   const db = getSupabase();
-  if (db) return supabaseStore.listProducts(db);
-  return localListProducts();
+  return withStoreFallback("listProducts", db, (client) => supabaseStore.listProducts(client), localListProducts);
 }
 
 export async function getProductBySku(sku: string): Promise<Product | undefined> {
   const db = getSupabase();
-  if (db) return supabaseStore.getProductBySku(db, sku);
-  return localGetProductBySku(sku);
+  return withStoreFallback("getProductBySku", db, (client) => supabaseStore.getProductBySku(client, sku), () => localGetProductBySku(sku));
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | undefined> {
   const db = getSupabase();
-  if (db) return supabaseStore.getProductBySlug(db, slug);
-  return localGetProductBySlug(slug);
+  return withStoreFallback("getProductBySlug", db, (client) => supabaseStore.getProductBySlug(client, slug), () => localGetProductBySlug(slug));
 }
 
 export async function upsertProduct(product: Product, actor: string, detail: string): Promise<Product> {
   const db = getSupabase();
-  if (db) return supabaseStore.upsertProduct(db, product, actor, detail);
-  return localUpsertProduct(product, actor, detail);
+  return withStoreFallback("upsertProduct", db, (client) => supabaseStore.upsertProduct(client, product, actor, detail), () => localUpsertProduct(product, actor, detail));
 }
 
 export async function setProductStatus(sku: string, status: Product["status"]) {
   const db = getSupabase();
-  if (db) return supabaseStore.setProductStatus(db, sku, status);
-  return localSetProductStatus(sku, status);
+  return withStoreFallback("setProductStatus", db, (client) => supabaseStore.setProductStatus(client, sku, status), () => localSetProductStatus(sku, status));
 }
 
 export async function nextSku(): Promise<string> {
   const db = getSupabase();
-  if (db) return supabaseStore.nextSku(db);
-  return localNextSku();
+  return withStoreFallback("nextSku", db, (client) => supabaseStore.nextSku(client), localNextSku);
 }
 
 export async function duplicateProduct(sku: string, actor: string): Promise<Product | undefined> {
   const db = getSupabase();
-  if (db) return supabaseStore.duplicateProduct(db, sku, actor);
-  return localDuplicateProduct(sku, actor);
+  return withStoreFallback("duplicateProduct", db, (client) => supabaseStore.duplicateProduct(client, sku, actor), () => localDuplicateProduct(sku, actor));
 }
 
 export async function reserveProducts(skus: string[]): Promise<{ ok: string[]; gone: string[] }> {
   const db = getSupabase();
-  if (db) return supabaseStore.reserveProducts(db, skus);
-  return localReserveProducts(skus);
+  return withStoreFallback("reserveProducts", db, (client) => supabaseStore.reserveProducts(client, skus), () => localReserveProducts(skus));
 }
 
 export async function releaseProducts(skus: string[]) {
   const db = getSupabase();
-  if (db) return supabaseStore.releaseProducts(db, skus);
-  return localReleaseProducts(skus);
+  return withStoreFallback("releaseProducts", db, (client) => supabaseStore.releaseProducts(client, skus), () => localReleaseProducts(skus));
 }
 
 export async function markSoldByOrder(skus: string[]) {
   const db = getSupabase();
-  if (db) return supabaseStore.markSoldByOrder(db, skus);
-  return localMarkSoldByOrder(skus);
+  return withStoreFallback("markSoldByOrder", db, (client) => supabaseStore.markSoldByOrder(client, skus), () => localMarkSoldByOrder(skus));
 }
 
 export async function createOrder(
   input: CreateOrderInput
 ): Promise<{ order?: Order; gone?: string[]; error?: string }> {
   const db = getSupabase();
-  if (db) return supabaseStore.createOrder(db, input);
-  return localCreateOrder(input);
+  return withStoreFallback("createOrder", db, (client) => supabaseStore.createOrder(client, input), () => localCreateOrder(input));
 }
 
 export async function markOrderPaid(id: string): Promise<Order | undefined> {
   const db = getSupabase();
-  if (db) return supabaseStore.markOrderPaid(db, id);
-  return localMarkOrderPaid(id);
+  return withStoreFallback("markOrderPaid", db, (client) => supabaseStore.markOrderPaid(client, id), () => localMarkOrderPaid(id));
 }
 
 export async function setOrderPayment(id: string, paymentIntentId: string, checkoutUrl?: string) {
   const db = getSupabase();
-  if (db) return supabaseStore.setOrderPayment(db, id, paymentIntentId);
-  return localSetOrderPayment(id, paymentIntentId, checkoutUrl);
+  return withStoreFallback("setOrderPayment", db, (client) => supabaseStore.setOrderPayment(client, id, paymentIntentId), () => localSetOrderPayment(id, paymentIntentId, checkoutUrl));
 }
 
 export async function cancelPendingOrdersForEmail(email: string) {
   const db = getSupabase();
-  if (db) return supabaseStore.cancelPendingOrdersForEmail(db, email);
-  return localCancelPendingOrdersForEmail(email);
+  return withStoreFallback("cancelPendingOrdersForEmail", db, (client) => supabaseStore.cancelPendingOrdersForEmail(client, email), () => localCancelPendingOrdersForEmail(email));
 }
 
 export async function evaluateDiscount(
@@ -1249,94 +1261,79 @@ export async function evaluateDiscount(
   context: DiscountContext
 ): Promise<DiscountResult> {
   const db = getSupabase();
-  if (db) return supabaseStore.evaluateDiscount(db, code, context);
-  return localEvaluateDiscount(code, context);
+  return withStoreFallback("evaluateDiscount", db, (client) => supabaseStore.evaluateDiscount(client, code, context), () => localEvaluateDiscount(code, context));
 }
 
 export async function recordDiscountUsage(code: string, email: string) {
   const db = getSupabase();
-  if (db) return supabaseStore.recordDiscountUsage(db, code, email);
-  return localRecordDiscountUsage(code, email);
+  return withStoreFallback("recordDiscountUsage", db, (client) => supabaseStore.recordDiscountUsage(client, code, email), () => localRecordDiscountUsage(code, email));
 }
 
 export async function listDiscounts(): Promise<Discount[]> {
   const db = getSupabase();
-  if (db) return supabaseStore.listDiscounts(db);
-  return localListDiscounts();
+  return withStoreFallback("listDiscounts", db, (client) => supabaseStore.listDiscounts(client), localListDiscounts);
 }
 
 export async function upsertDiscount(discount: Discount, actor: string): Promise<Discount> {
   const db = getSupabase();
-  if (db) return supabaseStore.upsertDiscount(db, discount, actor);
-  return localUpsertDiscount(discount, actor);
+  return withStoreFallback("upsertDiscount", db, (client) => supabaseStore.upsertDiscount(client, discount, actor), () => localUpsertDiscount(discount, actor));
 }
 
 export async function deleteDiscount(id: string, actor: string) {
   const db = getSupabase();
-  if (db) return supabaseStore.deleteDiscount(db, id, actor);
-  return localDeleteDiscount(id, actor);
+  return withStoreFallback("deleteDiscount", db, (client) => supabaseStore.deleteDiscount(client, id, actor), () => localDeleteDiscount(id, actor));
 }
 
 export async function logEmail(entry: Omit<EmailLogEntry, "id">) {
   const db = getSupabase();
-  if (db) return supabaseStore.logEmail(db, entry);
-  return localLogEmail(entry);
+  return withStoreFallback("logEmail", db, (client) => supabaseStore.logEmail(client, entry), () => localLogEmail(entry));
 }
 
 export async function listEmails(limit = 100): Promise<EmailLogEntry[]> {
   const db = getSupabase();
-  if (db) return supabaseStore.listEmails(db, limit);
-  return localListEmails(limit);
+  return withStoreFallback("listEmails", db, (client) => supabaseStore.listEmails(client, limit), () => localListEmails(limit));
 }
 
 export async function recordVisit() {
   const db = getSupabase();
-  if (db) return supabaseStore.recordVisit(db);
-  return localRecordVisit();
+  return withStoreFallback("recordVisit", db, (client) => supabaseStore.recordVisit(client), localRecordVisit);
 }
 
 export async function getVisits() {
   const db = getSupabase();
-  if (db) return supabaseStore.getVisits(db);
-  return localGetVisits();
+  return withStoreFallback("getVisits", db, (client) => supabaseStore.getVisits(client), localGetVisits);
 }
 
 export async function getOrder(id: string): Promise<Order | undefined> {
   const db = getSupabase();
-  if (db) return supabaseStore.getOrder(db, id);
-  return localGetOrder(id);
+  return withStoreFallback("getOrder", db, (client) => supabaseStore.getOrder(client, id), () => localGetOrder(id));
 }
 
 export async function listOrders(email?: string): Promise<Order[]> {
   const db = getSupabase();
-  if (db) return supabaseStore.listOrders(db, email);
-  return localListOrders(email);
+  return withStoreFallback("listOrders", db, (client) => supabaseStore.listOrders(client, email), () => localListOrders(email));
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus, actor: string) {
   const db = getSupabase();
-  if (db) return supabaseStore.updateOrderStatus(db, id, status, actor);
-  return localUpdateOrderStatus(id, status, actor);
+  return withStoreFallback("updateOrderStatus", db, (client) => supabaseStore.updateOrderStatus(client, id, status, actor), () => localUpdateOrderStatus(id, status, actor));
 }
 
 export async function setOrderTracking(id: string, carrier: string, tracking: string, actor: string) {
   const db = getSupabase();
-  if (db) return supabaseStore.setOrderTracking(db, id, carrier, tracking, actor);
-  return localSetOrderTracking(id, carrier, tracking, actor);
+  return withStoreFallback("setOrderTracking", db, (client) => supabaseStore.setOrderTracking(client, id, carrier, tracking, actor), () => localSetOrderTracking(id, carrier, tracking, actor));
 }
 
 export async function createLead(
   input: Omit<SellToUsLead, "id" | "status" | "createdAt">
 ): Promise<SellToUsLead> {
   const db = getSupabase();
-  if (db) return supabaseStore.createLead(db, input);
-  return localCreateLead(input);
+  return withStoreFallback("createLead", db, (client) => supabaseStore.createLead(client, input), () => localCreateLead(input));
 }
 
 export async function listLeads(): Promise<SellToUsLead[]> {
   const db = getSupabase();
-  if (db) return supabaseStore.listLeads(db);
-  return localListLeads();
+  return withStoreFallback("listLeads", db, (client) => supabaseStore.listLeads(client), localListLeads);
 }
 
 export async function updateLeadStatus(
@@ -1345,14 +1342,12 @@ export async function updateLeadStatus(
   offer?: string
 ): Promise<SellToUsLead | undefined> {
   const db = getSupabase();
-  if (db) return supabaseStore.updateLeadStatus(db, id, status, offer);
-  return localUpdateLeadStatus(id, status, offer);
+  return withStoreFallback("updateLeadStatus", db, (client) => supabaseStore.updateLeadStatus(client, id, status, offer), () => localUpdateLeadStatus(id, status, offer));
 }
 
 export async function listAuditLog(limit = 30): Promise<AuditEntry[]> {
   const db = getSupabase();
-  if (db) return supabaseStore.listAuditLog(db, limit);
-  return localListAuditLog(limit);
+  return withStoreFallback("listAuditLog", db, (client) => supabaseStore.listAuditLog(client, limit), () => localListAuditLog(limit));
 }
 
 export function productEconomics(product: Product) {
@@ -1361,14 +1356,12 @@ export function productEconomics(product: Product) {
 
 export async function subscribeNewsletter(email: string, source: string): Promise<NewsletterSubscriber> {
   const db = getSupabase();
-  if (db) return supabaseStore.subscribeNewsletter(db, email, source);
-  return localSubscribeNewsletter(email, source);
+  return withStoreFallback("subscribeNewsletter", db, (client) => supabaseStore.subscribeNewsletter(client, email, source), () => localSubscribeNewsletter(email, source));
 }
 
 export async function listSubscribers(): Promise<NewsletterSubscriber[]> {
   const db = getSupabase();
-  if (db) return supabaseStore.listSubscribers(db);
-  return localListSubscribers();
+  return withStoreFallback("listSubscribers", db, (client) => supabaseStore.listSubscribers(client), localListSubscribers);
 }
 
 export async function createPurchase(
@@ -1376,47 +1369,41 @@ export async function createPurchase(
   actor: string
 ): Promise<StockPurchase> {
   const db = getSupabase();
-  if (db) return supabaseStore.createPurchase(db, input, actor);
-  return localCreatePurchase(input, actor);
+  return withStoreFallback("createPurchase", db, (client) => supabaseStore.createPurchase(client, input, actor), () => localCreatePurchase(input, actor));
 }
 
 export async function listPurchases(): Promise<StockPurchase[]> {
   const db = getSupabase();
-  if (db) return supabaseStore.listPurchases(db);
-  return localListPurchases();
+  return withStoreFallback("listPurchases", db, (client) => supabaseStore.listPurchases(client), localListPurchases);
 }
 
 export async function markPurchasePaid(id: string, actor: string) {
   const db = getSupabase();
-  if (db) return supabaseStore.markPurchasePaid(db, id, actor);
-  return localMarkPurchasePaid(id, actor);
+  return withStoreFallback("markPurchasePaid", db, (client) => supabaseStore.markPurchasePaid(client, id, actor), () => localMarkPurchasePaid(id, actor));
 }
 
 export async function listPosts(includeUnpublished = false): Promise<JournalPost[]> {
   const db = getSupabase();
-  if (db) return supabaseStore.listPosts(db, includeUnpublished);
-  return localListPosts(includeUnpublished);
+  return withStoreFallback("listPosts", db, (client) => supabaseStore.listPosts(client, includeUnpublished), () => localListPosts(includeUnpublished));
 }
 
 export async function getPostBySlug(slug: string): Promise<JournalPost | undefined> {
   const db = getSupabase();
-  if (db) return supabaseStore.getPostBySlug(db, slug);
-  return localGetPostBySlug(slug);
+  return withStoreFallback("getPostBySlug", db, (client) => supabaseStore.getPostBySlug(client, slug), () => localGetPostBySlug(slug));
 }
 
 export async function upsertPost(post: JournalPost, actor: string): Promise<JournalPost> {
   const db = getSupabase();
-  if (db) return supabaseStore.upsertPost(db, post, actor);
-  return localUpsertPost(post, actor);
+  return withStoreFallback("upsertPost", db, (client) => supabaseStore.upsertPost(client, post, actor), () => localUpsertPost(post, actor));
 }
 
 export async function deletePost(id: string, actor: string) {
   const db = getSupabase();
-  if (db) return supabaseStore.deletePost(db, id, actor);
-  return localDeletePost(id, actor);
+  return withStoreFallback("deletePost", db, (client) => supabaseStore.deletePost(client, id, actor), () => localDeletePost(id, actor));
 }
 
 export function resetStoreForTests() {
+  supabaseDisabled = false;
   localResetStoreForTests();
 }
 
