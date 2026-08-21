@@ -55,7 +55,15 @@ export default async function Home() {
             title="New In"
             link="/shop/new-in"
           />
-          <ProductGrid products={newIn} />
+          {newIn.length ? (
+            <ProductGrid products={newIn} />
+          ) : (
+            <div className="py-12 text-center">
+              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-ink-faint">Fresh stock coming</p>
+              <p className="mt-2 font-display text-lg font-medium uppercase">New pieces land weekly — check back soon.</p>
+              <Link href="/shop" className="mt-6 inline-block font-mono text-[11px] uppercase tracking-[0.14em] text-accent-deep underline underline-offset-2">Browse everything →</Link>
+            </div>
+          )}
         </Container>
       </section>
 

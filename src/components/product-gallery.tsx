@@ -31,58 +31,69 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
     };
   }, [fullscreen, step]);
 
-  const current = images[active];
+  const current = images[active] ?? images[0];
+
+  if (!images.length) {
+    return (
+      <div className="aspect-[4/5] w-full bg-cream p-12 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-ink-faint">
+        No images
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="col-span-2">
-          <button
-            type="button"
-            className="relative block w-full cursor-zoom-in overflow-hidden bg-cream"
-            onClick={() => setFullscreen(true)}
-            aria-label="Open fullscreen image viewer"
-          >
-            <Image
-              src={current?.src ?? ""}
-              alt={current?.alt ?? "Product image"}
-              width={900}
-              height={1125}
-              priority
-              className="aspect-[4/5] w-full object-cover"
-              sizes="(min-width: 1024px) 50vw, 100vw"
-            />
-            <span className="absolute bottom-3 right-3 bg-ink/70 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-paper">
-              {active + 1} / {images.length}
+      <div className="space-y-2">
+        <button
+          type="button"
+          className="group relative block w-full cursor-zoom-in overflow-hidden bg-cream"
+          onClick={() => setFullscreen(true)}
+          aria-label="Open fullscreen image viewer"
+        >
+          <Image
+            src={current?.src ?? ""}
+            alt={current?.alt ?? "Product image"}
+            width={900}
+            height={1125}
+            priority
+            className="aspect-[4/5] w-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
+            sizes="(min-width: 1024px) 50vw, 100vw"
+          />
+          <span className="absolute bottom-3 right-3 bg-ink/80 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-paper backdrop-blur">
+            {active + 1} / {images.length}
+          </span>
+          <span className="absolute inset-0 hidden items-center justify-center bg-ink/0 transition-colors group-hover:bg-ink/5 sm:flex">
+            <span className="rounded-full bg-paper/90 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink opacity-0 transition-opacity group-hover:opacity-100">
+              View
             </span>
-          </button>
-        </div>
-        {images.slice(0, 4).map((img, i) => {
-          const index = i + 1 >= images.length ? i : i + 1;
-          const image = images[index];
-          if (!image) return null;
-          return (
-            <button
-              key={image.src}
-              type="button"
-              onClick={() => setActive(index)}
-              className={cn(
-                "relative block overflow-hidden bg-cream",
-                active === index && "ring-2 ring-accent ring-offset-2"
-              )}
-              aria-label={`View image ${index + 1}`}
-            >
-              <Image
-                src={image.src}
-                alt={image.alt ?? "Product image"}
-                width={450}
-                height={562}
-                className="aspect-[4/5] w-full object-cover transition-opacity hover:opacity-80"
-                sizes="(min-width: 1024px) 25vw, 50vw"
-              />
-            </button>
-          );
-        })}
+          </span>
+        </button>
+        {images.length > 1 && (
+          <div className="grid grid-cols-4 gap-2">
+            {images.slice(0, 8).map((img, i) => (
+              <button
+                key={`${img.src}-${i}`}
+                type="button"
+                onClick={() => setActive(i)}
+                className={cn(
+                  "relative aspect-[4/5] overflow-hidden bg-cream transition-all",
+                  active === i ? "ring-2 ring-ink ring-offset-1" : "opacity-70 hover:opacity-100 hover:ring-1 hover:ring-line"
+                )}
+                aria-label={`View image ${i + 1}`}
+                aria-current={active === i}
+              >
+                <Image
+                  src={img.src}
+                  alt={img.alt ?? `Product image ${i + 1}`}
+                  width={400}
+                  height={500}
+                  className="h-full w-full object-cover"
+                  sizes="120px"
+                />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {fullscreen && (

@@ -64,6 +64,7 @@ export function BagDrawer() {
 
   const subtotal = items.reduce((sum, { line, product }) => sum + product.price * line.qty, 0);
   const remaining = FREE_DELIVERY_THRESHOLD - subtotal;
+  const progress = Math.min(100, Math.max(0, (subtotal / FREE_DELIVERY_THRESHOLD) * 100));
 
   return (
     <div
@@ -92,38 +93,47 @@ export function BagDrawer() {
 
         <div className="flex-1 overflow-y-auto px-6">
           {loading ? (
-            <div className="flex h-full items-center justify-center">
-              <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
-                Loading…
-              </p>
+            <div className="space-y-4 py-6">
+              {[1, 2].map((i) => (
+                <div key={i} className="flex gap-4 animate-pulse">
+                  <div className="h-[100px] w-20 bg-cream" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-16 bg-cream" />
+                    <div className="h-4 w-3/4 bg-line" />
+                    <div className="h-3 w-20 bg-cream" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <p className="font-display text-xl font-semibold uppercase">
-                Nothing yet.
-              </p>
-              <p className="mt-2 max-w-[220px] text-sm text-ink-soft">
-                Find something.
+            <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-accent-deep">Bag</p>
+              <p className="mt-3 font-display text-2xl font-semibold uppercase tracking-tight">Nothing yet.</p>
+              <p className="mt-2 max-w-[260px] text-sm leading-relaxed text-ink-soft">
+                One-of-one pieces don’t wait. Find something before someone else does.
               </p>
               <Link
                 href="/shop"
                 onClick={closeBag}
-                className="mt-6 inline-block border border-ink px-6 py-3 font-display text-xs font-medium uppercase tracking-[0.14em] hover:bg-ink hover:text-paper"
+                className="mt-8 inline-flex h-11 items-center justify-center bg-ink px-8 font-display text-xs font-semibold uppercase tracking-[0.16em] text-paper hover:bg-accent"
               >
                 Browse everything
+              </Link>
+              <Link href="/shop/new-in" onClick={closeBag} className="mt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint underline underline-offset-2 hover:text-accent-deep">
+                Shop new in →
               </Link>
             </div>
           ) : (
             <ul className="divide-y divide-line">
               {items.map(({ line, product }) => (
                 <li key={line.sku} className="flex gap-4 py-5">
-                  <Link href={`/product/${product.slug}`} onClick={closeBag}>
+                  <Link href={`/product/${product.slug}`} onClick={closeBag} className="shrink-0 overflow-hidden">
                     <Image
                       src={product.images[0]?.src ?? ""}
                       alt={product.name}
                       width={80}
                       height={100}
-                      className="h-[100px] w-20 object-cover"
+                      className="h-[100px] w-20 object-cover transition-transform hover:scale-[1.03]"
                     />
                   </Link>
                   <div className="flex flex-1 flex-col">
@@ -133,43 +143,23 @@ export function BagDrawer() {
                     <Link
                       href={`/product/${product.slug}`}
                       onClick={closeBag}
-                      className="font-display text-sm font-medium hover:text-accent-deep"
+                      className="font-display text-sm font-medium leading-tight hover:text-accent-deep"
                     >
                       {product.name}
                     </Link>
                     <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-                      Size {product.size} · {conditionLabel(product.condition as never).toUpperCase()}
+                      {product.sku} · Size {product.size} · {conditionLabel(product.condition as never).toUpperCase()}
                     </p>
-                    <div className="mt-auto flex items-center justify-between pt-2">
-                      <div className="flex items-center border border-line">
-                        <button
-                          type="button"
-                          onClick={() => setQty(line.sku, line.qty - 1)}
-                          className="h-8 w-8 text-sm hover:bg-cream"
-                          aria-label="Decrease quantity"
-                        >
-                          −
-                        </button>
-                        <span className="w-8 text-center font-mono text-xs">
-                          {line.qty}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setQty(line.sku, line.qty + 1)}
-                          className="h-8 w-8 text-sm hover:bg-cream"
-                          aria-label="Increase quantity"
-                        >
-                          +
-                        </button>
-                      </div>
+                    <div className="mt-auto flex items-center justify-between pt-3">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">One of one</span>
                       <div className="flex items-center gap-3">
-                        <p className="font-mono text-sm">
+                        <p className="font-mono text-sm font-medium">
                           {formatPrice(product.price * line.qty)}
                         </p>
                         <button
                           type="button"
                           onClick={() => remove(line.sku)}
-                          className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint underline underline-offset-2 hover:text-accent-deep"
+                          className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint underline underline-offset-2 hover:text-red-700"
                         >
                           Remove
                         </button>
@@ -183,16 +173,18 @@ export function BagDrawer() {
         </div>
 
         {items.length > 0 && (
-          <div className="border-t border-line px-6 py-5">
-            {remaining > 0 ? (
-              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-                Add {formatPrice(remaining)} for free UK delivery
-              </p>
-            ) : (
-              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-accent-deep">
-                Free UK delivery unlocked
-              </p>
-            )}
+          <div className="border-t border-line bg-cream px-6 py-5">
+            <div className="mb-3">
+              <div className="mb-1.5 flex justify-between font-mono text-[10px] uppercase tracking-[0.12em]">
+                <span className={remaining <= 0 ? "text-accent-deep" : "text-ink-soft"}>
+                  {remaining > 0 ? `Add ${formatPrice(remaining)} for free delivery` : "Free delivery unlocked ✓"}
+                </span>
+                <span className="text-ink-faint">{formatPrice(subtotal)} / {formatPrice(FREE_DELIVERY_THRESHOLD)}</span>
+              </div>
+              <div className="h-1.5 w-full bg-line">
+                <div className="h-1.5 bg-accent transition-all duration-500" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
             <div className="mb-4 flex items-center justify-between">
               <p className="font-display text-sm font-medium uppercase tracking-[0.14em]">
                 Subtotal

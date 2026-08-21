@@ -57,20 +57,28 @@ export default function WishlistPage() {
       </h2>
 
       {loading ? (
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-faint">
-          Loading…
-        </p>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex gap-5 py-5 animate-pulse">
+              <div className="h-[112px] w-[90px] bg-cream" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-16 bg-cream" />
+                <div className="h-4 w-3/4 bg-line" />
+                <div className="h-3 w-20 bg-cream" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : items.length === 0 ? (
-        <div className="border border-dashed border-line p-10 text-center">
-          <p className="font-display text-sm font-semibold uppercase">
-            Nothing saved yet
-          </p>
-          <p className="mt-2 text-sm text-ink-soft">
-            Tap the heart on any piece to keep it here.
+        <div className="border border-line bg-cream p-12 text-center">
+          <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-accent-deep">Wishlist</p>
+          <p className="mt-3 font-display text-xl font-semibold uppercase tracking-tight">Nothing saved yet</p>
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-soft">
+            Tap the heart on any piece to keep it here. One-of-one, so save the ones you love.
           </p>
           <Link
             href="/shop"
-            className="mt-6 inline-block border border-ink px-6 py-3 font-display text-xs font-medium uppercase tracking-[0.16em] hover:bg-ink hover:text-paper"
+            className="mt-8 inline-flex h-11 items-center justify-center bg-ink px-8 font-display text-xs font-semibold uppercase tracking-[0.16em] text-paper hover:bg-accent"
           >
             Browse everything
           </Link>
