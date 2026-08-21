@@ -30,24 +30,7 @@ export default function LoginPage() {
     }
   };
 
-  const google = async () => {
-    setError("");
-    try {
-      const supabase = createSupabaseBrowser();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
-      });
-      if (error) throw new Error(error.message);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("not enabled") || msg.includes("Unsupported provider")) {
-        setError("Google login isn’t enabled yet — use email/password or enable Google in Supabase Dashboard → Auth → Providers → Google.");
-      } else {
-        setError(msg);
-      }
-    }
-  };
+
 
   return (
     <Container className="py-16 sm:py-20">
@@ -69,9 +52,6 @@ export default function LoginPage() {
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
-        <button type="button" onClick={google} className="mt-3 flex h-12 w-full items-center justify-center border border-line font-display text-xs font-medium uppercase tracking-[0.16em] hover:bg-cream">
-          Continue with Google
-        </button>
         <div className="mt-6 flex justify-between font-mono text-[11px] uppercase tracking-[0.14em]">
           <Link href="/auth/signup" className="text-accent-deep underline underline-offset-2">Create account</Link>
           <Link href="/auth/reset" className="text-ink-faint underline underline-offset-2">Forgot password?</Link>
