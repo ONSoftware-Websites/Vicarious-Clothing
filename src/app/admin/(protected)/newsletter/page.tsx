@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { listSubscribers } from "@/lib/server/store";
 import { formatDateTime } from "@/lib/utils";
+import { NewsletterAddForm } from "@/components/admin/newsletter-add-form";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,12 @@ export default async function NewsletterPage() {
         >
           Export CSV
         </a>
+      </div>
+
+      <div className="mb-8 border border-line p-5">
+        <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.18em]">Add subscriber manually</h2>
+        <p className="mb-4 text-xs leading-relaxed text-ink-faint">Add someone who gave consent offline or via another channel. Consent is recorded with source and timestamp for GDPR.</p>
+        <NewsletterAddForm />
       </div>
 
       <div className="overflow-x-auto border border-line">

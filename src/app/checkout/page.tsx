@@ -394,6 +394,9 @@ export default function CheckoutPage() {
         setError(data.error ?? "Something went wrong placing your order. Please try again.");
         return;
       }
+      if (marketing) {
+        fetch("/api/newsletter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, source: "checkout", consent: true }) }).catch(() => {});
+      }
       checkoutFinishedRef.current = true;
       clear();
       router.replace(`/order/${data.order.id}?paid=1`);
@@ -824,6 +827,9 @@ export default function CheckoutPage() {
           amount={total}
           disabled={!terms || placing}
           onSuccess={() => {
+            if (marketing) {
+              fetch("/api/newsletter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, source: "checkout", consent: true }) }).catch(() => {});
+            }
             checkoutFinishedRef.current = true;
             clear();
             router.replace(`/order/${pendingOrderId}?paid=1`);
