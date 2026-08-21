@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { ShopView, type ShopParams } from "@/components/shop-view";
 import { COLLECTIONS } from "@/lib/site";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Shop All Clothing",
   description:
