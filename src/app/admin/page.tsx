@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listAuditLog, listLeads, listOrders, listProducts } from "@/lib/server/store";
-import { formatDateTime, formatPrice, isAgedDays } from "@/lib/utils";
+import { formatPrice, isAgedDays } from "@/lib/utils";
+import { FormatDate, FormatDateTime, Now } from "@/components/time";
 
 export const dynamic = "force-dynamic";
 
@@ -59,12 +60,7 @@ export default async function AdminDashboardPage() {
           Dashboard
         </h1>
         <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
-          {new Date().toLocaleDateString("en-GB", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}
+          <Now />
         </p>
       </div>
 
@@ -149,7 +145,7 @@ export default async function AdminDashboardPage() {
                   </p>
                 )}
                 <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-                  {formatDateTime(entry.at)}
+                  <FormatDateTime date={entry.at} />
                 </p>
               </li>
             ))}

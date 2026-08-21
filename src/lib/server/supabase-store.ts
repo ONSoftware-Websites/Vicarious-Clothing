@@ -561,7 +561,7 @@ export async function createOrder(
   if (itemsError) throw new Error(itemsError.message);
 
   if (status === "PAID") await markSoldByOrder(db, skus);
-  else await reserveProducts(db, skus);
+  // For PENDING_PAYMENT: items already reserved by checkout API; no re-reservation needed
 
   if (input.discountCode && discount) {
     await recordDiscountUsage(db, input.discountCode, input.email);

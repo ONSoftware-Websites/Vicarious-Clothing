@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { listOrders, listProducts, getVisits, productEconomics } from "@/lib/server/store";
 import { formatPrice } from "@/lib/utils";
 import { CHANNELS, type SalesChannel } from "@/lib/types";
+import { Now } from "@/components/time";
 
 export const dynamic = "force-dynamic";
 
@@ -121,8 +122,7 @@ export default async function AnalyticsPage() {
           Analytics
         </h1>
         <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
-          {now.toLocaleDateString("en-GB", { month: "long", year: "numeric" })} ·
-          completed orders only
+          <Now /> · completed orders only
         </p>
       </div>
 

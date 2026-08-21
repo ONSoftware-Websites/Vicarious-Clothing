@@ -704,9 +704,8 @@ async function localCreateOrder(input: CreateOrderInput) {
 
   if (status === "PAID") {
     await localMarkSoldByOrder(items.map((i) => i.sku));
-  } else {
-    await localReserveProducts(items.map((i) => i.sku));
   }
+  // For PENDING_PAYMENT: items already reserved by checkout API; no re-reservation needed
 
   if (input.discountCode && discount) {
     await localRecordDiscountUsage(input.discountCode, input.email);
