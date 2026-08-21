@@ -56,6 +56,23 @@ export async function GET() {
     checks["sample_query"] = { error: String(e) };
   }
 
+  // Detailed product↔inventory link check (what store.ts sees)
+  try {
+    const { listProducts } = await import("@/lib/server/store");
+    const products = await listProducts();
+    checks["store_listProducts"] = {
+      count: products.length,
+      skus: products.map((p) => ({ sku: p.sku, status: p.status, slug: p.slug })),
+    };
+    // Raw supabase products + inventory for comparison
+    const { data: rawProducts } = await supabase.from("products").select("sku, slug, name, status:inventory_items(status)").limit(10);
+    checks["raw_products"] = rawProducts;
+    const { data: rawInv } = await supabase.from("inventory_items").select("sku, status").limit(10);
+    checks["raw_inventory"] = rawInv;
+  } catch (e) {
+    checks["store_listProducts"] = { error: String(e) };
+  }
+
   return Response.json({
     ok,
     supabase: { configured: true, url: process.env.NEXT_PUBLIC_SUPABASE_URL },
