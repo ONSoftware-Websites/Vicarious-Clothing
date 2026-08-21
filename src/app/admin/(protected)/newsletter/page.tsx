@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { listSubscribers } from "@/lib/server/store";
 import { formatDateTime } from "@/lib/utils";
 import { NewsletterAddForm } from "@/components/admin/newsletter-add-form";
+import { NewsletterSendForm } from "@/components/admin/newsletter-send-form";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,10 @@ export default async function NewsletterPage() {
         <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.18em]">Add subscriber manually</h2>
         <p className="mb-4 text-xs leading-relaxed text-ink-faint">Add someone who gave consent offline or via another channel. Consent is recorded with source and timestamp for GDPR.</p>
         <NewsletterAddForm />
+      </div>
+
+      <div className="mb-8">
+        <NewsletterSendForm count={subscribers.length} />
       </div>
 
       <div className="overflow-x-auto border border-line">
@@ -69,9 +74,7 @@ export default async function NewsletterPage() {
       </div>
 
       <p className="mt-4 max-w-2xl text-xs leading-relaxed text-ink-faint">
-        Sign-ups arrive from the homepage capture and the checkout opt-in.
-        Sending campaigns itself happens in your email platform — export this
-        list and keep it synced there (Phase 3: direct integration).
+        Sign-ups arrive from the homepage capture and the checkout opt-in. You can now send directly via Resend above, or export CSV to sync with another platform.
       </p>
     </div>
   );
