@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useShopUi } from "@/hooks/use-shop-ui";
-import { TRENDING_TERMS } from "@/lib/site";
+import { CATEGORY_LABELS, TRENDING_TERMS } from "@/lib/site";
 import { conditionLabel, formatPrice } from "@/lib/utils";
 
 interface SearchResult {
@@ -23,11 +23,22 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<{ query: string; items: SearchResult[] } | null>(null);
+  const [recent, setRecent] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
+    try {
+      const raw = localStorage.getItem("vc_recent_searches");
+      if (raw) setRecent(JSON.parse(raw) as string[]);
+    } catch {}
   }, []);
+
+  const saveRecent = (term: string) => {
+    const next = [term, ...recent.filter((r) => r !== term)].slice(0, 5);
+    setRecent(next);
+    try { localStorage.setItem("vc_recent_searches", JSON.stringify(next)); } catch {}
+  };
 
   useEffect(() => {
     const query = q.trim();
@@ -50,8 +61,11 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    const term = q.trim();
+    if (!term) return;
+    saveRecent(term);
     onClose();
-    router.push(`/search?q=${encodeURIComponent(q.trim())}`);
+    router.push(`/search?q=${encodeURIComponent(term)}`);
   };
 
   const currentQuery = q.trim();
@@ -87,21 +101,47 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
 
       <div className="flex-1 overflow-y-auto p-6 md:p-8">
         {currentQuery === "" ? (
-          <div>
-            <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.22em] text-accent-deep">
-              Trending
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {TRENDING_TERMS.map((term) => (
-                <Link
-                  key={term}
-                  href={`/search?q=${encodeURIComponent(term)}`}
-                  onClick={onClose}
-                  className="border border-line px-4 py-2 font-display text-xs uppercase tracking-[0.14em] transition-colors hover:border-ink hover:bg-ink hover:text-paper"
-                >
-                  {term}
-                </Link>
-              ))}
+          <div className="space-y-8">
+            {recent.length > 0 && (
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-accent-deep">Recent</p>
+                  <button type="button" onClick={() => { setRecent([]); try { localStorage.removeItem("vc_recent_searches"); } catch {} }} className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint underline underline-offset-2">Clear</button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {recent.map((term) => (
+                    <Link key={term} href={`/search?q=${encodeURIComponent(term)}`} onClick={onClose} className="border border-line px-4 py-2 font-display text-xs uppercase tracking-[0.14em] hover:border-ink hover:bg-ink hover:text-paper">
+                      {term}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.22em] text-accent-deep">Trending</p>
+              <div className="flex flex-wrap gap-2">
+                {TRENDING_TERMS.map((term) => (
+                  <Link
+                    key={term}
+                    href={`/search?q=${encodeURIComponent(term)}`}
+                    onClick={() => { saveRecent(term); onClose(); }}
+                    className="border border-line px-4 py-2 font-display text-xs uppercase tracking-[0.14em] transition-colors hover:border-ink hover:bg-ink hover:text-paper"
+                  >
+                    {term}
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.22em] text-accent-deep">Browse</p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                  <Link key={key} href={`/shop/${key}`} onClick={onClose} className="border border-line px-4 py-2 font-display text-xs uppercase tracking-[0.14em] hover:border-ink hover:bg-ink hover:text-paper">{label}</Link>
+                ))}
+                <Link href="/shop/sale" onClick={onClose} className="border border-accent bg-accent px-4 py-2 font-display text-xs uppercase tracking-[0.14em] text-white hover:bg-accent-deep">Sale</Link>
+                <Link href="/brands" onClick={onClose} className="border border-line px-4 py-2 font-display text-xs uppercase tracking-[0.14em] hover:border-ink hover:bg-ink hover:text-paper">Brands</Link>
+                <Link href="/journal" onClick={onClose} className="border border-line px-4 py-2 font-display text-xs uppercase tracking-[0.14em] hover:border-ink hover:bg-ink hover:text-paper">Journal</Link>
+              </div>
             </div>
           </div>
         ) : searching ? (

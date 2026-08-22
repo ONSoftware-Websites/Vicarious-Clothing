@@ -437,7 +437,7 @@ export function ProductForm({ product }: { product?: Product }) {
                 />
               </div>
               <div>
-                <label htmlFor="pf-compare" className={label}>Compare-at price (£)</label>
+                <label htmlFor="pf-compare" className={label}>Sale — compare-at price (£)</label>
                 <input
                   id="pf-compare"
                   type="number"
@@ -446,8 +446,13 @@ export function ProductForm({ product }: { product?: Product }) {
                   value={form.compareAtPrice}
                   onChange={(e) => set("compareAtPrice", e.target.value)}
                   className={input}
-                  placeholder="Optional"
+                  placeholder="£80.00 → shows Sale badge + appears on /shop/sale"
                 />
+                {form.compareAtPrice && Number.parseFloat(form.compareAtPrice) > Number.parseFloat(form.price || "0") && (
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-accent-deep">
+                    {Math.round((1 - Number.parseFloat(form.price || "0") / Number.parseFloat(form.compareAtPrice)) * 100)}% off — will appear on Sale
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="pf-floor" className={label}>Floor price (£)</label>
