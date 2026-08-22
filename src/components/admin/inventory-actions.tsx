@@ -125,6 +125,17 @@ export function InventoryActions({ sku }: { sku: string }) {
       >
         Print label
       </button>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          if (!window.confirm(`Delete ${sku}? This cannot be undone.`)) return;
+          run(() => post("/api/admin/products", { action: "delete", sku }));
+        }}
+        className={`${btn} text-red-700 hover:text-red-800 disabled:opacity-40`}
+      >
+        Delete
+      </button>
       {error && <span className="font-mono text-[10px] text-red-700">{error}</span>}
     </div>
   );

@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { OrderActions } from "@/components/admin/order-actions";
+import { OrderDeleteButton } from "@/components/admin/order-delete-button";
 import { getOrder } from "@/lib/server/store";
 import { conditionLabel, formatDateTime, formatPrice } from "@/lib/utils";
 
@@ -105,6 +106,9 @@ export default async function AdminOrderPage({
             </h2>
             <div className="p-5">
               <OrderActions id={order.id} status={order.status} />
+              <div className="mt-6 border-t border-line pt-4">
+                <OrderDeleteButton id={order.id} />
+              </div>
             </div>
           </section>
         </div>

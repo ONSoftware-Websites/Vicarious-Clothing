@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LeadDeleteButton } from "@/components/admin/lead-delete-button";
 import { LeadStatusSelect } from "@/components/admin/lead-status-select";
 import { listLeads } from "@/lib/server/store";
 import { formatDateTime } from "@/lib/utils";
@@ -32,6 +33,7 @@ export default async function AdminLeadsPage() {
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Item</th>
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Notes</th>
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Status</th>
+              <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -63,11 +65,14 @@ export default async function AdminLeadsPage() {
                 <td className="px-4 py-4">
                   <LeadStatusSelect id={lead.id} status={lead.status} />
                 </td>
+                <td className="px-4 py-4">
+                  <LeadDeleteButton id={lead.id} />
+                </td>
               </tr>
             ))}
             {leads.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
+                <td colSpan={6} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
                   No leads yet
                 </td>
               </tr>

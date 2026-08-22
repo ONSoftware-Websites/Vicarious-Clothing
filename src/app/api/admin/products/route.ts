@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import type { Product } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
 import {
+  deleteProduct,
   duplicateProduct,
   getProductBySku,
   nextSku,
@@ -17,6 +18,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const action = String(body.action ?? "save");
+
+    if (action === "delete") {
+      await deleteProduct(String(body.sku), "Henry");
+      return Response.json({ ok: true });
+    }
 
     if (action === "duplicate") {
       const copy = await duplicateProduct(String(body.sku), "Henry");

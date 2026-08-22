@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { InventoryDeleteButton } from "@/components/admin/inventory-delete-button";
 import { ProductForm } from "@/components/admin/product-form";
 import { getProductBySku, listAuditLog } from "@/lib/server/store";
 import { formatDateTime } from "@/lib/utils";
@@ -30,6 +31,9 @@ export default async function EditProductPage({
 
   return (
     <div>
+      <div className="mb-6 flex justify-end">
+        <InventoryDeleteButton sku={sku} />
+      </div>
       <ProductForm product={product} />
 
       <section className="mt-12 border-t border-line pt-8">

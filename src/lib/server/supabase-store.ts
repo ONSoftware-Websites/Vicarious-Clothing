@@ -1123,6 +1123,39 @@ export async function deletePost(db: SupabaseClient, id: string, actor: string) 
   if (post) await logAudit(db, actor, "deleted journal post", post.title);
 }
 
+export async function deleteProduct(db: SupabaseClient, sku: string, actor: string) {
+  await db.from("product_images").delete().eq("product_sku", sku);
+  await db.from("product_measurements").delete().eq("product_sku", sku);
+  await db.from("product_marketplace").delete().eq("sku", sku);
+  await db.from("inventory_items").delete().eq("sku", sku);
+  await db.from("inventory_history").delete().eq("sku", sku);
+  const { error } = await db.from("products").delete().eq("sku", sku);
+  if (error) throw new Error(error.message);
+  await logAudit(db, actor, "deleted product", sku);
+}
+
+export async function deleteLead(db: SupabaseClient, id: string, actor: string) {
+  await db.from("purchase_leads").delete().eq("id", id);
+  await logAudit(db, actor, "deleted lead", id);
+}
+
+export async function deleteOrder(db: SupabaseClient, id: string, actor: string) {
+  await db.from("order_items").delete().eq("order_id", id);
+  await db.from("orders").delete().eq("id", id);
+  await logAudit(db, actor, "deleted order", id);
+}
+
+export async function deletePurchase(db: SupabaseClient, id: string, actor: string) {
+  await db.from("stock_purchase_items").delete().eq("purchase_id", id);
+  await db.from("stock_purchases").delete().eq("id", id);
+  await logAudit(db, actor, "deleted purchase", id);
+}
+
+export async function deleteSubscriber(db: SupabaseClient, email: string, actor: string) {
+  await db.from("newsletter_subscribers").delete().eq("email", email.toLowerCase());
+  await logAudit(db, actor, "deleted subscriber", email);
+}
+
 export async function logEmail(db: SupabaseClient, entry: Omit<EmailLogEntry, "id">) {
   const id = `email-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const { error } = await db.from("email_log").insert({

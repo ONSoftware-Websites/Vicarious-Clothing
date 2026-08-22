@@ -1183,6 +1183,81 @@ async function localDeletePost(id: string, actor: string) {
   save();
 }
 
+async function localDeleteProduct(sku: string, actor: string) {
+  const data = load();
+  const product = data.products.find((p) => p.sku === sku);
+  if (!product) return;
+  data.products = data.products.filter((p) => p.sku !== sku);
+  data.auditLog.unshift({
+    id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    actor,
+    action: "deleted product",
+    detail: sku,
+    at: new Date().toISOString(),
+  });
+  save();
+}
+
+async function localDeleteLead(id: string, actor: string) {
+  const data = load();
+  const lead = data.leads.find((l) => l.id === id);
+  if (!lead) return;
+  data.leads = data.leads.filter((l) => l.id !== id);
+  data.auditLog.unshift({
+    id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    actor,
+    action: "deleted lead",
+    detail: id,
+    at: new Date().toISOString(),
+  });
+  save();
+}
+
+async function localDeleteOrder(id: string, actor: string) {
+  const data = load();
+  const order = data.orders.find((o) => o.id === id);
+  if (!order) return;
+  data.orders = data.orders.filter((o) => o.id !== id);
+  data.auditLog.unshift({
+    id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    actor,
+    action: "deleted order",
+    detail: id,
+    at: new Date().toISOString(),
+  });
+  save();
+}
+
+async function localDeletePurchase(id: string, actor: string) {
+  const data = load();
+  const purchase = data.purchases.find((p) => p.id === id);
+  if (!purchase) return;
+  data.purchases = data.purchases.filter((p) => p.id !== id);
+  data.auditLog.unshift({
+    id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    actor,
+    action: "deleted purchase",
+    detail: id,
+    at: new Date().toISOString(),
+  });
+  save();
+}
+
+async function localDeleteSubscriber(email: string, actor: string) {
+  const data = load();
+  const sub = data.subscribers.find((s) => s.email.toLowerCase() === email.toLowerCase());
+  if (!sub) return;
+  data.subscribers = data.subscribers.filter((s) => s.email.toLowerCase() !== email.toLowerCase());
+  data.auditLog.unshift({
+    id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    actor,
+    action: "deleted subscriber",
+    detail: email,
+    at: new Date().toISOString(),
+  });
+  save();
+}
+
 function localResetStoreForTests() {
   cache = null;
 }
@@ -1438,6 +1513,31 @@ export async function upsertPost(post: JournalPost, actor: string): Promise<Jour
 export async function deletePost(id: string, actor: string) {
   const db = getSupabase();
   return withStoreFallback("deletePost", db, (client) => supabaseStore.deletePost(client, id, actor), () => localDeletePost(id, actor));
+}
+
+export async function deleteProduct(sku: string, actor: string) {
+  const db = getSupabase();
+  return withStoreFallback("deleteProduct", db, (client) => supabaseStore.deleteProduct(client, sku, actor), () => localDeleteProduct(sku, actor));
+}
+
+export async function deleteLead(id: string, actor: string) {
+  const db = getSupabase();
+  return withStoreFallback("deleteLead", db, (client) => supabaseStore.deleteLead(client, id, actor), () => localDeleteLead(id, actor));
+}
+
+export async function deleteOrder(id: string, actor: string) {
+  const db = getSupabase();
+  return withStoreFallback("deleteOrder", db, (client) => supabaseStore.deleteOrder(client, id, actor), () => localDeleteOrder(id, actor));
+}
+
+export async function deletePurchase(id: string, actor: string) {
+  const db = getSupabase();
+  return withStoreFallback("deletePurchase", db, (client) => supabaseStore.deletePurchase(client, id, actor), () => localDeletePurchase(id, actor));
+}
+
+export async function deleteSubscriber(email: string, actor: string) {
+  const db = getSupabase();
+  return withStoreFallback("deleteSubscriber", db, (client) => supabaseStore.deleteSubscriber(client, email, actor), () => localDeleteSubscriber(email, actor));
 }
 
 export function resetStoreForTests() {

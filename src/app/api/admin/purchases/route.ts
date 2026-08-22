@@ -3,6 +3,7 @@ import type { StockPurchase } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
 import {
   createPurchase,
+  deletePurchase,
   getProductBySku,
   markPurchasePaid,
 } from "@/lib/server/store";
@@ -19,6 +20,11 @@ export async function POST(request: NextRequest) {
       const purchase = await markPurchasePaid(String(body.id), "Henry");
       if (!purchase) return Response.json({ error: "Not found" }, { status: 404 });
       return Response.json({ ok: true, purchase });
+    }
+
+    if (action === "delete") {
+      await deletePurchase(String(body.id), "Henry");
+      return Response.json({ ok: true });
     }
 
     if (action === "save") {
@@ -77,4 +83,13 @@ export async function POST(request: NextRequest) {
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 });
   }
+}
+
+export async function DELETE(request: NextRequest) {
+  const authError = await requireAdminApi();
+  if (authError) return authError;
+  const id = request.nextUrl.searchParams.get("id") ?? "";
+  if (!id) return Response.json({ error: "Missing id" }, { status: 400 });
+  await deletePurchase(id, "Henry");
+  return Response.json({ ok: true });
 }

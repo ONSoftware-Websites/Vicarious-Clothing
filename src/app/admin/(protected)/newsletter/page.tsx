@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { listSubscribers } from "@/lib/server/store";
 import { formatDateTime } from "@/lib/utils";
 import { NewsletterAddForm } from "@/components/admin/newsletter-add-form";
+import { NewsletterRow } from "@/components/admin/newsletter-row";
 import { NewsletterSendForm } from "@/components/admin/newsletter-send-form";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,7 @@ export default async function NewsletterPage() {
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Email</th>
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Source</th>
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Consented</th>
+              <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -60,11 +62,14 @@ export default async function NewsletterPage() {
                 <td className="px-4 py-3 font-mono text-xs">
                   {formatDateTime(s.consentedAt)}
                 </td>
+                <td className="px-4 py-3">
+                  <NewsletterRow email={s.email} />
+                </td>
               </tr>
             ))}
             {subscribers.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
+                <td colSpan={4} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
                   No subscribers yet
                 </td>
               </tr>

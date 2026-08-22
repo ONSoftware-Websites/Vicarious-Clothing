@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PurchaseActions } from "@/components/admin/purchase-actions";
+import { PurchaseDeleteButton } from "@/components/admin/purchase-delete-button";
 import { PurchaseForm } from "@/components/admin/purchase-form";
 import { listPurchases } from "@/lib/server/store";
 import { formatDate, formatPrice } from "@/lib/utils";
@@ -36,6 +37,7 @@ export default async function PurchasesPage() {
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Status</th>
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Notes</th>
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Date</th>
+              <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -83,11 +85,14 @@ export default async function PurchasesPage() {
                 <td className="px-4 py-4 font-mono text-xs whitespace-nowrap">
                   {formatDate(p.createdAt)}
                 </td>
+                <td className="px-4 py-4">
+                  <PurchaseDeleteButton id={p.id} />
+                </td>
               </tr>
             ))}
             {purchases.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
+                <td colSpan={7} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
                   No purchases recorded yet
                 </td>
               </tr>

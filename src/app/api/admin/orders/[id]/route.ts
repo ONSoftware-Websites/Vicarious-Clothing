@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import type { OrderStatus } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
-import { getOrder, setOrderTracking, updateOrderStatus } from "@/lib/server/store";
+import { deleteOrder, getOrder, setOrderTracking, updateOrderStatus } from "@/lib/server/store";
 import { getStripe } from "@/lib/server/payments";
 import { sendEmail } from "@/lib/server/mailer";
 
@@ -67,4 +67,15 @@ export async function PATCH(
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 });
   }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const authError = await requireAdminApi();
+  if (authError) return authError;
+  const { id } = await params;
+  await deleteOrder(id, "Henry");
+  return Response.json({ ok: true });
 }
