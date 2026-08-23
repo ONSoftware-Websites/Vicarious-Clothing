@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import type { OrderStatus } from "@/lib/types";
+import { ORDER_STATUSES, type OrderStatus } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
 import { deleteOrder, getOrder, setOrderTracking, updateOrderStatus } from "@/lib/server/store";
 import { getStripe } from "@/lib/server/payments";
@@ -18,27 +18,69 @@ export async function PATCH(
 
     if (body.status) {
       const status = String(body.status).toUpperCase() as OrderStatus;
+      if (!ORDER_STATUSES.includes(status)) {
+        return Response.json({ error: "Invalid order status" }, { status: 400 });
+      }
 
-      if (status === "REFUNDED") {
-        const existing = await getOrder(id);
-        if (existing && existing.paymentIntentId) {
-          const stripe = getStripe();
-          if (stripe) {
-            try {
-              await stripe.refunds.create({
-                payment_intent: existing.paymentIntentId,
-              });
-            } catch (err) {
-              console.error("Stripe refund failed:", err);
-            }
-          }
+      let existing = await getOrder(id);
+      if (!existing) return Response.json({ error: "Not found" }, { status: 404 });
+      if (existing.status === status) {
+        return Response.json({ ok: true, order: existing, unchanged: true });
+      }
+
+      // If tracking is supplied with dispatch, persist it before sending the email.
+      if (status === "DISPATCHED" && (body.carrier || body.tracking)) {
+        existing =
+          (await setOrderTracking(
+            id,
+            String(body.carrier ?? existing.carrier ?? ""),
+            String(body.tracking ?? existing.tracking ?? ""),
+            "Henry"
+          )) ?? existing;
+      }
+
+      if (status === "DISPATCHED" && (!existing.carrier?.trim() || !existing.tracking?.trim())) {
+        return Response.json(
+          { error: "Save the carrier and tracking number before marking the order dispatched." },
+          { status: 409 }
+        );
+      }
+
+      let refundAmount: number | undefined;
+      let refundReference: string | undefined;
+      if (status === "REFUNDED" && existing.paymentProvider === "stripe") {
+        if (!existing.paymentIntentId) {
+          return Response.json(
+            { error: "This Stripe order has no payment intent to refund." },
+            { status: 409 }
+          );
         }
+        const stripe = getStripe();
+        if (!stripe) {
+          return Response.json({ error: "Stripe is not configured; refund not attempted." }, { status: 503 });
+        }
+
+        // Stripe must confirm the refund before local status or customer email changes.
+        const refund = await stripe.refunds.create(
+          { payment_intent: existing.paymentIntentId },
+          { idempotencyKey: `vicarious-refund-${existing.id}` }
+        );
+        if (refund.status === "failed" || refund.status === "canceled") {
+          return Response.json({ error: "Stripe did not accept the refund." }, { status: 502 });
+        }
+        refundAmount = refund.amount / 100;
+        refundReference = refund.id;
       }
 
       const order = await updateOrderStatus(id, status, "Henry");
       if (!order) return Response.json({ error: "Not found" }, { status: 404 });
 
-      const emailTemplates: Partial<Record<OrderStatus, "order-dispatched" | "order-delivered" | "order-refunded" | "order-cancelled">> = {
+      const emailTemplates: Partial<
+        Record<
+          OrderStatus,
+          "order-dispatched" | "order-delivered" | "order-refunded" | "order-cancelled"
+        >
+      > = {
         DISPATCHED: "order-dispatched",
         DELIVERED: "order-delivered",
         REFUNDED: "order-refunded",
@@ -46,26 +88,40 @@ export async function PATCH(
       };
       const template = emailTemplates[status];
       if (template) {
-        await sendEmail({ to: order.email, template, data: { order } });
+        await sendEmail({
+          to: order.email,
+          template,
+          data: {
+            order,
+            refundAmount,
+            refundReference,
+            cancellationReason: body.cancellationReason,
+            refundInformation: body.refundInformation,
+          },
+        });
       }
 
-      return Response.json({ ok: true, order });
+      return Response.json({ ok: true, order, refundReference });
     }
 
     if (body.carrier || body.tracking) {
-      const order = await setOrderTracking(
-        id,
-        String(body.carrier ?? ""),
-        String(body.tracking ?? ""),
-        "Henry"
-      );
+      const carrier = String(body.carrier ?? "").trim();
+      const tracking = String(body.tracking ?? "").trim();
+      if (!carrier || !tracking) {
+        return Response.json({ error: "Carrier and tracking number are both required." }, { status: 400 });
+      }
+      const order = await setOrderTracking(id, carrier, tracking, "Henry");
       if (!order) return Response.json({ error: "Not found" }, { status: 404 });
       return Response.json({ ok: true, order });
     }
 
     return Response.json({ error: "Nothing to update" }, { status: 400 });
-  } catch {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
+  } catch (error) {
+    console.error("Order update failed:", error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Order update failed" },
+      { status: 500 }
+    );
   }
 }
 
