@@ -1,11 +1,20 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 function secret() {
-  const value = process.env.ORDER_ACCESS_SECRET || process.env.LEAD_OFFER_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const value =
+    process.env.ORDER_ACCESS_SECRET ||
+    process.env.LEAD_OFFER_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!value) {
-    throw new Error("ORDER_ACCESS_SECRET, LEAD_OFFER_SECRET or SUPABASE_SERVICE_ROLE_KEY is required");
+    throw new Error(
+      "ORDER_ACCESS_SECRET, LEAD_OFFER_SECRET or SUPABASE_SERVICE_ROLE_KEY is required"
+    );
   }
   return value;
+}
+
+export function orderAccessCookieName(id: string) {
+  return `vc_order_${id.replace(/[^a-z0-9]/gi, "_")}`;
 }
 
 export function createOrderAccessToken(id: string, email: string) {
