@@ -1,12 +1,35 @@
+import type { NextRequest } from "next/server";
 import { getSupabase, supabaseConfigured } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+function detailedHealthAllowed(request: NextRequest) {
+  if (process.env.NODE_ENV !== "production") return true;
+  const secret = process.env.HEALTHCHECK_SECRET;
+  if (!secret) return false;
+  return request.nextUrl.searchParams.get("token") === secret;
+}
+
+export async function GET(request: NextRequest) {
+  const detailed = detailedHealthAllowed(request);
   const checks: Record<string, unknown> = {};
   let ok = true;
 
   const configured = supabaseConfigured();
+  const requiredConfigured =
+    configured &&
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) &&
+    Boolean(process.env.STRIPE_SECRET_KEY) &&
+    Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) &&
+    Boolean(process.env.STRIPE_WEBHOOK_SECRET) &&
+    Boolean(process.env.RESEND_API_KEY);
+
+  if (process.env.NODE_ENV === "production" && !requiredConfigured) ok = false;
+
+  if (!detailed) {
+    return Response.json({ ok }, { status: ok ? 200 : 503 });
+  }
+
   checks.configuration = {
     supabase: configured,
     supabaseAnon: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
@@ -17,20 +40,11 @@ export async function GET() {
     leadAccessSecret: Boolean(
       process.env.LEAD_OFFER_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
     ),
+    orderAccessSecret: Boolean(
+      process.env.ORDER_ACCESS_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
+    ),
     siteUrl: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
   };
-
-  if (
-    process.env.NODE_ENV === "production" &&
-    (!configured ||
-      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      !process.env.STRIPE_SECRET_KEY ||
-      !process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
-      !process.env.STRIPE_WEBHOOK_SECRET ||
-      !process.env.RESEND_API_KEY)
-  ) {
-    ok = false;
-  }
 
   if (!configured) {
     return Response.json(
@@ -73,7 +87,6 @@ export async function GET() {
     }
   }
 
-  // Safe no-op call proves the atomic checkout claim migration has been applied.
   try {
     const { error } = await supabase.rpc("claim_inventory", {
       p_skus: ["__HEALTHCHECK_DO_NOT_CREATE__"],
