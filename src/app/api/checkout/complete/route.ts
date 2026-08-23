@@ -39,19 +39,28 @@ export async function POST(request: NextRequest) {
     const wasAlreadyPaid = existing.status === "PAID";
     await setOrderPayment(orderId, intent.id);
     const order = await markOrderPaid(orderId);
+    let emailSent = wasAlreadyPaid;
 
     if (order) {
       await recordDiscountUsageOnce(order.discount?.code, order.email);
       if (!wasAlreadyPaid) {
-        await sendEmail({
-          to: order.email,
-          template: "order-confirmed",
-          data: { order },
-        });
+        try {
+          await sendEmail({
+            to: order.email,
+            template: "order-confirmed",
+            data: { order },
+          });
+          emailSent = true;
+        } catch (emailError) {
+          // Payment finalisation must not be rolled back by a mail-provider issue.
+          // The Stripe webhook will also retry confirmation email delivery.
+          console.error("Order confirmation email failed after payment:", emailError);
+          emailSent = false;
+        }
       }
     }
 
-    return Response.json({ order: order ?? existing });
+    return Response.json({ order: order ?? existing, emailSent });
   } catch (error) {
     console.error("Checkout completion failed:", error);
     return Response.json({ error: "Could not confirm payment" }, { status: 500 });
