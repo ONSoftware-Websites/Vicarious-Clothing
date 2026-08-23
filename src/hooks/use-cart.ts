@@ -15,7 +15,11 @@ function parse(raw: string | null): CartLine[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as CartLine[];
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed
+          .map((line) => ({ sku: String(line.sku ?? "").toUpperCase(), qty: 1 }))
+          .filter((line) => line.sku)
+      : [];
   } catch {
     return [];
   }
@@ -30,13 +34,16 @@ export function useCart() {
   );
 
   const add = useCallback(
-    (sku: string, qty = 1) => {
-      const existing = lines.find((l) => l.sku === sku);
-      setLines(
-        existing
-          ? lines.map((l) => (l.sku === sku ? { ...l, qty: l.qty + qty } : l))
-          : [...lines, { sku, qty }]
-      );
+    (sku: string) => {
+      const normalizedSku = sku.trim().toUpperCase();
+      if (!normalizedSku) return;
+      if (lines.some((line) => line.sku === normalizedSku)) {
+        setLines(lines.map((line) =>
+          line.sku === normalizedSku ? { ...line, qty: 1 } : { ...line, qty: 1 }
+        ));
+        return;
+      }
+      setLines([...lines.map((line) => ({ ...line, qty: 1 })), { sku: normalizedSku, qty: 1 }]);
     },
     [lines, setLines]
   );
@@ -56,7 +63,7 @@ export function useCart() {
         setLines(lines.filter((l) => l.sku !== sku));
         return;
       }
-      setLines(lines.map((l) => (l.sku === sku ? { ...l, qty: 1 } : l)));
+      setLines(lines.map((l) => (l.sku === sku ? { ...l, qty: 1 } : { ...l, qty: 1 })));
     },
     [lines, setLines]
   );
@@ -65,7 +72,7 @@ export function useCart() {
     setLines([]);
   }, [setLines]);
 
-  const count = lines.reduce((sum, l) => sum + l.qty, 0);
+  const count = lines.length;
 
-  return { lines, count, add, remove, setQty, clear };
+  return { lines: lines.map((line) => ({ ...line, qty: 1 })), count, add, remove, setQty, clear };
 }
