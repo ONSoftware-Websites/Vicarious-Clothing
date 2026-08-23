@@ -13,23 +13,23 @@ export default function AccountPage() {
   const { count: wishCount } = useWishlist();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const email = profile?.email ?? "";
 
   useEffect(() => {
     if (accountLoading) return;
-    if (!email) {
+    if (!profile?.email) {
       setOrders([]);
       setLoading(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/orders?email=${encodeURIComponent(email)}`)
+    fetch("/api/orders")
       .then((r) => r.json())
       .then((data) => { if (!cancelled) setOrders(data.orders ?? []); })
+      .catch(() => { if (!cancelled) setOrders([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [email, accountLoading]);
+  }, [profile?.email, accountLoading]);
 
   return (
     <AccountShell>
