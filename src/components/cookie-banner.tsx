@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from "react";
 
-const CONSENT_KEY = "vc_cookie_consent";
+export const CONSENT_KEY = "vc_cookie_consent";
+export const COOKIE_CONSENT_EVENT = "vc_cookie_consent_changed";
+
+function saveConsent(value: "all" | "optional-out") {
+  window.localStorage.setItem(CONSENT_KEY, value);
+  window.dispatchEvent(new Event(COOKIE_CONSENT_EVENT));
+}
 
 export function CookieBanner() {
   const [visible, setVisible] = useState(false);
+  const [managing, setManaging] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -14,8 +21,8 @@ export function CookieBanner() {
     return () => clearTimeout(timer);
   }, []);
 
-  const choose = (value: "all" | "optional-out" | "manage") => {
-    window.localStorage.setItem(CONSENT_KEY, value);
+  const choose = (value: "all" | "optional-out") => {
+    saveConsent(value);
     setVisible(false);
   };
 
@@ -29,8 +36,21 @@ export function CookieBanner() {
         </p>
         <p className="mt-2 text-sm leading-relaxed text-paper/80">
           We use necessary technologies to make the store work. With permission,
-          we also use analytics.
+          we also use basic site analytics.
         </p>
+
+        {managing && (
+          <div className="mt-4 border border-paper/20 p-4 text-sm text-paper/80">
+            <p className="font-display text-xs font-semibold uppercase tracking-[0.14em] text-paper">
+              Your choices
+            </p>
+            <p className="mt-2">
+              Necessary cookies keep your bag, wishlist and consent choice working.
+              Optional analytics record a basic visit count only after you accept.
+            </p>
+          </div>
+        )}
+
         <div className="mt-5 flex flex-col gap-2">
           <button
             type="button"
@@ -48,10 +68,10 @@ export function CookieBanner() {
           </button>
           <button
             type="button"
-            onClick={() => choose("manage")}
+            onClick={() => setManaging((value) => !value)}
             className="font-mono text-[11px] uppercase tracking-[0.16em] text-paper/60 underline underline-offset-4 hover:text-paper"
           >
-            Manage
+            {managing ? "Hide choices" : "Manage choices"}
           </button>
         </div>
       </div>
