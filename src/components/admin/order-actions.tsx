@@ -23,21 +23,27 @@ export function OrderActions({ id, status }: { id: string; status: OrderStatus }
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [tracking, setTracking] = useState("");
 
   const patch = async (body: Record<string, unknown>) => {
     setBusy(true);
     setError("");
+    setNotice("");
     try {
       const res = await fetch(`/api/admin/orders/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "That didn't work.");
+      if (data.emailSent === false) {
+        setNotice("Status saved, but the customer email did not send. Check Resend/server logs.");
+      }
       router.refresh();
-    } catch {
-      setError("That didn't work.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That didn't work.");
     } finally {
       setBusy(false);
     }
@@ -60,7 +66,17 @@ export function OrderActions({ id, status }: { id: string; status: OrderStatus }
                 key={step.status}
                 type="button"
                 disabled={busy || done || !next}
-                onClick={() => patch({ status: step.status })}
+                onClick={() => {
+                  if (step.status === "DISPATCHED" && tracking.trim()) {
+                    patch({
+                      status: step.status,
+                      carrier: "Royal Mail Tracked 48",
+                      tracking: tracking.trim(),
+                    });
+                    return;
+                  }
+                  patch({ status: step.status });
+                }}
                 className={
                   done
                     ? "border border-emerald-200 bg-emerald-50 px-4 py-2 font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800"
@@ -121,8 +137,12 @@ export function OrderActions({ id, status }: { id: string; status: OrderStatus }
             Save
           </button>
         </div>
+        <p className="mt-2 text-xs text-ink-faint">
+          You can also enter tracking here and click “Mark dispatched”; it will save tracking before sending the dispatch email.
+        </p>
       </div>
 
+      {notice && <p className="text-xs text-amber-700">{notice}</p>}
       {error && <p className="font-mono text-[10px] uppercase text-red-700">{error}</p>}
     </div>
   );
