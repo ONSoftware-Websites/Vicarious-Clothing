@@ -11,13 +11,17 @@ export type Condition = (typeof CONDITIONS)[number];
 
 export const CATEGORIES = [
   "tops",
+  "trousers",
+  "dresses",
+  "skirts",
+  "shoes",
+  "accessories",
+  // legacy (kept for existing products)
   "hoodies",
   "knitwear",
   "jackets",
-  "trousers",
   "jeans",
   "footwear",
-  "accessories",
   "vintage",
 ] as const;
 

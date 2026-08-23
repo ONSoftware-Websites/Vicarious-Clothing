@@ -57,7 +57,7 @@ function toForm(p?: Product): FormProduct {
     slug: p?.slug ?? "",
     name: p?.name ?? "",
     brand: p?.brand ?? "",
-    category: p?.category ?? "jackets",
+    category: p?.category ?? "tops",
     size: p?.size ?? "",
     colour: p?.colour ?? "",
     material: p?.material ?? "",

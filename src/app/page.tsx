@@ -20,7 +20,7 @@ export default async function Home() {
     <div>
       <section className="relative flex min-h-[82vh] items-end overflow-hidden bg-ink">
         <Image
-          src={seedImage("vc-hero", 2400, 1600)}
+          src="/images/hero.jpg"
           alt="Vicarious Clothing campaign"
           fill
           priority
@@ -143,7 +143,7 @@ export default async function Home() {
       <section className="py-16 sm:py-20">
         <Container>
           <SectionHeading eyebrow="Browse" title="Shop by category" />
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             {SHOP_CATEGORIES.map((cat) => (
               <Link
                 key={cat}
@@ -152,11 +152,7 @@ export default async function Home() {
               >
                 <div className="relative aspect-[4/5] overflow-hidden bg-cream sm:aspect-square">
                   <Image
-                    src={seedImage(
-                      `vc-cat-${cat}`,
-                      600,
-                      600
-                    )}
+                    src={`/images/categories/${cat}.jpg`}
                     alt={CATEGORY_LABELS[cat]}
                     fill
                     sizes="(min-width: 1024px) 25vw, 50vw"
@@ -177,7 +173,7 @@ export default async function Home() {
         <Container className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-20">
           <div className="relative aspect-[4/3] overflow-hidden lg:aspect-[5/4]">
             <Image
-              src={seedImage("vc-story", 1200, 900)}
+              src="/images/story.jpg"
               alt="Inside the Vicarious studio"
               fill
               sizes="(min-width: 1024px) 50vw, 100vw"

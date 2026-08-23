@@ -28,17 +28,20 @@ export const EMAILS = {
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   tops: "Tops",
+  trousers: "Trousers",
+  dresses: "Dresses",
+  skirts: "Skirts",
+  shoes: "Shoes",
+  accessories: "Accessories",
   hoodies: "Hoodies",
   knitwear: "Knitwear",
   jackets: "Jackets",
-  trousers: "Trousers",
   jeans: "Jeans",
   footwear: "Footwear",
-  accessories: "Accessories",
   vintage: "Vintage",
 };
 
-export const SHOP_CATEGORIES = Object.keys(CATEGORY_LABELS) as Category[];
+export const SHOP_CATEGORIES: Category[] = ["tops", "trousers", "dresses", "skirts", "shoes", "accessories"];
 
 export const COLLECTIONS = [
   { key: "latest", label: "Latest Drop", description: "The newest pieces in, listed this month." },
@@ -76,15 +79,12 @@ export const LEGAL_TOPICS = [
 ];
 
 export const MEASUREMENT_FIELDS: Record<string, string[]> = {
-  jackets: ["Pit to pit", "Length", "Sleeve"],
   tops: ["Pit to pit", "Length", "Sleeve"],
-  hoodies: ["Pit to pit", "Length", "Sleeve"],
-  knitwear: ["Pit to pit", "Length", "Sleeve"],
   trousers: ["Waist", "Rise", "Inseam"],
-  jeans: ["Waist", "Rise", "Inseam"],
-  footwear: ["UK size", "Insole length"],
+  dresses: ["Pit to pit", "Waist", "Length"],
+  skirts: ["Waist", "Length"],
+  shoes: ["UK size", "Insole length"],
   accessories: [],
-  vintage: ["Pit to pit", "Length"],
 };
 
 export const CONDITION_DESCRIPTIONS: Record<Condition, string> = {
