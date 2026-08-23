@@ -63,7 +63,8 @@ export default async function AdminLeadsPage() {
                   {lead.notes ?? "—"}
                 </td>
                 <td className="px-4 py-4">
-                  <LeadStatusSelect id={lead.id} status={lead.status} />
+                  <LeadStatusSelect id={lead.id} status={lead.status} currentOffer={lead.offer} />
+                  {lead.offer && <p className="mt-1 font-mono text-[10px] text-accent-deep">Offer: {lead.offer}</p>}
                 </td>
                 <td className="px-4 py-4">
                   <LeadDeleteButton id={lead.id} />

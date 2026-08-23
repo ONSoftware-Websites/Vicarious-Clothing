@@ -7,6 +7,10 @@ import { logEmail } from "@/lib/server/store";
 
 const EMAIL_DIR = path.join(process.cwd(), ".data", "emails");
 
+function esc(s: unknown) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 export type EmailTemplate =
   | "welcome"
   | "order-confirmed"
@@ -151,12 +155,13 @@ function buildTemplate(
     }
     case "lead-offer": {
       const lead = data;
-      const amount = String(lead.offer ?? "");
+      const raw = String(lead.offer ?? "").trim();
+      const amount = raw ? (/^\d/.test(raw) && !raw.includes("£") ? `£${raw}` : raw) : "an amount";
       return {
         subject: `An offer on your ${String(lead.itemType ?? "item")} — Vicarious Clothing`,
-        html: layout("We'd like to buy it.", `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#3f3f46;">Hi ${String(lead.name ?? "")},<br>Good news — we'd like to offer you <strong>${amount}</strong> for your ${String(lead.brand ?? "")} ${String(lead.itemType ?? "")}.</p>
-          <p style="margin:0 0 16px;font-size:13px;color:#3f3f46;">Reply to this email to accept, and we'll sort postage and payment.</p>
-          <p style="margin:0;font-size:12px;color:#8b8b93;">Any questions — just reply.</p>`),
+        html: layout("We'd like to buy it.", `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#3f3f46;">Hi ${esc(lead.name ?? "")},<br>Good news — we'd like to offer you <strong>${esc(amount)}</strong> for your ${esc(lead.brand ?? "")} ${esc(lead.itemType ?? "")} <span style="color:#8b8b93;">(Size ${esc(lead.size ?? "")}, ${esc(lead.condition ?? "")})</span>.</p>
+          <p style="margin:0 0 8px;font-size:13px;color:#3f3f46;">If you accept, reply to this email and we'll sort postage and payment. Offer valid for 7 days.</p>
+          <p style="margin:0;font-size:12px;color:#8b8b93;">Questions — just reply. Your item: ${esc(lead.brand ?? "")} ${esc(lead.itemType ?? "")}.</p>`),
       };
     }
   }
