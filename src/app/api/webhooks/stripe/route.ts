@@ -2,26 +2,54 @@ import type { NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe, getWebhookSecret } from "@/lib/server/payments";
 import {
-  cancelPendingOrdersForEmail,
   getOrder,
   listEmails,
   markOrderPaid,
   setOrderPayment,
+  updateOrderStatus,
 } from "@/lib/server/store";
 import { recordDiscountUsageOnce } from "@/lib/server/checkout-ledger";
+import { checkoutExpired } from "@/lib/server/checkout-expiry";
+import { releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { sendEmail } from "@/lib/server/mailer";
 
-async function sendConfirmationOnce(order: NonNullable<Awaited<ReturnType<typeof getOrder>>>) {
+async function sendConfirmationOnce(
+  order: NonNullable<Awaited<ReturnType<typeof getOrder>>>
+) {
   const recent = await listEmails(100);
   const alreadySent = recent.some(
-    (e) =>
-      e.template === "order-confirmed" &&
-      e.to.toLowerCase() === order.email.toLowerCase() &&
-      (e.subject.includes(order.id) || e.preview.includes(order.id))
+    (entry) =>
+      entry.template === "order-confirmed" &&
+      entry.to.toLowerCase() === order.email.toLowerCase() &&
+      (entry.subject.includes(order.id) || entry.preview.includes(order.id))
   );
   if (!alreadySent) {
-    await sendEmail({ to: order.email, template: "order-confirmed", data: { order } });
+    await sendEmail({
+      to: order.email,
+      template: "order-confirmed",
+      data: { order },
+    });
   }
+}
+
+async function cancelPendingOrder(
+  order: NonNullable<Awaited<ReturnType<typeof getOrder>>>,
+  actor: string
+) {
+  if (order.status !== "PENDING_PAYMENT") return;
+  await updateOrderStatus(order.id, "CANCELLED", actor);
+  await releaseCheckoutStock(order.items.map((item) => item.sku));
+}
+
+async function refundExpiredPayment(
+  stripe: Stripe,
+  order: NonNullable<Awaited<ReturnType<typeof getOrder>>>,
+  paymentIntentId: string
+) {
+  await stripe.refunds.create(
+    { payment_intent: paymentIntentId },
+    { idempotencyKey: `expired-checkout-refund-${order.id}` }
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -58,11 +86,29 @@ export async function POST(request: NextRequest) {
           throw new Error(`Stripe amount mismatch for ${orderId}`);
         }
 
+        if (existing.status === "CANCELLED") {
+          await refundExpiredPayment(stripe, existing, intent.id);
+          break;
+        }
+
+        if (existing.status !== "PENDING_PAYMENT") {
+          // Stripe retries are normal. Never regress PICKING/DISPATCHED/etc. back
+          // to PAID just because the original payment event is delivered again.
+          await setOrderPayment(orderId, intent.id);
+          break;
+        }
+
+        if (checkoutExpired(existing)) {
+          await cancelPendingOrder(existing, "checkout-expiry");
+          await refundExpiredPayment(stripe, existing, intent.id);
+          break;
+        }
+
         await setOrderPayment(orderId, intent.id);
         const order = await markOrderPaid(orderId);
         if (order) {
           await recordDiscountUsageOnce(order.discount?.code, order.email);
-          if (existing.status === "PENDING_PAYMENT") await sendConfirmationOnce(order);
+          await sendConfirmationOnce(order);
         }
         break;
       }
@@ -72,9 +118,7 @@ export async function POST(request: NextRequest) {
         const orderId = intent.metadata?.orderId;
         if (!orderId) break;
         const order = await getOrder(orderId);
-        if (order?.status === "PENDING_PAYMENT") {
-          await cancelPendingOrdersForEmail(order.email);
-        }
+        if (order) await cancelPendingOrder(order, "stripe-payment-failed");
         break;
       }
 
@@ -86,13 +130,34 @@ export async function POST(request: NextRequest) {
 
         const existing = await getOrder(orderId);
         if (!existing) throw new Error(`Order ${orderId} was not found`);
-        if (typeof session.payment_intent === "string") {
-          await setOrderPayment(orderId, session.payment_intent);
+        const paymentIntentId =
+          typeof session.payment_intent === "string" ? session.payment_intent : undefined;
+
+        if (existing.status === "CANCELLED") {
+          if (paymentIntentId) {
+            await refundExpiredPayment(stripe, existing, paymentIntentId);
+          }
+          break;
         }
+
+        if (existing.status !== "PENDING_PAYMENT") {
+          if (paymentIntentId) await setOrderPayment(orderId, paymentIntentId);
+          break;
+        }
+
+        if (checkoutExpired(existing)) {
+          await cancelPendingOrder(existing, "checkout-expiry");
+          if (paymentIntentId) {
+            await refundExpiredPayment(stripe, existing, paymentIntentId);
+          }
+          break;
+        }
+
+        if (paymentIntentId) await setOrderPayment(orderId, paymentIntentId);
         const order = await markOrderPaid(orderId);
         if (order) {
           await recordDiscountUsageOnce(order.discount?.code, order.email);
-          if (existing.status === "PENDING_PAYMENT") await sendConfirmationOnce(order);
+          await sendConfirmationOnce(order);
         }
         break;
       }
@@ -102,9 +167,7 @@ export async function POST(request: NextRequest) {
         const orderId = session.metadata?.orderId ?? session.client_reference_id;
         if (!orderId) break;
         const order = await getOrder(orderId);
-        if (order?.status === "PENDING_PAYMENT") {
-          await cancelPendingOrdersForEmail(order.email);
-        }
+        if (order) await cancelPendingOrder(order, "stripe-session-expired");
         break;
       }
 
