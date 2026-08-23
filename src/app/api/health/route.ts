@@ -3,21 +3,48 @@ import { getSupabase, supabaseConfigured } from "@/lib/server/supabase";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const configured = supabaseConfigured();
-  if (!configured) {
-    return Response.json({
-      ok: false,
-      supabase: { configured: false, error: "NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing" },
-      seedDemo: process.env.SEED_DEMO ?? "(unset — demo seed active)",
-      vercel: process.env.VERCEL ?? null,
-    }, { status: 503 });
-  }
-
-  const supabase = getSupabase()!;
   const checks: Record<string, unknown> = {};
   let ok = true;
 
-  // Minimal connectivity check: count products, orders, posts, etc.
+  const configured = supabaseConfigured();
+  checks.configuration = {
+    supabase: configured,
+    supabaseAnon: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    stripeSecret: Boolean(process.env.STRIPE_SECRET_KEY),
+    stripePublishable: Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
+    stripeWebhook: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
+    resend: Boolean(process.env.RESEND_API_KEY),
+    leadAccessSecret: Boolean(
+      process.env.LEAD_OFFER_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
+    ),
+    siteUrl: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
+  };
+
+  if (
+    process.env.NODE_ENV === "production" &&
+    (!configured ||
+      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      !process.env.STRIPE_SECRET_KEY ||
+      !process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
+      !process.env.STRIPE_WEBHOOK_SECRET ||
+      !process.env.RESEND_API_KEY)
+  ) {
+    ok = false;
+  }
+
+  if (!configured) {
+    return Response.json(
+      {
+        ok: false,
+        checks,
+        seedDemo: process.env.SEED_DEMO ?? "(unset)",
+        vercel: process.env.VERCEL ?? null,
+      },
+      { status: 503 }
+    );
+  }
+
+  const supabase = getSupabase()!;
   const tables = [
     "products",
     "inventory_items",
@@ -26,59 +53,63 @@ export async function GET() {
     "newsletter_subscribers",
     "discounts",
     "email_log",
+    "purchase_leads",
   ] as const;
 
   for (const table of tables) {
     try {
-      const { count, error } = await supabase.from(table).select("*", { count: "exact", head: true });
+      const { count, error } = await supabase
+        .from(table)
+        .select("*", { count: "exact", head: true });
       if (error) {
         ok = false;
-        checks[table] = { error: error.message };
+        checks[table] = { ok: false, error: error.message };
       } else {
-        checks[table] = { count };
+        checks[table] = { ok: true, count };
       }
-    } catch (e) {
+    } catch (error) {
       ok = false;
-      checks[table] = { error: String(e) };
+      checks[table] = { ok: false, error: String(error) };
     }
   }
 
-  // Auth check: can we read products with a sample query?
+  // Safe no-op call proves the atomic checkout claim migration has been applied.
   try {
-    const { data, error } = await supabase.from("products").select("sku").limit(1);
+    const { error } = await supabase.rpc("claim_inventory", {
+      p_skus: ["__HEALTHCHECK_DO_NOT_CREATE__"],
+      p_minutes: 1,
+    });
     if (error) {
       ok = false;
-      checks["sample_query"] = { error: error.message };
+      checks.claimInventoryRpc = { ok: false, error: error.message };
     } else {
-      checks["sample_query"] = { ok: true, sample_sku: data?.[0]?.sku ?? null };
+      checks.claimInventoryRpc = { ok: true };
     }
-  } catch (e) {
+  } catch (error) {
     ok = false;
-    checks["sample_query"] = { error: String(e) };
+    checks.claimInventoryRpc = { ok: false, error: String(error) };
   }
 
-  // Detailed product↔inventory link check (what store.ts sees)
   try {
-    const { listProducts } = await import("@/lib/server/store");
-    const products = await listProducts();
-    checks["store_listProducts"] = {
-      count: products.length,
-      skus: products.map((p) => ({ sku: p.sku, status: p.status, slug: p.slug })),
-    };
-    // Raw supabase products + inventory for comparison
-    const { data: rawProducts } = await supabase.from("products").select("sku, slug, name, status:inventory_items(status)").limit(10);
-    checks["raw_products"] = rawProducts;
-    const { data: rawInv } = await supabase.from("inventory_items").select("sku, status").limit(10);
-    checks["raw_inventory"] = rawInv;
-  } catch (e) {
-    checks["store_listProducts"] = { error: String(e) };
+    const { data, error } = await supabase.storage.getBucket("lead-photos");
+    if (error || !data) {
+      ok = false;
+      checks.leadPhotoBucket = { ok: false, error: error?.message ?? "Bucket missing" };
+    } else {
+      checks.leadPhotoBucket = { ok: true, public: data.public };
+    }
+  } catch (error) {
+    ok = false;
+    checks.leadPhotoBucket = { ok: false, error: String(error) };
   }
 
-  return Response.json({
-    ok,
-    supabase: { configured: true, url: process.env.NEXT_PUBLIC_SUPABASE_URL },
-    seedDemo: process.env.SEED_DEMO ?? "(unset — demo seed active)",
-    vercel: process.env.VERCEL ?? null,
-    checks,
-  }, { status: ok ? 200 : 500 });
+  return Response.json(
+    {
+      ok,
+      checks,
+      seedDemo: process.env.SEED_DEMO ?? "(unset)",
+      vercel: process.env.VERCEL ?? null,
+    },
+    { status: ok ? 200 : 500 }
+  );
 }
