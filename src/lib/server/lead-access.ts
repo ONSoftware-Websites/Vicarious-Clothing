@@ -1,7 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 function secret() {
-  const value = process.env.LEAD_OFFER_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const value =
+    process.env.LEAD_OFFER_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    (process.env.NODE_ENV !== "production" ? "vicarious-local-development-lead-access" : "");
   if (!value) {
     throw new Error(
       "LEAD_OFFER_SECRET or SUPABASE_SERVICE_ROLE_KEY is required for customer lead links"
@@ -15,7 +18,9 @@ function payload(id: string, email: string, expiresAt?: string) {
 }
 
 export function createLeadAccessToken(id: string, email: string, expiresAt?: string) {
-  return createHmac("sha256", secret()).update(payload(id, email, expiresAt)).digest("hex");
+  return createHmac("sha256", secret())
+    .update(payload(id, email, expiresAt))
+    .digest("hex");
 }
 
 export function verifyLeadAccessToken(
