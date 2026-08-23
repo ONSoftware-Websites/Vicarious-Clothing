@@ -46,13 +46,7 @@ export async function POST(request: NextRequest) {
       const recent = await listEmails(50);
       const alreadySent = recent.some((e) => e.template === "order-confirmed" && e.preview.includes(order.id));
       if (!alreadySent) {
-        try {
-          console.log("Sending order-confirmed email (checkout complete)", { orderId: order.id, to: order.email });
-          await sendEmail({ to: order.email, template: "order-confirmed", data: { order } });
-          console.log("Sent order-confirmed email", { orderId: order.id });
-        } catch (err) {
-          console.error("Failed to send order-confirmed email (checkout complete):", err, { orderId: order.id, to: order.email });
-        }
+        await sendEmail({ to: order.email, template: "order-confirmed", data: { order } });
       }
     }
     return Response.json({ order: order ?? existing });

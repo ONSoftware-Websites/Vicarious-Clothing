@@ -43,19 +43,12 @@ export async function POST(request: NextRequest) {
       if (order && existing?.status === "PENDING_PAYMENT") {
         const recent = await listEmails(50);
         const alreadySent = recent.some((e) => e.template === "order-confirmed" && e.preview.includes(order.id));
-        console.log("webhook payment_intent.succeeded", { orderId, alreadySent, recentCount: recent.length });
         if (!alreadySent) {
-          try {
-            console.log("Sending order-confirmed email (webhook)", { orderId: order.id, to: order.email });
-            await sendEmail({
-              to: order.email,
-              template: "order-confirmed",
-              data: { order },
-            });
-            console.log("Sent order-confirmed email (webhook)", { orderId: order.id });
-          } catch (err) {
-            console.error("Failed to send order-confirmed email (webhook):", err, { orderId: order.id, to: order.email });
-          }
+          await sendEmail({
+            to: order.email,
+            template: "order-confirmed",
+            data: { order },
+          });
         }
       }
       break;
@@ -84,19 +77,12 @@ export async function POST(request: NextRequest) {
       if (order && existing?.status === "PENDING_PAYMENT") {
         const recent = await listEmails(50);
         const alreadySent = recent.some((e) => e.template === "order-confirmed" && e.preview.includes(order.id));
-        console.log("webhook checkout.session.completed", { orderId, alreadySent, recentCount: recent.length });
         if (!alreadySent) {
-          try {
-            console.log("Sending order-confirmed email (webhook checkout.session.completed)", { orderId: order.id, to: order.email });
-            await sendEmail({
-              to: order.email,
-              template: "order-confirmed",
-              data: { order },
-            });
-            console.log("Sent order-confirmed email (webhook checkout.session.completed)", { orderId: order.id });
-          } catch (err) {
-            console.error("Failed to send order-confirmed email (webhook checkout.session.completed):", err, { orderId: order.id, to: order.email });
-          }
+          await sendEmail({
+            to: order.email,
+            template: "order-confirmed",
+            data: { order },
+          });
         }
       }
       break;

@@ -300,16 +300,7 @@ export async function sendEmail(input: {
   template: EmailTemplate;
   data: Record<string, unknown>;
 }): Promise<"sent" | "logged"> {
-  let subject: string;
-  let html: string;
-  try {
-    const built = buildTemplate(input.template, input.data);
-    subject = built.subject;
-    html = built.html;
-  } catch (err) {
-    console.error("Failed to build email template:", err, { template: input.template, to: input.to });
-    throw err;
-  }
+  const { subject, html } = buildTemplate(input.template, input.data);
   const apiKey = process.env.RESEND_API_KEY;
   const from = `${EMAILS.notifications}`;
 
