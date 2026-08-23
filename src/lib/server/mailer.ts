@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Order } from "@/lib/types";
-import { EMAILS, SITE_URL } from "@/lib/site";
+import { EMAILS, EXPRESS_DELIVERY_COST, SITE_URL } from "@/lib/site";
 import { formatPrice } from "@/lib/utils";
 import { logEmail } from "@/lib/server/store";
 import { createLeadAccessToken } from "@/lib/server/lead-access";
+import { createOrderAccessToken } from "@/lib/server/order-access";
 
 const EMAIL_DIR = path.join(process.cwd(), ".data", "emails");
 
@@ -111,6 +112,17 @@ function itemsTable(order: Order) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin:12px 0;">${rows}</table>`;
 }
 
+function deliveryMethod(order: Order) {
+  return order.delivery === EXPRESS_DELIVERY_COST
+    ? "Express — Royal Mail Tracked 24"
+    : "Standard — Royal Mail Tracked 48";
+}
+
+function customerOrderUrl(order: Order) {
+  const token = createOrderAccessToken(order.id, order.email);
+  return `${SITE_URL}/order/${encodeURIComponent(order.id)}?token=${encodeURIComponent(token)}`;
+}
+
 function visibleLeadNotes(notes: unknown) {
   return String(notes ?? "")
     .split("\n")
@@ -148,8 +160,9 @@ function buildTemplate(
       const name = String(data.name ?? "");
       return {
         subject: "Welcome to Vicarious Clothing",
-        html: layout("Welcome to Vicarious Clothing.", `
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#3f3f46;">Hi ${firstName(name)},</p>
+        html: layout(
+          "Welcome to Vicarious Clothing.",
+          `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#3f3f46;">Hi ${firstName(name)},</p>
           <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Welcome to Vicarious Clothing.</p>
           <p style="margin:0 0 10px;font-size:14px;color:#3f3f46;">Your account is ready, so you can now:</p>
           <ul style="color:#3f3f46;line-height:1.7;"><li>track your orders;</li><li>save pieces to your wishlist;</li><li>manage your addresses;</li><li>update your preferences; and</li><li>see your order history.</li></ul>
@@ -158,15 +171,18 @@ function buildTemplate(
           ${button("Shop new in", `${SITE_URL}/shop/new-in`)}
           <p style="margin:16px 0 8px;color:#3f3f46;">Thanks for joining us.</p>
           <p style="margin:0 0 8px;font-weight:bold;">Vicarious Clothing</p>
-          <p style="margin:0;font-style:italic;color:#8b8b93;">Clothes worth another life.</p>`),
+          <p style="margin:0;font-style:italic;color:#8b8b93;">Clothes worth another life.</p>`
+        ),
       };
     }
+
     case "order-confirmed": {
       const order = data.order as Order;
       return {
         subject: `It's yours — order ${order.id}`,
-        html: layout("Order confirmed.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
+        html: layout(
+          "Order confirmed.",
+          `<p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
           <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">Thanks for your order.</p>
           <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve received your payment and your piece is now yours.</p>
           <p style="margin:8px 0;font-weight:bold;">Order ${esc(order.id)}</p>
@@ -175,93 +191,158 @@ function buildTemplate(
           <p style="margin:12px 0;color:#3f3f46;line-height:1.8;"><strong>Subtotal:</strong> ${formatPrice(order.subtotal)}<br><strong>Delivery:</strong> ${order.delivery === 0 ? "Free" : formatPrice(order.delivery)}<br><strong>Discount:</strong> ${order.discount ? `${esc(order.discount.code)} — ${formatPrice(order.discount.amount || 0)}` : "—"}<br><strong>Total:</strong> <strong>${formatPrice(order.total)}</strong></p>
           <p style="margin:16px 0 4px;font-weight:bold;">Delivering to</p>
           <p style="margin:6px 0;line-height:1.6;">${esc(order.name)}<br>${formatAddress(order.address)}</p>
-          <p style="margin:6px 0;"><strong>Delivery method:</strong> ${esc(order.channel)}</p>
+          <p style="margin:6px 0;"><strong>Delivery method:</strong> ${deliveryMethod(order)}</p>
           <p style="margin:16px 0;color:#3f3f46;">We’ll email you again when your order is on its way.</p>
-          ${button("View order", `${SITE_URL}/order/${order.id}`)}
-          <p style="margin:16px 0 8px;color:#3f3f46;">Thanks for giving something another life.</p><p style="margin:0;font-weight:bold;">Vicarious Clothing</p>`),
+          ${button("View order", customerOrderUrl(order))}
+          <p style="margin:16px 0 8px;color:#3f3f46;">Thanks for giving something another life.</p>
+          <p style="margin:0;font-weight:bold;">Vicarious Clothing</p>`
+        ),
       };
     }
+
     case "order-dispatched": {
       const order = data.order as Order;
       return {
         subject: `On its way — order ${order.id}`,
-        html: layout("It's on the way.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p><p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Your order is on its way.</p>
-          <p style="margin:8px 0;font-weight:bold;">Order ${esc(order.id)}</p>${itemsTable(order)}
-          <p style="margin:12px 0;color:#3f3f46;line-height:1.8;"><strong>Carrier:</strong> ${esc(order.carrier ?? "—")}<br><strong>Delivery service:</strong> ${esc(order.channel)}<br><strong>Tracking number:</strong> ${esc(order.tracking ?? "—")}</p>
-          ${button("Track your order", `${SITE_URL}/order/${order.id}`)}
-          <p style="margin:16px 0 6px;color:#3f3f46;">Your order is being delivered to:</p><p style="margin:6px 0;line-height:1.6;">${esc(order.name)}<br>${formatAddress(order.address)}</p>
-          <p style="margin:16px 0;color:#3f3f46;">We hope it likes where it’s going next.</p><p style="margin:0;font-weight:bold;">Vicarious Clothing</p>`),
+        html: layout(
+          "It's on the way.",
+          `<p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Your order is on its way.</p>
+          <p style="margin:8px 0;font-weight:bold;">Order ${esc(order.id)}</p>
+          ${itemsTable(order)}
+          <p style="margin:12px 0;color:#3f3f46;line-height:1.8;"><strong>Carrier:</strong> ${esc(order.carrier ?? "—")}<br><strong>Delivery service:</strong> ${deliveryMethod(order)}<br><strong>Tracking number:</strong> ${esc(order.tracking ?? "—")}</p>
+          ${button("Track your order", customerOrderUrl(order))}
+          <p style="margin:16px 0 6px;color:#3f3f46;">Your order is being delivered to:</p>
+          <p style="margin:6px 0;line-height:1.6;">${esc(order.name)}<br>${formatAddress(order.address)}</p>
+          <p style="margin:16px 0;color:#3f3f46;">We hope it likes where it’s going next.</p>
+          <p style="margin:0;font-weight:bold;">Vicarious Clothing</p>`
+        ),
       };
     }
+
     case "order-delivered": {
       const order = data.order as Order;
       return {
         subject: `Delivered — order ${order.id}`,
-        html: layout("It's arrived.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p><p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Your Vicarious order has been marked as delivered.</p>
-          <p style="margin:8px 0;font-weight:bold;">Order ${esc(order.id)}</p>${itemsTable(order)}
-          <p style="margin:16px 0;color:#3f3f46;">We hope it’s found the right wardrobe.</p>${button("View order", `${SITE_URL}/order/${order.id}`)}
-          <p style="margin:16px 0;color:#3f3f46;">If something isn’t right, contact us and we’ll help.</p>${button("Get support", `${SITE_URL}/help`)}
-          <p style="margin:16px 0 8px;color:#3f3f46;">Thanks for shopping with Vicarious.</p><p style="margin:0;font-weight:bold;">Vicarious Clothing</p>`),
+        html: layout(
+          "It's arrived.",
+          `<p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Your Vicarious order has been marked as delivered.</p>
+          <p style="margin:8px 0;font-weight:bold;">Order ${esc(order.id)}</p>
+          ${itemsTable(order)}
+          <p style="margin:16px 0;color:#3f3f46;">We hope it’s found the right wardrobe.</p>
+          ${button("View order", customerOrderUrl(order))}
+          <p style="margin:16px 0;color:#3f3f46;">If something isn’t right, contact us and we’ll help.</p>
+          ${button("Get support", `${SITE_URL}/help`)}
+          <p style="margin:16px 0 8px;color:#3f3f46;">Thanks for shopping with Vicarious.</p>
+          <p style="margin:0;font-weight:bold;">Vicarious Clothing</p>`
+        ),
       };
     }
+
     case "order-refunded": {
       const order = data.order as Order;
-      const refundAmount = typeof data.refundAmount === "number" ? data.refundAmount : order.total;
+      const refundAmount =
+        typeof data.refundAmount === "number" ? data.refundAmount : order.total;
       return {
         subject: `Your refund has been issued — order ${order.id}`,
-        html: layout("Refund issued.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p><p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve issued a refund relating to order <strong>${esc(order.id)}</strong>.</p>
+        html: layout(
+          "Refund issued.",
+          `<p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve issued a refund relating to order <strong>${esc(order.id)}</strong>.</p>
           <p style="margin:12px 0;color:#3f3f46;line-height:1.8;"><strong>Refund amount:</strong> ${formatPrice(refundAmount)}<br><strong>Refund reference:</strong> ${esc(String(data.refundReference ?? order.paymentIntentId ?? "—"))}</p>
-          <p style="margin:16px 0;color:#3f3f46;">The refund has been sent to the original payment method used for your order.</p><p style="margin:16px 0;color:#3f3f46;">Depending on your bank or payment provider, it may take some time for the funds to appear on your account.</p><p style="margin:16px 0;color:#3f3f46;">If you have any questions about the refund, reply to this email or contact our support team.</p><p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>`),
+          <p style="margin:16px 0;color:#3f3f46;">The refund has been sent to the original payment method used for your order.</p>
+          <p style="margin:16px 0;color:#3f3f46;">Depending on your bank or payment provider, it may take some time for the funds to appear on your account.</p>
+          <p style="margin:16px 0;color:#3f3f46;">If you have any questions about the refund, reply to this email or contact our support team.</p>
+          <p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>`
+        ),
       };
     }
+
     case "order-cancelled": {
       const order = data.order as Order;
       return {
         subject: `Order ${order.id} has been cancelled`,
-        html: layout("Order cancelled.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p><p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Your order <strong>${esc(order.id)}</strong> has been cancelled.</p>
+        html: layout(
+          "Order cancelled.",
+          `<p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Your order <strong>${esc(order.id)}</strong> has been cancelled.</p>
           ${data.cancellationReason ? `<p style="margin:16px 0;color:#3f3f46;">${esc(String(data.cancellationReason))}</p>` : ""}
-          <p style="margin:12px 0;color:#3f3f46;"><strong>Order total:</strong> ${formatPrice(order.total)}</p>${data.refundInformation ? `<p style="margin:16px 0;color:#3f3f46;">${esc(String(data.refundInformation))}</p>` : ""}
-          <p style="margin:16px 0;color:#3f3f46;">If a refund is due, it will be returned to the original payment method.</p><p style="margin:16px 0;color:#3f3f46;">If you weren’t expecting this cancellation or need any help, reply to this email.</p>${button("Contact support", `${SITE_URL}/help`)}<p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>`),
+          <p style="margin:12px 0;color:#3f3f46;"><strong>Order total:</strong> ${formatPrice(order.total)}</p>
+          ${data.refundInformation ? `<p style="margin:16px 0;color:#3f3f46;">${esc(String(data.refundInformation))}</p>` : ""}
+          <p style="margin:16px 0;color:#3f3f46;">If a refund is due, it will be returned to the original payment method.</p>
+          <p style="margin:16px 0;color:#3f3f46;">If you weren’t expecting this cancellation or need any help, reply to this email.</p>
+          ${button("Contact support", `${SITE_URL}/help`)}
+          <p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>`
+        ),
       };
     }
+
     case "password-reset": {
       const link = String(data.link ?? "");
       return {
         subject: "Reset your Vicarious Clothing password",
-        html: layout("Reset your password.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(data.name)},</p><p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We received a request to reset the password for your Vicarious account.</p>${button("Reset password", link)}
-          <p style="margin:16px 0;color:#3f3f46;">This link will expire in ${esc(String(data.expiryTime ?? "1 hour"))}.</p><p style="margin:16px 0;color:#3f3f46;">If you didn’t request a password reset, you can ignore this email. Your existing password will remain unchanged.</p><p style="margin:16px 0;color:#3f3f46;">For your security, we will never ask you to send us your password by email.</p><p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>`),
+        html: layout(
+          "Reset your password.",
+          `<p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(data.name)},</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We received a request to reset the password for your Vicarious account.</p>
+          ${button("Reset password", link)}
+          <p style="margin:16px 0;color:#3f3f46;">This link will expire in ${esc(String(data.expiryTime ?? "1 hour"))}.</p>
+          <p style="margin:16px 0;color:#3f3f46;">If you didn’t request a password reset, you can ignore this email. Your existing password will remain unchanged.</p>
+          <p style="margin:16px 0;color:#3f3f46;">For your security, we will never ask you to send us your password by email.</p>
+          <p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>`
+        ),
       };
     }
+
     case "lead-enquiry": {
       const lead = data as any;
       return {
         subject: `We've received your submission — ${String(lead.id ?? "")}`,
-        html: layout("We've received your submission.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(lead.name)},</p><p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">Thanks for offering your clothes to Vicarious.</p><p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve received your submission and will take a look at the information and photographs you’ve provided.</p>
-          <p style="margin:12px 0;"><strong>Reference:</strong> ${esc(lead.id)}</p>${leadItems(lead)}
-          <p style="margin:16px 0 8px;color:#3f3f46;">We’ll review your items based on factors including:</p><ul style="color:#3f3f46;line-height:1.7;"><li>condition;</li><li>brand;</li><li>authenticity where relevant;</li><li>current demand; and</li><li>the stock we already hold.</li></ul>
-          <p style="margin:16px 0;color:#3f3f46;">Submitting your items does not oblige you to sell them, and it does not oblige Vicarious Clothing to purchase them.</p><p style="margin:16px 0;color:#3f3f46;">We’ll contact you once we’ve reviewed your submission.</p>
-          ${button("View submission", customerLeadUrl(lead))}<p style="margin:16px 0 8px;color:#3f3f46;">Thanks for thinking of Vicarious.</p><p style="margin:0;font-weight:bold;">Vicarious Clothing</p>`),
+        html: layout(
+          "We've received your submission.",
+          `<p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(lead.name)},</p>
+          <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">Thanks for offering your clothes to Vicarious.</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve received your submission and will take a look at the information and photographs you’ve provided.</p>
+          <p style="margin:12px 0;"><strong>Reference:</strong> ${esc(lead.id)}</p>
+          ${leadItems(lead)}
+          <p style="margin:16px 0 8px;color:#3f3f46;">We’ll review your items based on factors including:</p>
+          <ul style="color:#3f3f46;line-height:1.7;"><li>condition;</li><li>brand;</li><li>authenticity where relevant;</li><li>current demand; and</li><li>the stock we already hold.</li></ul>
+          <p style="margin:16px 0;color:#3f3f46;">Submitting your items does not oblige you to sell them, and it does not oblige Vicarious Clothing to purchase them.</p>
+          <p style="margin:16px 0;color:#3f3f46;">We’ll contact you once we’ve reviewed your submission.</p>
+          ${button("View submission", customerLeadUrl(lead))}
+          <p style="margin:16px 0 8px;color:#3f3f46;">Thanks for thinking of Vicarious.</p>
+          <p style="margin:0;font-weight:bold;">Vicarious Clothing</p>`
+        ),
       };
     }
+
     case "lead-offer": {
       const lead = data as any;
       const raw = String(lead.offer ?? "").trim();
-      const amount = raw ? (/^\d/.test(raw) && !raw.includes("£") ? `£${raw}` : raw) : "an amount";
+      const amount = raw
+        ? /^\d/.test(raw) && !raw.includes("£")
+          ? `£${raw}`
+          : raw
+        : "an amount";
       return {
         subject: `We'd like to make you an offer — ${String(lead.id ?? "")}`,
-        html: layout("We'd like to make you an offer.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(lead.name)},</p><p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve reviewed your submission <strong>${esc(lead.id)}</strong> and we’re interested in buying some or all of your items.</p>${leadItems(lead)}
-          <p style="margin:16px 0;color:#3f3f46;"><strong>Total provisional offer:</strong> <strong>${esc(amount)}</strong></p><p style="margin:16px 0;color:#3f3f46;"><strong>Offer expires:</strong> ${esc(String(lead.offerExpiry ?? "7 days"))}</p>
-          <p style="margin:16px 0;color:#3f3f46;">This offer is provisional and is based on the information and photographs you supplied.</p><p style="margin:16px 0 8px;color:#3f3f46;">The final purchase remains subject to the items being received and matching the:</p><ul style="color:#3f3f46;line-height:1.7;"><li>description;</li><li>condition;</li><li>authenticity information;</li><li>photographs; and</li><li>other information supplied with your submission.</li></ul>
+        html: layout(
+          "We'd like to make you an offer.",
+          `<p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(lead.name)},</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve reviewed your submission <strong>${esc(lead.id)}</strong> and we’re interested in buying some or all of your items.</p>
+          ${leadItems(lead)}
+          <p style="margin:16px 0;color:#3f3f46;"><strong>Total provisional offer:</strong> <strong>${esc(amount)}</strong></p>
+          <p style="margin:16px 0;color:#3f3f46;"><strong>Offer expires:</strong> ${esc(String(lead.offerExpiry ?? "7 days"))}</p>
+          <p style="margin:16px 0;color:#3f3f46;">This offer is provisional and is based on the information and photographs you supplied.</p>
+          <p style="margin:16px 0 8px;color:#3f3f46;">The final purchase remains subject to the items being received and matching the:</p>
+          <ul style="color:#3f3f46;line-height:1.7;"><li>description;</li><li>condition;</li><li>authenticity information;</li><li>photographs; and</li><li>other information supplied with your submission.</li></ul>
           <p style="margin:16px 0;color:#3f3f46;">If everything matches, we’ll complete the purchase at the agreed amount.</p>
-          ${button("Accept offer", customerLeadUrl(lead, "accept"))}${button("Decline offer", customerLeadUrl(lead, "decline"))}
-          <p style="margin:16px 0;color:#3f3f46;">If you have any questions before deciding, reply to this email.</p><p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>`),
+          ${button("Accept offer", customerLeadUrl(lead, "accept"))}
+          ${button("Decline offer", customerLeadUrl(lead, "decline"))}
+          <p style="margin:16px 0;color:#3f3f46;">If you have any questions before deciding, reply to this email.</p>
+          <p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>`
+        ),
       };
     }
   }
@@ -272,7 +353,7 @@ function writeHtmlFile(filename: string, html: string) {
     fs.mkdirSync(EMAIL_DIR, { recursive: true });
     fs.writeFileSync(path.join(EMAIL_DIR, filename), html, "utf-8");
   } catch {
-    // read-only filesystem — the email is still recorded in the log
+    // Read-only filesystem — the email is still recorded in the log in development.
   }
 }
 
