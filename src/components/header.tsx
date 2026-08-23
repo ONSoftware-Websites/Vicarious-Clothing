@@ -9,6 +9,7 @@ import { useWishlist } from "@/hooks/use-wishlist";
 import { useAccount } from "@/hooks/use-account";
 import { NAV_LINKS } from "@/lib/site";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/brand-mark";
 
 function IconSearch() {
   return (
@@ -113,8 +114,9 @@ export function Header() {
 
         <Link
           href="/"
-          className="font-display text-xl font-bold uppercase tracking-[0.08em] sm:text-2xl"
+          className="flex items-center gap-2.5 font-display text-xl font-bold uppercase tracking-[0.08em] sm:text-2xl"
         >
+          <BrandMark size={36} className="h-8 w-8 sm:h-9 sm:w-9" />
           Vicarious
         </Link>
 

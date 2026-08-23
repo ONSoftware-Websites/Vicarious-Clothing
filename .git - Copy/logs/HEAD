@@ -1,0 +1,37 @@
+0000000000000000000000000000000000000000 38baa8354fd44dc51d493c8fedeec98c8f286a4f ONSofftware <AdminONSoftware@gmail.com> 1786959229 +0100	commit (initial): Initial commit from Create Next App
+38baa8354fd44dc51d493c8fedeec98c8f286a4f b9a51f4ec8a9df5aea98a98f605d4c687eaa2898 ONSofftware <AdminONSoftware@gmail.com> 1786972446 +0100	commit: Initial Launch
+b9a51f4ec8a9df5aea98a98f605d4c687eaa2898 da10dab1ac39314e469ae83ae613fd83e328709e ONSofftware <AdminONSoftware@gmail.com> 1786987588 +0100	commit: Initial Launch VITE
+da10dab1ac39314e469ae83ae613fd83e328709e c8ac73ae2646a69d9dbd93cc8b6ea4463fd17081 ONSofftware <AdminONSoftware@gmail.com> 1787255258 +0100	commit: Stripe
+c8ac73ae2646a69d9dbd93cc8b6ea4463fd17081 5bd5d17c9b0518b6a9bbc06215ec523453ababa2 ONSofftware <AdminONSoftware@gmail.com> 1787318419 +0100	commit: Update 21082026
+5bd5d17c9b0518b6a9bbc06215ec523453ababa2 519bb331f7bb4afe2329814ca4e16f4dbc44bfc7 ONSofftware <AdminONSoftware@gmail.com> 1787319438 +0100	commit: Fix on Admin pages
+519bb331f7bb4afe2329814ca4e16f4dbc44bfc7 1424f4fccec41b449adcfb127bb21af0a072214a ONSofftware <AdminONSoftware@gmail.com> 1787321527 +0100	commit: Please work
+1424f4fccec41b449adcfb127bb21af0a072214a 06731c77a6907a59b12a4559639579c3bb98750a ONSofftware <AdminONSoftware@gmail.com> 1787322315 +0100	commit: Work
+06731c77a6907a59b12a4559639579c3bb98750a 4b65e3e30b15237fc49103237d6623c750d87852 ONSofftware <AdminONSoftware@gmail.com> 1787323246 +0100	commit: Update 15:4021082026
+4b65e3e30b15237fc49103237d6623c750d87852 5646a48becd426107d3e8e7e74402e83a6a96958 ONSofftware <AdminONSoftware@gmail.com> 1787324605 +0100	commit: Update 16:0421082026
+5646a48becd426107d3e8e7e74402e83a6a96958 78c7354c63b79717609cd020d67e30657850ffce ONSofftware <AdminONSoftware@gmail.com> 1787326852 +0100	commit: Update 16:4021082026
+78c7354c63b79717609cd020d67e30657850ffce 16ba767876ea0a9542b593e1c3e9bf1315037f8e ONSofftware <AdminONSoftware@gmail.com> 1787327823 +0100	commit: Update 16:5621082026
+16ba767876ea0a9542b593e1c3e9bf1315037f8e 05adc4a4780330dce645b03cef3fd5526e54a987 ONSofftware <AdminONSoftware@gmail.com> 1787329345 +0100	commit: Update 17:2221082026
+05adc4a4780330dce645b03cef3fd5526e54a987 b38fa2e66b0f431a477d084e6229a4c1a2630eb3 ONSofftware <AdminONSoftware@gmail.com> 1787329758 +0100	commit: Update 17:2921082026
+b38fa2e66b0f431a477d084e6229a4c1a2630eb3 bde98e9a20ac30f4c2ebfe813f782ba9aa2c19c3 ONSofftware <AdminONSoftware@gmail.com> 1787332083 +0100	commit: live: strip demo seed for production (SEED_DEMO), add Supabase health check, cleanup SQL
+bde98e9a20ac30f4c2ebfe813f782ba9aa2c19c3 fc9d3f3181aeb98f121b8a97618e9cd401f64c75 ONSofftware <AdminONSoftware@gmail.com> 1787333036 +0100	commit: images: drag-and-drop file uploads to Supabase Storage
+fc9d3f3181aeb98f121b8a97618e9cd401f64c75 64d2800953c116d84de4eba4134da7fc5a6e428f ONSofftware <AdminONSoftware@gmail.com> 1787334883 +0100	commit: fix: make /shop dynamic so publish appears immediately (was static cached at build, showed 0 items)
+64d2800953c116d84de4eba4134da7fc5a6e428f 4027e639405507c4c59023d4e419a3c6c4a10d24 ONSofftware <AdminONSoftware@gmail.com> 1787334986 +0100	commit: debug: health shows store vs raw Supabase
+4027e639405507c4c59023d4e419a3c6c4a10d24 486ce8e9fb4ab0de5dff1bbb2b58e11ce77f34b7 ONSofftware <AdminONSoftware@gmail.com> 1787335090 +0100	commit: fix: inventory location FK blocks publish (auto-create location, retry without)
+486ce8e9fb4ab0de5dff1bbb2b58e11ce77f34b7 bd73824f98e76e03d98e9e30ad8dda764b866cdc ONSofftware <AdminONSoftware@gmail.com> 1787335338 +0100	commit: health: include email_log
+bd73824f98e76e03d98e9e30ad8dda764b866cdc f06be33be1b85d2b7b20ee1a4e7e1c332821e862 ONSofftware <AdminONSoftware@gmail.com> 1787337825 +0100	commit: phase 3: Supabase Auth (login/signup/reset/callback), wishlist sync, account shell
+f06be33be1b85d2b7b20ee1a4e7e1c332821e862 3379debc3cffd2cc66cdf284b8f0662ee019a10e ONSofftware <AdminONSoftware@gmail.com> 1787348460 +0100	commit: fix: account loading + header account link, handle missing anon key
+3379debc3cffd2cc66cdf284b8f0662ee019a10e 3d4ef0563968be2753dd9be9310acacea86d1bc1 ONSofftware <AdminONSoftware@gmail.com> 1787349045 +0100	commit: fix: account orders flicker (memoize profile, stabilize deps) + header account link
+3d4ef0563968be2753dd9be9310acacea86d1bc1 7fa121947928be200e7f03b5675e1b057f46018a ONSofftware <AdminONSoftware@gmail.com> 1787350541 +0100	commit: phase 3+4: addresses+preferences Supabase, checkout prefill, inventory history
+7fa121947928be200e7f03b5675e1b057f46018a 5130113f4b1f524eeee5b181880dc6efec68c991 ONSofftware <AdminONSoftware@gmail.com> 1787351541 +0100	commit: polish: shop/product skeletons, gallery, bag drawer, wishlist, homepage, header account
+5130113f4b1f524eeee5b181880dc6efec68c991 06bcb603ef704a7286f81e2e40626290f7dd4f34 ONSofftware <AdminONSoftware@gmail.com> 1787351837 +0100	commit: fix: Google login error handling (provider not enabled)
+06bcb603ef704a7286f81e2e40626290f7dd4f34 372b337d73b32147203d08760a66f0c1303a96d7 ONSofftware <AdminONSoftware@gmail.com> 1787352125 +0100	commit: remove Google login
+372b337d73b32147203d08760a66f0c1303a96d7 86e014b09abdf9809faf08b7c7a8fee8992fb2b7 ONSofftware <AdminONSoftware@gmail.com> 1787352560 +0100	commit: newsletter: consent checkbox + admin add form + checkout subscribe
+86e014b09abdf9809faf08b7c7a8fee8992fb2b7 b3d3afd4fe4d4b41bca83158242020eb5fe9d24b ONSofftware <AdminONSoftware@gmail.com> 1787353083 +0100	commit: newsletter: add Resend broadcast (compose + test + send to all)
+b3d3afd4fe4d4b41bca83158242020eb5fe9d24b fef45a37541db2420b96b924ea311d7f8db325a3 ONSofftware <AdminONSoftware@gmail.com> 1787405575 +0100	commit: admin: add delete actions to inventory, leads, orders, purchases, newsletter
+fef45a37541db2420b96b924ea311d7f8db325a3 f64d52409b832e6fc41cb675a4be9d772719dd09 ONSofftware <AdminONSoftware@gmail.com> 1787407859 +0100	commit: search+sale: Sale to nav, sale badge hint, search recent+categories+brands
+f64d52409b832e6fc41cb675a4be9d772719dd09 32670f37f1469f3c3bb6d7bf3230121be2a61084 ONSofftware <AdminONSoftware@gmail.com> 1787481501 +0100	commit: fix: addresses save (remove created_at), checkout address selector, remove duplicate PaymentElement, idempotent emails
+32670f37f1469f3c3bb6d7bf3230121be2a61084 a57d0019b2271d2c79b249e38807fa8260dada96 ONSofftware <AdminONSoftware@gmail.com> 1787482327 +0100	commit: checkout: 3-step flow (contact → delivery → review with payment), fix payment errors
+a57d0019b2271d2c79b249e38807fa8260dada96 026ddbced28e2ecf26fb371be5b9add0f3c83ad9 ONSofftware <AdminONSoftware@gmail.com> 1787483826 +0100	commit: sell-to-us: offer details prompt + email shows actual amount
+026ddbced28e2ecf26fb371be5b9add0f3c83ad9 74dfb48fa98b7de4fe5e4b01e4628533ed4db56b ONSofftware <AdminONSoftware@gmail.com> 1787484937 +0100	commit: favicons: integrate Favicon-package (96x96, svg, apple-touch, 192/512, webmanifest) + layout icons
+74dfb48fa98b7de4fe5e4b01e4628533ed4db56b 0ae91779212f5028264ebff4950fe127e809f300 ONSofftware <AdminONSoftware@gmail.com> 1787485473 +0100	commit: categories: Tops/Trousers/Dresses/Skirts/Shoes/Accessories + hero/story images to public
+0ae91779212f5028264ebff4950fe127e809f300 bf6488f9d9bcc316201066940f067a6b5a9f711a ONSofftware <AdminONSoftware@gmail.com> 1787511073 +0100	commit: Favicon

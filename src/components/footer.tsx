@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 import { Container } from "@/components/ui";
 import { EMAILS } from "@/lib/site";
 
@@ -50,13 +50,7 @@ export function Footer() {
       <Container className="py-14 lg:py-20">
         <div className="grid grid-cols-2 gap-10 md:grid-cols-12">
           <div className="col-span-2 md:col-span-4">
-            <Image
-              src="/logo.png"
-              alt="Vicarious Clothing"
-              width={64}
-              height={64}
-              className="mb-6 h-14 w-14 object-contain invert"
-            />
+            <BrandMark size={64} className="mb-6 h-14 w-14" />
             <p className="font-display text-xl font-bold uppercase tracking-[0.08em]">
               Vicarious Clothing
             </p>

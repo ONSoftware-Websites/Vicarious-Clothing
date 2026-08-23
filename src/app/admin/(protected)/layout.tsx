@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { isAdminSession } from "@/lib/server/admin-auth";
+import { BrandMark } from "@/components/brand-mark";
 import { LogoutButton } from "@/components/admin/logout-button";
 
 const NAV = [
@@ -30,8 +31,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           <div className="flex items-center gap-8">
             <Link
               href="/admin"
-              className="font-display text-sm font-bold uppercase tracking-[0.12em]"
+              className="flex items-center gap-2.5 font-display text-sm font-bold uppercase tracking-[0.12em]"
             >
+              <BrandMark size={28} className="h-7 w-7" />
               Vicarious Admin
             </Link>
             <nav aria-label="Admin" className="hidden items-center gap-6 md:flex">

@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { BrandMark } from "@/components/brand-mark";
 
 export function AdminLoginForm() {
   const router = useRouter();
@@ -28,6 +29,7 @@ export function AdminLoginForm() {
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
+        <BrandMark size={56} className="mb-6 h-14 w-14" />
         <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.24em] text-accent-deep">
           Staff only
         </p>

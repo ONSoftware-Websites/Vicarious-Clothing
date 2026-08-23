@@ -30,6 +30,9 @@ function layout(title: string, bodyHtml: string) {
     <tr><td align="center" style="padding:40px 16px;">
       <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border:1px solid #e4e2d9;">
         <tr><td style="padding:36px 40px;">
+          <p style="margin:0 0 24px;">
+            <img src="${SITE_URL}/android-chrome-192x192.png" width="56" height="56" alt="Vicarious Clothing" style="display:block;border-radius:50%;" />
+          </p>
           <p style="margin:0 0 24px;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:#007587;">VICARIOUS CLOTHING</p>
           <h1 style="margin:0 0 16px;font-size:24px;letter-spacing:0.02em;text-transform:uppercase;line-height:1.15;">${title}</h1>
           ${bodyHtml}
