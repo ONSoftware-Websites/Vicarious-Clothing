@@ -18,6 +18,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
+function isPublicProductStatus(status: string) {
+  return status === "AVAILABLE" || status === "RESERVED" || status === "SOLD";
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -25,7 +29,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) return {};
+  if (!product || !isPublicProductStatus(product.status)) return {};
   return {
     title: `${product.brand} ${product.name} - Size ${product.size}`,
     description: `${product.brand} ${product.name} in ${product.colour}. Condition: ${conditionLabel(product.condition)}. Pre-owned and checked at Vicarious Clothing.`,
@@ -45,7 +49,7 @@ export default async function ProductPage({
 }) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) notFound();
+  if (!product || !isPublicProductStatus(product.status)) notFound();
 
   const sold = product.status === "SOLD";
   const similar = await getSimilar(product, 4);
