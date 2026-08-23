@@ -84,7 +84,7 @@ export default function PreferencesPage() {
             Security
           </p>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-            Signed in with Supabase Auth. Use <a href="/auth/reset" className="text-accent-deep underline underline-offset-2">reset password</a> to change your password. Google sign-in is available on the login page.
+            Signed in with email and password. Use <a href="/auth/reset" className="text-accent-deep underline underline-offset-2">reset password</a> to change your password.
           </p>
         </div>
       </div>
