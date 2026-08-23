@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Container } from "@/components/ui";
-import { createSupabaseBrowser } from "@/lib/supabase/browser";
 
 export default function ResetPage() {
   const [email, setEmail] = useState("");
@@ -16,11 +15,13 @@ export default function ResetPage() {
     setError("");
     setLoading(true);
     try {
-      const supabase = createSupabaseBrowser();
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/verify`,
+      const response = await fetch("/api/account/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       });
-      if (error) throw new Error(error.message);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Reset failed");
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reset failed");
