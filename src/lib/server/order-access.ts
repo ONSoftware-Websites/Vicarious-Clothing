@@ -4,7 +4,8 @@ function secret() {
   const value =
     process.env.ORDER_ACCESS_SECRET ||
     process.env.LEAD_OFFER_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    (process.env.NODE_ENV !== "production" ? "vicarious-local-development-order-access" : "");
   if (!value) {
     throw new Error(
       "ORDER_ACCESS_SECRET, LEAD_OFFER_SECRET or SUPABASE_SERVICE_ROLE_KEY is required"
