@@ -41,7 +41,13 @@ export async function POST(request: NextRequest) {
     await setOrderPayment(orderId, intent.id);
     const order = await markOrderPaid(orderId);
     if (order && !wasAlreadyPaid) {
-      await sendEmail({ to: order.email, template: "order-confirmed", data: { order } });
+      // Idempotency: check email_log so webhook + complete don't both send
+      const { listEmails } = await import("@/lib/server/store");
+      const recent = await listEmails(50);
+      const alreadySent = recent.some((e) => e.template === "order-confirmed" && e.preview.includes(order.id));
+      if (!alreadySent) {
+        await sendEmail({ to: order.email, template: "order-confirmed", data: { order } });
+      }
     }
     return Response.json({ order: order ?? existing });
   } catch (err) {

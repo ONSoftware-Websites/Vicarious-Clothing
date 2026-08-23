@@ -12,7 +12,7 @@ export async function GET() {
 
   const db = getSupabase();
   if (!db) return NextResponse.json({ addresses: [] });
-  const { data, error } = await db.from("addresses").select("*").eq("profile_id", user.id).order("created_at", { ascending: false });
+  const { data, error } = await db.from("addresses").select("*").eq("profile_id", user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ addresses: data ?? [] });
 }

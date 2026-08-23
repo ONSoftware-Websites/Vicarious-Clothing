@@ -4,6 +4,7 @@ import { getStripe, getWebhookSecret } from "@/lib/server/payments";
 import {
   cancelPendingOrdersForEmail,
   getOrder,
+  listEmails,
   markOrderPaid,
   setOrderPayment,
 } from "@/lib/server/store";
@@ -40,11 +41,15 @@ export async function POST(request: NextRequest) {
 
       const order = await markOrderPaid(orderId);
       if (order && existing?.status === "PENDING_PAYMENT") {
-        await sendEmail({
-          to: order.email,
-          template: "order-confirmed",
-          data: { order },
-        });
+        const recent = await listEmails(50);
+        const alreadySent = recent.some((e) => e.template === "order-confirmed" && e.preview.includes(order.id));
+        if (!alreadySent) {
+          await sendEmail({
+            to: order.email,
+            template: "order-confirmed",
+            data: { order },
+          });
+        }
       }
       break;
     }
@@ -70,11 +75,15 @@ export async function POST(request: NextRequest) {
       const existing = await getOrder(orderId);
       const order = await markOrderPaid(orderId);
       if (order && existing?.status === "PENDING_PAYMENT") {
-        await sendEmail({
-          to: order.email,
-          template: "order-confirmed",
-          data: { order },
-        });
+        const recent = await listEmails(50);
+        const alreadySent = recent.some((e) => e.template === "order-confirmed" && e.preview.includes(order.id));
+        if (!alreadySent) {
+          await sendEmail({
+            to: order.email,
+            template: "order-confirmed",
+            data: { order },
+          });
+        }
       }
       break;
     }

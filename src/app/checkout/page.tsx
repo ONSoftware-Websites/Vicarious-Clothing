@@ -12,6 +12,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Container } from "@/components/ui";
+import { CheckoutAddressSelector } from "@/components/checkout-address-selector";
 import { useCart } from "@/hooks/use-cart";
 import { useMounted } from "@/hooks/use-local-storage";
 import { useAccount } from "@/hooks/use-account";
@@ -500,6 +501,14 @@ export default function CheckoutPage() {
           <h2 className="mb-5 font-display text-lg font-semibold uppercase tracking-tight">
             Delivery
           </h2>
+          <CheckoutAddressSelector
+            onSelect={(a) => {
+              setLine1(a.line1);
+              setLine2(a.line2 || "");
+              setCity(a.city);
+              setPostcode(a.postcode);
+            }}
+          />
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label htmlFor="co-name" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
@@ -772,10 +781,8 @@ export default function CheckoutPage() {
               </p>
               {isStripe ? (
                 <>
-                  <p className="text-sm">Card payment via Stripe</p>
-                  <div className="mt-4">
-                    <PaymentElement />
-                  </div>
+                  <p className="text-sm">Card payment via Stripe — entered on previous step</p>
+                  <p className="mt-1 text-xs text-ink-faint">You’ll confirm payment with the Pay button below.</p>
                   <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-ink-soft">
                     <input
                       type="checkbox"
