@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Container, Button } from "@/components/ui";
 import { getOrder } from "@/lib/server/store";
+import { getSupabaseUser } from "@/lib/supabase/server";
+import {
+  orderAccessCookieName,
+  verifyOrderAccessToken,
+} from "@/lib/server/order-access";
 import { conditionLabel, formatDate, formatPrice } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +20,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  return { title: `Order ${id}`, robots: { index: false } };
+  return { title: `Order ${id}`, robots: { index: false, follow: false } };
 }
 
 export default async function OrderPage({
@@ -29,6 +35,19 @@ export default async function OrderPage({
   if (!order) notFound();
 
   const raw = await searchParams;
+  const queryToken = typeof raw.token === "string" ? raw.token : "";
+  const cookieStore = await cookies();
+  const cookieToken = cookieStore.get(orderAccessCookieName(order.id))?.value ?? "";
+  const user = await getSupabaseUser();
+
+  const signedAccess =
+    verifyOrderAccessToken(order.id, order.email, queryToken) ||
+    verifyOrderAccessToken(order.id, order.email, cookieToken);
+  const accountAccess =
+    Boolean(user?.email) && user!.email!.toLowerCase() === order.email.toLowerCase();
+
+  if (!signedAccess && !accountAccess) notFound();
+
   const justPaid = raw.paid === "1";
   const pending = order.status === "PENDING_PAYMENT";
   const paymentJustCaptured = justPaid && pending;
@@ -148,8 +167,10 @@ export default async function OrderPage({
           </div>
           {order.discount && (
             <div className="flex justify-between text-accent-deep">
-              <dt>{order.discount.code} — {order.discount.description}</dt>
-              <dd>−{formatPrice(order.discount.amount || order.delivery)}</dd>
+              <dt>
+                {order.discount.code} — {order.discount.description}
+              </dt>
+              <dd>−{formatPrice(order.discount.amount || 0)}</dd>
             </div>
           )}
           <div className="flex justify-between">
@@ -191,7 +212,10 @@ export default async function OrderPage({
 
       <p className="mx-auto mt-8 max-w-2xl text-center font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
         Questions?{" "}
-        <Link href="/help/contact" className="text-accent-deep underline underline-offset-2">
+        <Link
+          href="/help/contact"
+          className="text-accent-deep underline underline-offset-2"
+        >
           Contact us
         </Link>{" "}
         — we answer within one working day.
