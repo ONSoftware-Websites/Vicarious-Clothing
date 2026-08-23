@@ -1,8 +1,43 @@
 import type { NextRequest } from "next/server";
-import type { LeadStatus } from "@/lib/types";
+import { LEAD_STATUSES, type LeadStatus } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
-import { createPurchase, deleteLead, updateLeadStatus } from "@/lib/server/store";
+import {
+  createPurchase,
+  deleteLead,
+  listLeads,
+  listPurchases,
+  updateLeadStatus,
+} from "@/lib/server/store";
 import { sendEmail } from "@/lib/server/mailer";
+
+function offerAmount(value: string | undefined) {
+  if (!value) return undefined;
+  const match = value.replace(/,/g, "").match(/£?\s*(\d+(?:\.\d{1,2})?)/);
+  if (!match) return undefined;
+  const amount = Number(match[1]);
+  return Number.isFinite(amount) && amount > 0 ? amount : undefined;
+}
+
+async function ensurePurchaseForAcceptedLead(lead: Awaited<ReturnType<typeof updateLeadStatus>>) {
+  if (!lead) return;
+  const amount = offerAmount(lead.offer);
+  if (!amount) return;
+  const existing = (await listPurchases()).find((purchase) => purchase.leadId === lead.id);
+  if (existing) return;
+
+  await createPurchase(
+    {
+      sellerName: lead.name,
+      sellerEmail: lead.email,
+      amount,
+      status: "AGREED",
+      items: [],
+      notes: `Accepted sell-to-us offer: ${lead.brand} ${lead.itemType}, size ${lead.size} (${lead.condition}).`,
+      leadId: lead.id,
+    },
+    "Henry"
+  );
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -14,40 +49,42 @@ export async function PATCH(
   const { id } = await params;
   try {
     const body = await request.json();
-    const status = String(body.status).toUpperCase() as LeadStatus;
-    const offer = body.offer ? String(body.offer) : undefined;
-    const lead = await updateLeadStatus(id, status, offer);
-    if (!lead) return Response.json({ error: "Not found" }, { status: 404 });
+    const status = String(body.status ?? "").toUpperCase() as LeadStatus;
+    if (!LEAD_STATUSES.includes(status)) {
+      return Response.json({ error: "Invalid lead status" }, { status: 400 });
+    }
 
+    const current = (await listLeads()).find((lead) => lead.id === id);
+    if (!current) return Response.json({ error: "Not found" }, { status: 404 });
+
+    const offer = body.offer ? String(body.offer).trim() : current.offer;
     if (status === "OFFER_SENT") {
+      if (!offer) {
+        return Response.json({ error: "Enter an offer before sending it." }, { status: 400 });
+      }
+
+      // Deliver first. If Resend fails, the lead remains in its previous state.
       await sendEmail({
-        to: lead.email,
+        to: current.email,
         template: "lead-offer",
-        data: { ...lead, offer: lead.offer ?? "an amount" },
+        data: { ...current, status: "OFFER_SENT", offer, offerExpiry: "7 days" },
       });
     }
 
+    const lead = await updateLeadStatus(id, status, offer);
+    if (!lead) return Response.json({ error: "Not found" }, { status: 404 });
+
     if (status === "ACCEPTED") {
-      const amount = body.amount ? Number(body.amount) : undefined;
-      if (amount && amount > 0) {
-        await createPurchase(
-          {
-            sellerName: lead.name,
-            sellerEmail: lead.email,
-            amount,
-            status: "AGREED",
-            items: [],
-            notes: `From sell-to-us lead: ${lead.brand} ${lead.itemType}, size ${lead.size} (${lead.condition}).`,
-            leadId: lead.id,
-          },
-          "Henry"
-        );
-      }
+      await ensurePurchaseForAcceptedLead(lead);
     }
 
     return Response.json({ ok: true, lead });
-  } catch {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
+  } catch (error) {
+    console.error("Lead update failed:", error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Lead update failed" },
+      { status: 500 }
+    );
   }
 }
 
