@@ -1,15 +1,18 @@
 import type { NextRequest } from "next/server";
 import { getProductBySku } from "@/lib/server/store";
 
+function normalizeSkus(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((sku) => String(sku).trim().toUpperCase()).filter(Boolean))];
+}
+
 // This endpoint is now an availability check only. The actual stock claim is
 // performed atomically when checkout creates the pending order, which prevents
 // one customer's passive bag/checkout session from owning stock without an order.
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const skus: string[] = Array.isArray(body.skus)
-      ? [...new Set(body.skus.map((s: unknown) => String(s).toUpperCase()))]
-      : [];
+    const body = (await request.json()) as { skus?: unknown };
+    const skus = normalizeSkus(body.skus);
     if (skus.length === 0) {
       return Response.json({ error: "No items" }, { status: 400 });
     }
