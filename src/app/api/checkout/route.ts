@@ -2,12 +2,12 @@ import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import type { Order } from "@/lib/types";
 import {
-  cancelPendingOrdersForEmail,
   createOrder,
   evaluateDiscount,
   getProductBySku,
   listDiscounts,
   setOrderPayment,
+  updateOrderStatus,
 } from "@/lib/server/store";
 import { getStripe, stripeEnabled } from "@/lib/server/payments";
 import {
@@ -22,7 +22,10 @@ import {
   createOrderAccessToken,
   orderAccessCookieName,
 } from "@/lib/server/order-access";
-import { productionRequiresSupabase, supabaseConfigured } from "@/lib/server/supabase";
+import {
+  productionRequiresSupabase,
+  supabaseConfigured,
+} from "@/lib/server/supabase";
 
 function validEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -80,7 +83,9 @@ export async function POST(request: NextRequest) {
 
     const skus = [
       ...new Set(
-        items.map((i: { sku?: unknown }) => String(i.sku ?? "").trim().toUpperCase())
+        items.map((item: { sku?: unknown }) =>
+          String(item.sku ?? "").trim().toUpperCase()
+        )
       ),
     ].filter(Boolean);
     if (skus.length !== items.length) {
@@ -97,7 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     const subtotal =
-      Math.round(products.reduce((sum, p) => sum + p.price, 0) * 100) / 100;
+      Math.round(products.reduce((sum, product) => sum + product.price, 0) * 100) / 100;
 
     let discount: Order["discount"];
     const normalizedDiscountCode = discountCode
@@ -106,11 +111,11 @@ export async function POST(request: NextRequest) {
     if (normalizedDiscountCode) {
       const definitions = await listDiscounts();
       const definition = definitions.find(
-        (d) => d.code.toLowerCase() === normalizedDiscountCode.toLowerCase()
+        (item) => item.code.toLowerCase() === normalizedDiscountCode.toLowerCase()
       );
       if (definition?.categories?.length) {
         const ineligible = products.some(
-          (p) => !definition.categories!.includes(p.category)
+          (product) => !definition.categories!.includes(product.category)
         );
         if (ineligible) {
           return Response.json(
@@ -156,8 +161,6 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       );
     }
-
-    await cancelPendingOrdersForEmail(cleanEmail);
 
     const claim = await claimCheckoutStock(skus);
     claimedSkus = claim.ok;
@@ -218,7 +221,7 @@ export async function POST(request: NextRequest) {
         metadata: {
           orderId: order.id,
           items: order.items
-            .map((i) => `${i.brand} ${i.name}`)
+            .map((item) => `${item.brand} ${item.name}`)
             .join(", ")
             .slice(0, 450),
         },
@@ -231,7 +234,8 @@ export async function POST(request: NextRequest) {
         { status: 201 }
       );
     } catch (error) {
-      await cancelPendingOrdersForEmail(order.email);
+      await updateOrderStatus(order.id, "CANCELLED", "checkout-system");
+      await releaseCheckoutStock(order.items.map((item) => item.sku));
       claimedSkus = [];
       throw error;
     }
