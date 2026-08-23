@@ -9,6 +9,10 @@ import {
   updateLeadStatus,
 } from "@/lib/server/store";
 import { sendEmail } from "@/lib/server/mailer";
+import { getSupabase } from "@/lib/server/supabase";
+
+const OFFER_VALID_MS = 7 * 24 * 60 * 60 * 1000;
+const ACTOR = "Admin";
 
 function offerAmount(value: string | undefined) {
   if (!value) return undefined;
@@ -16,6 +20,23 @@ function offerAmount(value: string | undefined) {
   if (!match) return undefined;
   const amount = Number(match[1]);
   return Number.isFinite(amount) && amount > 0 ? amount : undefined;
+}
+
+async function markOfferWindow(leadId: string) {
+  const db = getSupabase();
+  if (!db) return;
+  const sentAt = new Date();
+  const expiresAt = new Date(sentAt.getTime() + OFFER_VALID_MS);
+  const { error } = await db
+    .from("purchase_leads")
+    .update({
+      offer_sent_at: sentAt.toISOString(),
+      offer_expires_at: expiresAt.toISOString(),
+    })
+    .eq("id", leadId);
+  if (error) {
+    console.warn("Could not write offer expiry metadata:", error.message);
+  }
 }
 
 async function ensurePurchaseForAcceptedLead(lead: Awaited<ReturnType<typeof updateLeadStatus>>) {
@@ -35,7 +56,7 @@ async function ensurePurchaseForAcceptedLead(lead: Awaited<ReturnType<typeof upd
       notes: `Accepted sell-to-us offer: ${lead.brand} ${lead.itemType}, size ${lead.size} (${lead.condition}).`,
       leadId: lead.id,
     },
-    "Henry"
+    ACTOR
   );
 }
 
@@ -63,7 +84,6 @@ export async function PATCH(
         return Response.json({ error: "Enter an offer before sending it." }, { status: 400 });
       }
 
-      // Deliver first. If Resend fails, the lead remains in its previous state.
       await sendEmail({
         to: current.email,
         template: "lead-offer",
@@ -73,6 +93,10 @@ export async function PATCH(
 
     const lead = await updateLeadStatus(id, status, offer);
     if (!lead) return Response.json({ error: "Not found" }, { status: 404 });
+
+    if (status === "OFFER_SENT") {
+      await markOfferWindow(lead.id);
+    }
 
     if (status === "ACCEPTED") {
       await ensurePurchaseForAcceptedLead(lead);
@@ -95,6 +119,6 @@ export async function DELETE(
   const authError = await requireAdminApi();
   if (authError) return authError;
   const { id } = await params;
-  await deleteLead(id, "Henry");
+  await deleteLead(id, ACTOR);
   return Response.json({ ok: true });
 }
