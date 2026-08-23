@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/server/admin-auth";
-import { getSupabase } from "@/lib/server/supabase";
+import { getSupabase, productionRequiresSupabase } from "@/lib/server/supabase";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -40,7 +40,6 @@ export async function POST(request: NextRequest) {
         upsert: false,
       });
       if (error && error.message.includes("Bucket not found")) {
-        // Auto-create buckets (public) if you haven't run supabase/storage.sql yet
         await supabase.storage.createBucket(bucket, { public: true }).catch(() => {});
         const retry = await supabase.storage.from(bucket).upload(key, buffer, {
           contentType: file.type || "image/jpeg",
@@ -62,7 +61,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ url: urlData.publicUrl, path: key, bucket });
     }
 
-    // Local fallback (dev without Supabase) — write to public/uploads
+    if (productionRequiresSupabase()) {
+      return NextResponse.json(
+        { error: "Supabase Storage is required for production uploads." },
+        { status: 503 }
+      );
+    }
+
     const uploadsDir = path.join(process.cwd(), "public", "uploads");
     try {
       fs.mkdirSync(uploadsDir, { recursive: true });
