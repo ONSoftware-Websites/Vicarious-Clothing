@@ -1,119 +1,130 @@
-# Deploying to Vercel
+# Deploying Vicarious Clothing to Vercel
 
-Everything needed to deploy is already in the repo (`vercel.json`, build
-scripts, environment template). This guide walks through it once.
+The production application depends on **Supabase, Stripe and Resend**. Local development can still use demo data/payment behaviour, but production intentionally fails closed if durable storage or payments are unavailable.
 
----
+## 1. Vercel project
 
-## 1. Push the repo to GitHub (once)
+Import `ONSoftware-Websites/Vicarious-Clothing` into Vercel.
 
-Vercel deploys from Git. If you don't have a remote yet:
+- Framework: Next.js
+- Build command: `npm run build`
+- Node: 22.x is recommended (`package.json` requires >=20.9)
+- Production branch: `master`
 
-```bash
-git add .
-git commit -m "Vicarious Clothing — initial storefront, admin, commerce"
-git remote add origin https://github.com/<you>/vicarious-clothing.git
-git push -u origin main
-```
+Never commit a real `.env` file. `.env.example` is the configuration template.
 
-Never commit `.env` — it's already gitignored (`.env.example` is the
-template that ships).
+## 2. Required production environment variables
 
-## 2. Import into Vercel
+Add these under Vercel → Project Settings → Environment Variables for **Production**. Use separate test credentials for Preview.
 
-1. Go to https://vercel.com/new → **Import** the repo.
-2. Vercel auto-detects Next.js:
-   - Framework preset: **Next.js**
-   - Build command: `npm run build` (default)
-   - Output directory: default
-   - Node version: 22.x (or leave auto — `engines` in package.json asks for >=20.9)
-3. Click **Deploy**. You now have a working preview on `*.vercel.app`.
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_SITE_URL` | `https://vicariousclothing.co.uk` |
+| `ADMIN_PASSWORD` | Protects `/admin` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public browser/server-session auth key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only application/database key |
+| `STRIPE_SECRET_KEY` | Server payment key |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe Payment Element browser key |
+| `STRIPE_WEBHOOK_SECRET` | Signature secret for the production webhook |
+| `RESEND_API_KEY` | Transactional email delivery |
+| `ORDER_ACCESS_SECRET` | Long random HMAC secret for guest order links |
+| `LEAD_OFFER_SECRET` | Long random HMAC secret for sell-to-us links |
 
-## 3. Environment variables
+Optional:
 
-Project Settings → Environment Variables. Add these for **Production**
-(and **Preview** with test keys):
+- `PASSWORD_RESET_EXPIRY_LABEL=1 hour` — display text in the reset email. Keep it aligned with Supabase Auth's configured recovery expiry.
+- `SEED_DEMO=false` — recommended on Production and Preview.
 
-| Variable | Value | Required? |
-| --- | --- | --- |
-| `ADMIN_PASSWORD` | Your admin password (change from the example!) | Yes — otherwise `/admin` is open |
-| `NEXT_PUBLIC_SITE_URL` | `https://vicariousclothing.co.uk` (or the `.vercel.app` URL while testing) | Recommended — drives sitemap/robots/OG/email links |
-| `STRIPE_SECRET_KEY` | `sk_test_…` in Preview, `sk_live_…` in Production | No — blank = demo checkout |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_test_…` / `pk_live_…` | Only with Stripe — needed for the on-site card form |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_…` from Stripe (see below) | Only with Stripe |
-| `RESEND_API_KEY` | `re_…` | No — blank = emails logged, not sent |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Only for Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key (server-only) | Only for Supabase |
+`SUPABASE_SERVICE_ROLE_KEY`, `ORDER_ACCESS_SECRET`, `LEAD_OFFER_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY` and `ADMIN_PASSWORD` must never be exposed in client-side code.
 
-**Important about the demo data store:** on Vercel the filesystem is
-read-only, so the file-backed store automatically switches to in-memory
-mode. That means the site works fully for previewing, but data resets on
-redeploys/cold starts, is **not shared across serverless instances**, and
-admin edits may not show on storefront pages (each instance keeps its own
-copy). That's fine for previewing — **production data belongs in Supabase**:
+## 3. Supabase database and storage
 
-1. Create the Supabase project, then in the SQL editor run
-   `supabase/schema.sql`, followed by `supabase/seed.sql` if you want the
-   demo catalogue.
-2. Add `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` to Vercel
-   and redeploy — the store switches to Supabase automatically. No code
-   changes needed.
+For a new project, run these in the Supabase SQL editor in order:
 
-## 4. Stripe webhook (only when using Stripe)
+1. `supabase/schema.sql`
+2. `supabase/repair-2026-08-23.sql`
 
-The checkout is fully on-site — customers enter card details in the
-Vicarious checkout (Stripe Payment Element styled to the brand), and the
-order is marked paid by the webhook.
+The repair migration installs the atomic one-of-one inventory claim used by checkout, atomic discount finalisation and the `lead-photos` Storage bucket used by Sell To Us.
 
-1. Stripe Dashboard → Developers → Webhooks → **Add endpoint**.
-2. Endpoint URL: `https://vicariousclothing.co.uk/api/webhooks/stripe`
-   (or your `.vercel.app` URL while testing).
-3. Events to send: `payment_intent.succeeded`,
-   `payment_intent.payment_failed`.
-4. Copy the signing secret into `STRIPE_WEBHOOK_SECRET` in Vercel.
-5. For local testing: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`.
+Only run `supabase/seed.sql` in an environment where you intentionally want demo stock.
 
-Both keys are needed for the on-site form: `STRIPE_SECRET_KEY` (server)
-and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (browser). With either missing,
-checkout falls back to demo mode automatically.
+### Auth URL configuration
 
-## 5. Domain
+In Supabase → Authentication → URL Configuration:
 
-1. Project Settings → Domains → add `vicariousclothing.co.uk`.
-2. Follow Vercel's DNS instructions at your registrar (CNAME to
-   `cname.vercel-dns.com` or A record to `76.76.21.21`).
-3. Vercel issues SSL automatically. Set
-   `NEXT_PUBLIC_SITE_URL=https://vicariousclothing.co.uk` and redeploy.
-4. Email DNS (SPF/DKIM/DMARC) is separate — follow Resend's domain
-   verification and Google Workspace/Zoho instructions.
+- Site URL: `https://vicariousclothing.co.uk`
+- Allowed redirect URL: `https://vicariousclothing.co.uk/auth/callback`
+- Add your Preview callback URL separately when testing auth in Preview.
 
-## 6. Post-deploy checks
+The browser and customer-session clients use `NEXT_PUBLIC_SUPABASE_ANON_KEY` only. The service-role key remains server-only.
 
-- [ ] `/` renders, images load (picsum is allowed in `next.config.ts`)
-- [ ] `/shop`, `/product/…`, `/sitemap.xml`, `/robots.txt` return 200
-- [ ] `/admin` asks for the password; login works over HTTPS
-- [ ] Place a test order (Stripe test card `4242 4242 4242 4242` if
-      Stripe is on, otherwise demo mode)
-- [ ] `/admin/emails` shows the confirmation email; Resend delivers it
-- [ ] `https://vicariousclothing.co.uk/opengraph-image` shows the brand
-      image (paste a product URL into https://www.opengraph.xyz or
-      LinkedIn's post inspector)
+## 4. Stripe
 
-## 7. Day-to-day
+The storefront uses Stripe Payment Element. Production does **not** fall back to demo checkout if Stripe is missing.
 
-- Every push to `main` = Production deployment; every branch = Preview
-  with its own URL (great for checking changes before merge).
-- Run the test suite before pushing: `npm test` (reservation rules,
-  discount validation, order flow, catalog logic).
-- Revert anything: Project → Deployments → ⋯ → Rollback.
-- Logs: Project → Logs (runtime), Build logs on each deployment.
-- The `vercel.json` in this repo already sets security headers
-  (nosniff, frame-deny, referrer policy, permissions policy, HSTS).
+Configure this webhook endpoint in Stripe:
 
-## 8. Staging pattern (recommended)
+`https://vicariousclothing.co.uk/api/webhooks/stripe`
 
-1. Push to `main` → production deploy.
-2. Create a `preview` Git branch with Stripe **test** keys in the
-   Preview environment → a permanent staging URL for trying changes
-   against real payment UI without touching live money.
-3. Keep `ADMIN_PASSWORD` distinct between environments.
+Events:
+
+- `payment_intent.succeeded` — required
+- `payment_intent.payment_failed` — recommended
+
+Copy the endpoint signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+The browser completion request and Stripe webhook are both idempotent. The webhook is still essential for payment methods that redirect away from the checkout page.
+
+## 5. Resend
+
+Verify `vicariousclothing.co.uk` in Resend and complete its SPF/DKIM DNS requirements.
+
+The application sends transactional mail from:
+
+`notifications@vicariousclothing.co.uk`
+
+Set `RESEND_API_KEY` in Vercel. In production, failed/missing email configuration is treated as a real delivery failure rather than silently writing an HTML file.
+
+## 6. Domain
+
+Add `vicariousclothing.co.uk` to the Vercel project and follow Vercel's DNS instructions. After the domain is active, ensure `NEXT_PUBLIC_SITE_URL` is the canonical HTTPS domain and redeploy.
+
+## 7. Health check
+
+After deployment open:
+
+`https://vicariousclothing.co.uk/api/health`
+
+A production-ready deployment should return `ok: true`. It checks:
+
+- required configuration;
+- core Supabase tables;
+- the atomic `claim_inventory` RPC;
+- the Sell To Us photo bucket.
+
+Do not treat a deployment as ready while this endpoint is returning 500/503.
+
+## 8. End-to-end checks
+
+Before taking real orders:
+
+- [ ] `/` and `/shop` load real Supabase inventory.
+- [ ] `/admin` requires the configured password.
+- [ ] Create and verify a customer account; the branded welcome email arrives.
+- [ ] Request a password reset; the branded reset email opens the password-update flow.
+- [ ] Submit Sell To Us with photos; staff can see the photos in Admin.
+- [ ] Send a sell-to-us offer; Accept and Decline links update the lead correctly.
+- [ ] Place a Stripe test order; Stripe records the payment and Admin shows the order as paid.
+- [ ] The confirmation email opens the protected order page.
+- [ ] Save tracking before marking an order dispatched; the dispatch email contains tracking.
+- [ ] Mark a test Stripe order refunded; local status changes only after Stripe accepts the refund.
+- [ ] Verify `/api/health` still reports `ok: true`.
+
+## 9. Operational notes
+
+- Production writes require Supabase. If the durable data service is unavailable, API mutations return 503 instead of pretending to succeed in serverless memory.
+- Website customers must use `/api/checkout`; the legacy `/api/orders` creation route is staff-only.
+- Customer order pages require either the matching authenticated account, a signed email link or the signed HttpOnly cookie issued at checkout.
+- One-of-one stock is claimed atomically when a pending order is created, not simply because someone opened checkout.
+- Every push to `master` triggers a Vercel production deployment. Use a separate preview branch plus Stripe test credentials for staging.
