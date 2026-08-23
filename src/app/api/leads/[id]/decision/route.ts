@@ -1,8 +1,22 @@
 import type { NextRequest } from "next/server";
-import { listEmails, listLeads, updateLeadStatus } from "@/lib/server/store";
+import {
+  createPurchase,
+  listEmails,
+  listLeads,
+  listPurchases,
+  updateLeadStatus,
+} from "@/lib/server/store";
 import { verifyLeadAccessToken } from "@/lib/server/lead-access";
 
 const OFFER_VALID_MS = 7 * 24 * 60 * 60 * 1000;
+
+function offerAmount(value?: string) {
+  if (!value) return undefined;
+  const match = value.replace(/,/g, "").match(/£?\s*(\d+(?:\.\d{1,2})?)/);
+  if (!match) return undefined;
+  const amount = Number(match[1]);
+  return Number.isFinite(amount) && amount > 0 ? amount : undefined;
+}
 
 export async function POST(
   request: NextRequest,
@@ -49,6 +63,27 @@ export async function POST(
       decision === "accept" ? "ACCEPTED" : "DECLINED"
     );
     if (!updated) return Response.json({ error: "Submission not found" }, { status: 404 });
+
+    if (updated.status === "ACCEPTED") {
+      const amount = offerAmount(updated.offer);
+      const purchaseExists = (await listPurchases()).some(
+        (purchase) => purchase.leadId === updated.id
+      );
+      if (amount && !purchaseExists) {
+        await createPurchase(
+          {
+            sellerName: updated.name,
+            sellerEmail: updated.email,
+            amount,
+            status: "AGREED",
+            items: [],
+            notes: `Accepted sell-to-us offer: ${updated.brand} ${updated.itemType}, size ${updated.size} (${updated.condition}).`,
+            leadId: updated.id,
+          },
+          "customer"
+        );
+      }
+    }
 
     return Response.json({ ok: true, status: updated.status });
   } catch (error) {
