@@ -86,11 +86,13 @@ export async function POST(request: NextRequest) {
       }
 
       const order = orderResult.order;
-      await sendEmail({
-        to: order.email,
-        template: "order-confirmed",
-        data: { order },
-      });
+      try {
+        console.log("Sending order-confirmed email (demo checkout)", { orderId: order.id, to: order.email });
+        await sendEmail({ to: order.email, template: "order-confirmed", data: { order } });
+        console.log("Sent order-confirmed email (demo checkout)", { orderId: order.id });
+      } catch (err) {
+        console.error("Failed to send order-confirmed email (demo checkout):", err, { orderId: order.id, to: order.email });
+      }
       return Response.json({ order, mode: "demo" }, { status: 201 });
     }
 

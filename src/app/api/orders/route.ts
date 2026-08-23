@@ -45,11 +45,17 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Could not create order" }, { status: 500 });
     }
 
-    await sendEmail({
-      to: result.order.email,
-      template: "order-confirmed",
-      data: { order: result.order },
-    });
+    try {
+      console.log("Sending order-confirmed email (orders API)", { orderId: result.order.id, to: result.order.email });
+      await sendEmail({
+        to: result.order.email,
+        template: "order-confirmed",
+        data: { order: result.order },
+      });
+      console.log("Sent order-confirmed email (orders API)", { orderId: result.order.id });
+    } catch (err) {
+      console.error("Failed to send order-confirmed email (orders API):", err, { orderId: result.order.id, to: result.order.email });
+    }
 
     return Response.json({ order: result.order }, { status: 201 });
   } catch {
