@@ -30,6 +30,41 @@ $$;
 revoke all on function public.claim_inventory(text[], integer) from public;
 grant execute on function public.claim_inventory(text[], integer) to service_role;
 
+-- The legacy createOrder implementation records a discount before Stripe has
+-- actually succeeded. These two RPCs let the repaired checkout undo that pending
+-- use and later finalize it exactly once, even if browser completion and Stripe's
+-- webhook arrive at the same time.
+create or replace function public.undo_discount_usage(p_code text, p_email text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update discounts
+  set used_count = greatest(0, used_count - 1),
+      used_emails = array_remove(used_emails, lower(trim(p_email)))
+  where lower(code) = lower(trim(p_code))
+    and lower(trim(p_email)) = any(used_emails);
+$$;
+
+create or replace function public.record_discount_usage_once(p_code text, p_email text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update discounts
+  set used_count = used_count + 1,
+      used_emails = array_append(used_emails, lower(trim(p_email)))
+  where lower(code) = lower(trim(p_code))
+    and not (lower(trim(p_email)) = any(used_emails));
+$$;
+
+revoke all on function public.undo_discount_usage(text, text) from public;
+revoke all on function public.record_discount_usage_once(text, text) from public;
+grant execute on function public.undo_discount_usage(text, text) to service_role;
+grant execute on function public.record_discount_usage_once(text, text) to service_role;
+
 -- Storage used by the Sell To Us form. Uploads are performed server-side with
 -- the service-role key; public read is required so staff can view submitted photos.
 insert into storage.buckets (id, name, public)
