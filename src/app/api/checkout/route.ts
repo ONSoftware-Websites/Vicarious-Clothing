@@ -198,3 +198,4 @@ export async function POST(request: NextRequest) {
     console.error("Checkout error:", err);
     return Response.json({ error: "Checkout failed" }, { status: 500 });
   }
+}
