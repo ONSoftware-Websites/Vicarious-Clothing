@@ -8,7 +8,7 @@ export async function GET() {
   if (!enabled && productionRequiresSupabase()) {
     return Response.json(
       {
-        mode: "unavailable",
+        mode: "stripe",
         publishableKey: "",
         error: "Payments are not configured.",
       },
