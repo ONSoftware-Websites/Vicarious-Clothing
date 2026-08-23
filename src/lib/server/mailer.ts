@@ -7,6 +7,15 @@ import { logEmail } from "@/lib/server/store";
 
 const EMAIL_DIR = path.join(process.cwd(), ".data", "emails");
 
+// -----------------------------------------------------------------------------
+// EMAIL BRANDING — REPLACE THESE VALUES WITH YOUR OWN ASSETS/LINKS.
+// Leave a social URL blank if you do not want that social link shown in emails.
+// -----------------------------------------------------------------------------
+const EMAIL_LOGO_URL = `${SITE_URL}/android-chrome-192x192.png`; // TODO: Replace with the final public Vicarious logo URL.
+const EMAIL_INSTAGRAM_URL = ""; // TODO: Add the full Instagram URL, e.g. https://www.instagram.com/yourhandle
+const EMAIL_TIKTOK_URL = ""; // TODO: Add the full TikTok URL.
+const EMAIL_FACEBOOK_URL = ""; // TODO: Add the full Facebook URL if used.
+
 function esc(s: unknown) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -38,6 +47,20 @@ export type EmailTemplate =
   | "lead-enquiry"
   | "lead-offer";
 
+function socialLinks() {
+  const links = [
+    { label: "Instagram", url: EMAIL_INSTAGRAM_URL },
+    { label: "TikTok", url: EMAIL_TIKTOK_URL },
+    { label: "Facebook", url: EMAIL_FACEBOOK_URL },
+  ].filter((link) => link.url.trim());
+
+  if (!links.length) return "";
+
+  return `<p style="margin:10px 0 0;font-size:11px;line-height:1.7;">
+    ${links.map((link) => `<a href="${esc(link.url)}" style="color:#56565e;text-decoration:underline;">${link.label}</a>`).join(" &nbsp;·&nbsp; ")}
+  </p>`;
+}
+
 function layout(title: string, bodyHtml: string) {
   return `<!doctype html>
 <html>
@@ -47,7 +70,7 @@ function layout(title: string, bodyHtml: string) {
       <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border:1px solid #e4e2d9;">
         <tr><td style="padding:36px 40px;">
           <p style="margin:0 0 24px;">
-            <img src="${SITE_URL}/android-chrome-192x192.png" width="56" height="56" alt="Vicarious Clothing" style="display:block;border-radius:50%;" />
+            <img src="${EMAIL_LOGO_URL}" width="56" height="56" alt="Vicarious Clothing" style="display:block;border-radius:50%;" />
           </p>
           <p style="margin:0 0 24px;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:#007587;">VICARIOUS CLOTHING</p>
           <h1 style="margin:0 0 16px;font-size:24px;letter-spacing:0.02em;text-transform:uppercase;line-height:1.15;">${title}</h1>
@@ -58,6 +81,7 @@ function layout(title: string, bodyHtml: string) {
             Vicarious Clothing · ${SITE_URL}<br>
             Curated clothing, ready to go again.
           </p>
+          ${socialLinks()}
         </td></tr>
       </table>
     </td></tr>
@@ -66,33 +90,32 @@ function layout(title: string, bodyHtml: string) {
 </html>`;
 }
 
+function button(label: string, href: string) {
+  return `<p style="margin:20px 0;">
+    <a href="${esc(href)}" style="display:inline-block;background:#101014;color:#ffffff;text-decoration:none;padding:12px 18px;font-size:12px;font-weight:bold;letter-spacing:0.08em;text-transform:uppercase;">${esc(label)}</a>
+  </p>`;
+}
+
 function itemsTable(order: Order) {
   const rows = order.items
     .map(
       (i) => `<tr>
-        <td style="padding:8px 0;border-bottom:1px solid #e4e2d9;">${i.brand} ${i.name} <span style="color:#8b8b93;">· ${i.size}</span></td>
+        <td style="padding:8px 0;border-bottom:1px solid #e4e2d9;">${esc(i.brand)} ${esc(i.name)} <span style="color:#8b8b93;">· ${esc(i.size)}</span></td>
         <td style="padding:8px 0;border-bottom:1px solid #e4e2d9;text-align:right;white-space:nowrap;">${formatPrice(i.price)}</td>
       </tr>`
     )
     .join("");
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
-    ${rows}
-    <tr>
-      <td style="padding:12px 0 4px;color:#56565e;">Subtotal</td>
-      <td style="padding:12px 0 4px;text-align:right;">${formatPrice(order.subtotal)}</td>
-    </tr>
-    ${order.discount ? `<tr>
-      <td style="padding:4px 0;color:#007587;">${order.discount.code} — ${order.discount.description}</td>
-      <td style="padding:4px 0;text-align:right;color:#007587;">-${formatPrice(order.discount.amount || order.delivery)}</td>
-    </tr>` : ""}
-    <tr>
-      <td style="padding:4px 0;color:#56565e;">Delivery</td>
-      <td style="padding:4px 0;text-align:right;">${order.delivery === 0 ? "Free" : formatPrice(order.delivery)}</td>
-    </tr>
-    <tr>
-      <td style="padding:10px 0;font-weight:bold;text-transform:uppercase;font-size:13px;letter-spacing:0.08em;">Total</td>
-      <td style="padding:10px 0;font-weight:bold;text-align:right;">${formatPrice(order.total)}</td>
-    </tr>
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin:12px 0;">${rows}</table>`;
+}
+
+function leadItems(lead: any) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin:12px 0;">
+    <tr><td style="padding:5px 0;color:#56565e;"><strong>Brand:</strong></td><td style="padding:5px 0;text-align:right;">${esc(lead.brand ?? "—")}</td></tr>
+    <tr><td style="padding:5px 0;color:#56565e;"><strong>Item:</strong></td><td style="padding:5px 0;text-align:right;">${esc(lead.itemType ?? "—")}</td></tr>
+    <tr><td style="padding:5px 0;color:#56565e;"><strong>Size:</strong></td><td style="padding:5px 0;text-align:right;">${esc(lead.size ?? "—")}</td></tr>
+    <tr><td style="padding:5px 0;color:#56565e;"><strong>Condition:</strong></td><td style="padding:5px 0;text-align:right;">${esc(lead.condition ?? "—")}</td></tr>
+    ${lead.notes ? `<tr><td style="padding:5px 0;color:#56565e;"><strong>Notes:</strong></td><td style="padding:5px 0;text-align:right;">${esc(lead.notes)}</td></tr>` : ""}
   </table>`;
 }
 
@@ -106,18 +129,20 @@ function buildTemplate(
       return {
         subject: "Welcome to Vicarious Clothing",
         html: layout("Welcome to Vicarious Clothing.", `
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#3f3f46;">Hi ${esc(firstName(name))},</p>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#3f3f46;">Hi ${firstName(name)},</p>
           <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Welcome to Vicarious Clothing.</p>
-          <ul style="color:#3f3f46;">
+          <p style="margin:0 0 10px;font-size:14px;color:#3f3f46;">Your account is ready, so you can now:</p>
+          <ul style="color:#3f3f46;line-height:1.7;">
             <li>track your orders;</li>
             <li>save pieces to your wishlist;</li>
             <li>manage your addresses;</li>
             <li>update your preferences; and</li>
             <li>see your order history.</li>
           </ul>
-          <p style="margin:16px 0;"><a href="${SITE_URL}/account" style="color:#007587;">My account</a></p>
-          <p style="margin:0 0 16px;"><a href="${SITE_URL}/shop/new-in" style="color:#007587;">Shop new in</a></p>
-          <p style="margin:0 0 8px;color:#3f3f46;">Thanks for joining us.</p>
+          ${button("My account", `${SITE_URL}/account`)}
+          <p style="margin:16px 0;color:#3f3f46;">Want to see what’s just arrived?</p>
+          ${button("Shop new in", `${SITE_URL}/shop/new-in`)}
+          <p style="margin:16px 0 8px;color:#3f3f46;">Thanks for joining us.</p>
           <p style="margin:0 0 8px;font-weight:bold;">Vicarious Clothing</p>
           <p style="margin:0;font-style:italic;color:#8b8b93;">Clothes worth another life.</p>
         `),
@@ -130,18 +155,22 @@ function buildTemplate(
         html: layout("Order confirmed.", `
           <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
           <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">Thanks for your order.</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve received your payment and your piece is now yours.</p>
           <p style="margin:8px 0;font-weight:bold;">Order ${esc(order.id)}</p>
           <p style="margin:0 0 8px;color:#8b8b93;">Placed ${esc(order.createdAt)}</p>
           ${itemsTable(order)}
-          <p style="margin:8px 0;color:#3f3f46;"><strong>Subtotal:</strong> ${formatPrice(order.subtotal)}<br>
-          <strong>Delivery:</strong> ${order.delivery === 0 ? "Free" : formatPrice(order.delivery)}<br>
-          <strong>Discount:</strong> ${order.discount ? esc(order.discount.code) : "—"}<br>
-          <strong>Total:</strong> <strong>${formatPrice(order.total)}</strong></p>
-          <p style="margin:12px 0 0;font-weight:bold;">Delivering to</p>
-          <p style="margin:6px 0;">${esc(order.name)}<br>${formatAddress(order.address)}</p>
+          <p style="margin:12px 0;color:#3f3f46;line-height:1.8;">
+            <strong>Subtotal:</strong> ${formatPrice(order.subtotal)}<br>
+            <strong>Delivery:</strong> ${order.delivery === 0 ? "Free" : formatPrice(order.delivery)}<br>
+            <strong>Discount:</strong> ${order.discount ? `${esc(order.discount.code)} — ${formatPrice(order.discount.amount || 0)}` : "—"}<br>
+            <strong>Total:</strong> <strong>${formatPrice(order.total)}</strong>
+          </p>
+          <p style="margin:16px 0 4px;font-weight:bold;">Delivering to</p>
+          <p style="margin:6px 0;line-height:1.6;">${esc(order.name)}<br>${formatAddress(order.address)}</p>
           <p style="margin:6px 0;"><strong>Delivery method:</strong> ${esc(order.channel)}</p>
-          <p style="margin:16px 0 0;"><a href="${SITE_URL}/order/${order.id}" style="color:#007587;">View order →</a></p>
-          <p style="margin:16px 0 0;color:#3f3f46;">Thanks for giving something another life.</p>
+          <p style="margin:16px 0;color:#3f3f46;">We’ll email you again when your order is on its way.</p>
+          ${button("View order", `${SITE_URL}/order/${order.id}`)}
+          <p style="margin:16px 0 8px;color:#3f3f46;">Thanks for giving something another life.</p>
           <p style="margin:0;font-weight:bold;">Vicarious Clothing</p>
         `),
       };
@@ -152,15 +181,18 @@ function buildTemplate(
         subject: `On its way — order ${order.id}`,
         html: layout("It's on the way.", `
           <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
-          <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">Your order is on its way.</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Your order is on its way.</p>
           <p style="margin:8px 0;font-weight:bold;">Order ${esc(order.id)}</p>
           ${itemsTable(order)}
-          <p style="margin:8px 0;color:#3f3f46;"><strong>Carrier:</strong> ${esc(order.carrier ?? "—")}<br>
-          <strong>Delivery service:</strong> ${esc(order.channel)}<br>
-          <strong>Tracking number:</strong> ${esc(order.tracking ?? "—")}</p>
-          <p style="margin:12px 0;"><a href="${SITE_URL}/order/${order.id}" style="color:#007587;">Track your order →</a></p>
-          <p style="margin:8px 0;color:#3f3f46;">Your order is being delivered to:<br>${esc(order.name)}<br>${formatAddress(order.address)}</p>
-          <p style="margin:12px 0;color:#3f3f46;">We hope it likes where it’s going next.</p>
+          <p style="margin:12px 0;color:#3f3f46;line-height:1.8;">
+            <strong>Carrier:</strong> ${esc(order.carrier ?? "—")}<br>
+            <strong>Delivery service:</strong> ${esc(order.channel)}<br>
+            <strong>Tracking number:</strong> ${esc(order.tracking ?? "—")}
+          </p>
+          ${button("Track your order", `${SITE_URL}/order/${order.id}`)}
+          <p style="margin:16px 0 6px;color:#3f3f46;">Your order is being delivered to:</p>
+          <p style="margin:6px 0;line-height:1.6;">${esc(order.name)}<br>${formatAddress(order.address)}</p>
+          <p style="margin:16px 0;color:#3f3f46;">We hope it likes where it’s going next.</p>
           <p style="margin:0;font-weight:bold;">Vicarious Clothing</p>
         `),
       };
@@ -171,30 +203,34 @@ function buildTemplate(
         subject: `Delivered — order ${order.id}`,
         html: layout("It's arrived.", `
           <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
-          <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">Your Vicarious order has been marked as delivered.</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Your Vicarious order has been marked as delivered.</p>
           <p style="margin:8px 0;font-weight:bold;">Order ${esc(order.id)}</p>
           ${itemsTable(order)}
-          <p style="margin:12px 0;color:#3f3f46;">We hope it’s found the right wardrobe.</p>
-          <p style="margin:12px 0;"><a href="${SITE_URL}/order/${order.id}" style="color:#007587;">View order →</a></p>
-          <p style="margin:8px 0;color:#3f3f46;">If something isn’t right, contact us and we’ll help.</p>
-          <p style="margin:8px 0;"><a href="${SITE_URL}/help" style="color:#007587;">Get support →</a></p>
-          <p style="margin:12px 0;font-weight:bold;">Vicarious Clothing</p>
+          <p style="margin:16px 0;color:#3f3f46;">We hope it’s found the right wardrobe.</p>
+          ${button("View order", `${SITE_URL}/order/${order.id}`)}
+          <p style="margin:16px 0;color:#3f3f46;">If something isn’t right, contact us and we’ll help.</p>
+          ${button("Get support", `${SITE_URL}/help`)}
+          <p style="margin:16px 0 8px;color:#3f3f46;">Thanks for shopping with Vicarious.</p>
+          <p style="margin:0;font-weight:bold;">Vicarious Clothing</p>
         `),
       };
     }
     case "order-refunded": {
       const order = data.order as Order;
+      const refundAmount = typeof data.refundAmount === "number" ? data.refundAmount : order.total;
       return {
         subject: `Your refund has been issued — order ${order.id}`,
         html: layout("Refund issued.", `
           <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
-          <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">We’ve issued a refund relating to order <strong>${esc(order.id)}</strong>.</p>
-          <p style="margin:8px 0;color:#3f3f46;"><strong>Refund amount:</strong> ${formatPrice(order.total)}<br>
-          <strong>Refund reference:</strong> ${esc(order.paymentIntentId ?? "—")}</p>
-          <p style="margin:8px 0;color:#3f3f46;">The refund has been sent to the original payment method used for your order.</p>
-          <p style="margin:8px 0;color:#8b8b93;">Depending on your bank or payment provider, it may take some time for the funds to appear on your account.</p>
-          <p style="margin:8px 0;color:#3f3f46;">If you have any questions about the refund, reply to this email or contact our support team.</p>
-          <p style=margin:12px 0;font-weight:bold;"> Vicarious Clothing</p> 
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve issued a refund relating to order <strong>${esc(order.id)}</strong>.</p>
+          <p style="margin:12px 0;color:#3f3f46;line-height:1.8;">
+            <strong>Refund amount:</strong> ${formatPrice(refundAmount)}<br>
+            <strong>Refund reference:</strong> ${esc(String(data.refundReference ?? order.paymentIntentId ?? "—"))}
+          </p>
+          <p style="margin:16px 0;color:#3f3f46;">The refund has been sent to the original payment method used for your order.</p>
+          <p style="margin:16px 0;color:#3f3f46;">Depending on your bank or payment provider, it may take some time for the funds to appear on your account.</p>
+          <p style="margin:16px 0;color:#3f3f46;">If you have any questions about the refund, reply to this email or contact our support team.</p>
+          <p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>
         `),
       };
     }
@@ -204,14 +240,14 @@ function buildTemplate(
         subject: `Order ${order.id} has been cancelled`,
         html: layout("Order cancelled.", `
           <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(order.name)},</p>
-          <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">Your order <strong>${esc(order.id)}</strong> has been cancelled.</p>
-          <p style="margin:8px 0;color:#3f3f46;">${esc(String(data.cancellationReason ?? ""))}</p>
-          <p style="margin:8px 0;color:#3f3f46;"><strong>Order total:</strong> ${formatPrice(order.total)}</p>
-          <p style="margin:8px 0;color:#3f3f46;">${esc(String(data.refundInformation ?? ""))}</p>
-          <p style="margin:8px 0;color:#3f3f46;">If a refund is due, it will be returned to the original payment method.</p>
-          <p style="margin:8px 0;color:#3f3f46;">If you weren’t expecting this cancellation or need any help, reply to this email.</p>
-          <p style="margin:8px 0;"><a href="${SITE_URL}/help" style="color:#007587;">Contact support →</a></p>
-          <p style="margin:12px 0;font-weight:bold;">Vicarious Clothing</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Your order <strong>${esc(order.id)}</strong> has been cancelled.</p>
+          ${data.cancellationReason ? `<p style="margin:16px 0;color:#3f3f46;">${esc(String(data.cancellationReason))}</p>` : ""}
+          <p style="margin:12px 0;color:#3f3f46;"><strong>Order total:</strong> ${formatPrice(order.total)}</p>
+          ${data.refundInformation ? `<p style="margin:16px 0;color:#3f3f46;">${esc(String(data.refundInformation))}</p>` : ""}
+          <p style="margin:16px 0;color:#3f3f46;">If a refund is due, it will be returned to the original payment method.</p>
+          <p style="margin:16px 0;color:#3f3f46;">If you weren’t expecting this cancellation or need any help, reply to this email.</p>
+          ${button("Contact support", `${SITE_URL}/help`)}
+          <p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>
         `),
       };
     }
@@ -220,13 +256,13 @@ function buildTemplate(
       return {
         subject: "Reset your Vicarious Clothing password",
         html: layout("Reset your password.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${esc(firstName(data.name))},</p>
-          <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">We received a request to reset the password for your Vicarious account.</p>
-          <p style="margin:8px 0;"><a href="${link}" style="color:#007587;">Reset password →</a></p>
-          <p style="margin:8px 0;color:#8b8b93;">This link will expire in ${esc(String(data.expiryTime ?? "1 hour"))}.</p>
-          <p style="margin:8px 0;color:#8b8b93;">If you didn’t request a password reset, you can ignore this email. Your existing password will remain unchanged.</p>
-          <p style="margin:8px 0;color:#8b8b93;">For your security, we will never ask you to send us your password by email.</p>
-          <p style="margin:12px 0;font-weight:bold;">Vicarious Clothing</p>
+          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(data.name)},</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We received a request to reset the password for your Vicarious account.</p>
+          ${button("Reset password", link)}
+          <p style="margin:16px 0;color:#3f3f46;">This link will expire in ${esc(String(data.expiryTime ?? "1 hour"))}.</p>
+          <p style="margin:16px 0;color:#3f3f46;">If you didn’t request a password reset, you can ignore this email. Your existing password will remain unchanged.</p>
+          <p style="margin:16px 0;color:#3f3f46;">For your security, we will never ask you to send us your password by email.</p>
+          <p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>
         `),
       };
     }
@@ -235,51 +271,53 @@ function buildTemplate(
       return {
         subject: `We've received your submission — ${String(lead.id ?? "")}`,
         html: layout("We've received your submission.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${esc(firstName(lead.name))},</p>
+          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(lead.name)},</p>
           <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">Thanks for offering your clothes to Vicarious.</p>
-          <p style="margin:8px 0;"><strong>Reference:</strong> ${esc(lead.id)}</p>
-          <p style="margin:8px 0;color:#3f3f46;">${esc(String(lead.notes ?? ""))}</p>
-          <p style="margin:12px 0;color:#3f3f46;">We’ll review your items based on factors including:</p>
-          <ul style="color:#3f3f46;">
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve received your submission and will take a look at the information and photographs you’ve provided.</p>
+          <p style="margin:12px 0;"><strong>Reference:</strong> ${esc(lead.id)}</p>
+          ${leadItems(lead)}
+          <p style="margin:16px 0 8px;color:#3f3f46;">We’ll review your items based on factors including:</p>
+          <ul style="color:#3f3f46;line-height:1.7;">
             <li>condition;</li>
             <li>brand;</li>
             <li>authenticity where relevant;</li>
             <li>current demand; and</li>
             <li>the stock we already hold.</li>
           </ul>
-          <p style="margin:8px 0;color:#3f3f46;">Submitting your items does not oblige you to sell them, and it does not oblige Vicarious Clothing to purchase them.</p>
-          <p style="margin:8px 0;color:#3f3f46;">We’ll contact you once we’ve reviewed your submission.</p>
-          <p style="margin:12px 0;"><a href="${SITE_URL}/leads/${lead.id}" style="color:#007587;">View submission →</a></p>
-          <p style="margin:12px 0;font-weight:bold;">Vicarious Clothing</p>
+          <p style="margin:16px 0;color:#3f3f46;">Submitting your items does not oblige you to sell them, and it does not oblige Vicarious Clothing to purchase them.</p>
+          <p style="margin:16px 0;color:#3f3f46;">We’ll contact you once we’ve reviewed your submission.</p>
+          ${button("View submission", `${SITE_URL}/leads/${lead.id}`)}
+          <p style="margin:16px 0 8px;color:#3f3f46;">Thanks for thinking of Vicarious.</p>
+          <p style="margin:0;font-weight:bold;">Vicarious Clothing</p>
         `),
       };
     }
     case "lead-offer": {
-      const lead = data;
-      const l = lead as any;
+      const l = data as any;
       const raw = String(l.offer ?? "").trim();
       const amount = raw ? (/^\d/.test(raw) && !raw.includes("£") ? `£${raw}` : raw) : "an amount";
       return {
         subject: `We'd like to make you an offer — ${String(l.id ?? "")}`,
-        html: layout("Offer received.", `
-          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${esc(firstName(l.name))},</p>
-          <p style="margin:0 0 8px;font-size:14px;color:#3f3f46;">We’ve reviewed your submission <strong>${esc(l.id)}</strong> and we’re interested in buying some or all of your items.</p>
-          <p style="margin:8px 0;color:#3f3f46;">${esc(String(l.notes ?? ""))}</p>
-          <p style="margin:8px 0;color:#3f3f46;"><strong>Total provisional offer:</strong> <strong>${esc(amount)}</strong></p>
-          <p style="margin:8px 0;color:#3f3f46;"><strong>Offer expires:</strong> ${esc(String(l.offerExpiry ?? "7 days"))}</p>
-          <p style="margin:8px 0;color:#3f3f46;">This offer is provisional and is based on the information and photographs you supplied.</p>
-          <p style="margin:8px 0;color:#3f3f46;">The final purchase remains subject to the items being received and matching the:</p>
-          <ul style="color:#3f3f46;">
+        html: layout("We'd like to make you an offer.", `
+          <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;">Hi ${firstName(l.name)},</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">We’ve reviewed your submission <strong>${esc(l.id)}</strong> and we’re interested in buying some or all of your items.</p>
+          ${leadItems(l)}
+          <p style="margin:16px 0;color:#3f3f46;"><strong>Total provisional offer:</strong> <strong>${esc(amount)}</strong></p>
+          <p style="margin:16px 0;color:#3f3f46;"><strong>Offer expires:</strong> ${esc(String(l.offerExpiry ?? "7 days"))}</p>
+          <p style="margin:16px 0;color:#3f3f46;">This offer is provisional and is based on the information and photographs you supplied.</p>
+          <p style="margin:16px 0 8px;color:#3f3f46;">The final purchase remains subject to the items being received and matching the:</p>
+          <ul style="color:#3f3f46;line-height:1.7;">
             <li>description;</li>
             <li>condition;</li>
             <li>authenticity information;</li>
             <li>photographs; and</li>
             <li>other information supplied with your submission.</li>
           </ul>
-          <p style="margin:8px 0;color:#3f3f46;">If everything matches, we’ll complete the purchase at the agreed amount.</p>
-          <p style="margin:12px 0;"><a href="${SITE_URL}/leads/${l.id}" style="color:#007587;">Accept offer →</a> &nbsp; <a href="${SITE_URL}/leads/${l.id}" style="color:#8b8b93;">Decline offer →</a></p>
-          <p style="margin:8px 0;color:#3f3f46;">If you have any questions before deciding, reply to this email.</p>
-          <p style="margin:12px 0;font-weight:bold;">Vicarious Clothing</p>
+          <p style="margin:16px 0;color:#3f3f46;">If everything matches, we’ll complete the purchase at the agreed amount.</p>
+          ${button("Accept offer", `${SITE_URL}/leads/${l.id}`)}
+          ${button("Decline offer", `${SITE_URL}/leads/${l.id}`)}
+          <p style="margin:16px 0;color:#3f3f46;">If you have any questions before deciding, reply to this email.</p>
+          <p style="margin:16px 0 0;font-weight:bold;">Vicarious Clothing</p>
         `),
       };
     }
