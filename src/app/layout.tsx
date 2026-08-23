@@ -37,6 +37,15 @@ export const metadata: Metadata = {
   },
   description:
     "Curated pre-owned menswear and streetwear, picked piece by piece. Independent UK retailer — clothing, ready to go again.",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   openGraph: {
     siteName: SITE_NAME,
     type: "website",
