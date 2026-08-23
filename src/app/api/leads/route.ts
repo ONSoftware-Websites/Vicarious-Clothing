@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { createLead } from "@/lib/server/store";
 import { sendEmail } from "@/lib/server/mailer";
-import { EMAILS } from "@/lib/site";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +20,7 @@ export async function POST(request: NextRequest) {
     });
 
     await sendEmail({
-      to: EMAILS.owner,
+      to: lead.email,
       template: "lead-enquiry",
       data: { ...lead },
     });
