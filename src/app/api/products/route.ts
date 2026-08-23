@@ -1,15 +1,21 @@
 import type { NextRequest } from "next/server";
 import { listProducts } from "@/lib/server/store";
 
+const PUBLIC_STATUSES = new Set(["AVAILABLE", "RESERVED", "SOLD"]);
+
 export async function GET(request: NextRequest) {
   const skus = (request.nextUrl.searchParams.get("skus") ?? "")
     .split(",")
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
 
+  const allPublicProducts = (await listProducts()).filter((p) =>
+    PUBLIC_STATUSES.has(p.status)
+  );
+
   const products = skus.length
-    ? (await listProducts()).filter((p) => skus.includes(p.sku))
-    : (await listProducts()).filter((p) => p.status !== "DRAFT");
+    ? allPublicProducts.filter((p) => skus.includes(p.sku))
+    : allPublicProducts;
 
   return Response.json({
     products: products.map((p) => ({
