@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import type { Order } from "@/lib/types";
 import {
@@ -17,9 +18,24 @@ import {
 import { sendEmail } from "@/lib/server/mailer";
 import { claimCheckoutStock, releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { undoPendingDiscountUsage } from "@/lib/server/checkout-ledger";
+import {
+  createOrderAccessToken,
+  orderAccessCookieName,
+} from "@/lib/server/order-access";
 
 function validEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+async function grantBrowserOrderAccess(order: Order) {
+  const store = await cookies();
+  store.set(orderAccessCookieName(order.id), createOrderAccessToken(order.id, order.email), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: `/order/${order.id}`,
+    maxAge: 60 * 60 * 24 * 30,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -51,8 +67,11 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "A complete delivery address is required" }, { status: 400 });
     }
 
-    const skus = [...new Set(items.map((i: { sku?: unknown }) => String(i.sku ?? "").trim().toUpperCase()))]
-      .filter(Boolean);
+    const skus = [
+      ...new Set(
+        items.map((i: { sku?: unknown }) => String(i.sku ?? "").trim().toUpperCase())
+      ),
+    ].filter(Boolean);
     if (skus.length !== items.length) {
       return Response.json({ error: "Invalid or duplicate items" }, { status: 400 });
     }
@@ -66,20 +85,28 @@ export async function POST(request: NextRequest) {
       products.push(product);
     }
 
-    const subtotal = Math.round(products.reduce((sum, p) => sum + p.price, 0) * 100) / 100;
+    const subtotal =
+      Math.round(products.reduce((sum, p) => sum + p.price, 0) * 100) / 100;
 
     let discount: Order["discount"];
-    const normalizedDiscountCode = discountCode ? String(discountCode).trim() : undefined;
+    const normalizedDiscountCode = discountCode
+      ? String(discountCode).trim()
+      : undefined;
     if (normalizedDiscountCode) {
       const definitions = await listDiscounts();
       const definition = definitions.find(
         (d) => d.code.toLowerCase() === normalizedDiscountCode.toLowerCase()
       );
       if (definition?.categories?.length) {
-        const ineligible = products.some((p) => !definition.categories!.includes(p.category));
+        const ineligible = products.some(
+          (p) => !definition.categories!.includes(p.category)
+        );
         if (ineligible) {
           return Response.json(
-            { error: "That code can only be used when every piece in the bag is eligible." },
+            {
+              error:
+                "That code can only be used when every piece in the bag is eligible.",
+            },
             { status: 400 }
           );
         }
@@ -96,11 +123,10 @@ export async function POST(request: NextRequest) {
       discount = result.discount;
     }
 
-    // Never trust an arbitrary delivery amount from the browser. The legacy
-    // deliveryCost value is used only to infer which service was selected.
     const requestedMethod = String(body.deliveryMethod ?? "").toLowerCase();
     const wantsExpress =
-      requestedMethod === "express" || Number(body.deliveryCost) === EXPRESS_DELIVERY_COST;
+      requestedMethod === "express" ||
+      Number(body.deliveryCost) === EXPRESS_DELIVERY_COST;
     const baseDelivery =
       subtotal >= FREE_DELIVERY_THRESHOLD
         ? 0
@@ -112,14 +138,16 @@ export async function POST(request: NextRequest) {
     const stripe = stripeEnabled() ? getStripe() : null;
     if (!stripe && process.env.NODE_ENV === "production") {
       return Response.json(
-        { error: "Checkout is temporarily unavailable because payments are not configured." },
+        {
+          error:
+            "Checkout is temporarily unavailable because payments are not configured.",
+        },
         { status: 503 }
       );
     }
 
     await cancelPendingOrdersForEmail(cleanEmail);
 
-    // The actual stock claim happens here, not when someone merely opens checkout.
     const claim = await claimCheckoutStock(skus);
     claimedSkus = claim.ok;
     if (claim.gone.length) {
@@ -148,19 +176,25 @@ export async function POST(request: NextRequest) {
     if (!orderResult.order) {
       await releaseCheckoutStock(claimedSkus);
       claimedSkus = [];
-      return Response.json({ error: orderResult.error ?? "Could not create order" }, { status: 500 });
+      return Response.json(
+        { error: orderResult.error ?? "Could not create order" },
+        { status: 500 }
+      );
     }
 
     const order = orderResult.order;
+    await grantBrowserOrderAccess(order);
 
     if (!stripe) {
       claimedSkus = [];
-      await sendEmail({ to: order.email, template: "order-confirmed", data: { order } });
+      await sendEmail({
+        to: order.email,
+        template: "order-confirmed",
+        data: { order },
+      });
       return Response.json({ order, mode: "demo" }, { status: 201 });
     }
 
-    // createOrder's legacy implementation records discount use at creation.
-    // Pending Stripe orders must not consume a one-use code until payment succeeds.
     await undoPendingDiscountUsage(order.discount?.code, order.email);
 
     try {
@@ -172,7 +206,10 @@ export async function POST(request: NextRequest) {
         description: `Vicarious Clothing order ${order.id}`,
         metadata: {
           orderId: order.id,
-          items: order.items.map((i) => `${i.brand} ${i.name}`).join(", ").slice(0, 450),
+          items: order.items
+            .map((i) => `${i.brand} ${i.name}`)
+            .join(", ")
+            .slice(0, 450),
         },
       });
 
