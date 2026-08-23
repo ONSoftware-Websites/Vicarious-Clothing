@@ -22,6 +22,7 @@ import {
   createOrderAccessToken,
   orderAccessCookieName,
 } from "@/lib/server/order-access";
+import { productionRequiresSupabase, supabaseConfigured } from "@/lib/server/supabase";
 
 function validEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -54,6 +55,16 @@ export async function POST(request: NextRequest) {
       !address
     ) {
       return Response.json({ error: "Missing or invalid checkout details" }, { status: 400 });
+    }
+
+    if (productionRequiresSupabase() && !supabaseConfigured()) {
+      return Response.json(
+        {
+          error:
+            "Checkout is temporarily unavailable because the live database is not configured.",
+        },
+        { status: 503 }
+      );
     }
 
     const addressData = {
