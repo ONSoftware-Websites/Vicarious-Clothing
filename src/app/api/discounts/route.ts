@@ -7,13 +7,10 @@ import {
 
 function normalizeSkus(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return [
-    ...new Set(
-      value
-        .map((sku) => String(sku).trim().toUpperCase())
-        .filter(Boolean)
-    ),
-  ];
+  const normalized: string[] = value
+    .map((sku: unknown) => String(sku).trim().toUpperCase())
+    .filter((sku: string) => sku.length > 0);
+  return Array.from(new Set<string>(normalized));
 }
 
 export async function POST(request: NextRequest) {
