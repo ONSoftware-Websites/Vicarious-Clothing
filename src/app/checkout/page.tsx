@@ -36,7 +36,7 @@ interface PayConfig {
   publishableKey: string;
 }
 
-type Step = "contact" | "delivery" | "payment" | "review";
+type Step = "contact" | "delivery" | "review";
 
 const input =
   "h-12 w-full border border-line bg-paper px-4 text-sm focus:border-ink focus:outline-none";
@@ -355,7 +355,8 @@ export default function CheckoutPage() {
       }
       setClientSecret(data.clientSecret);
       setPendingOrderId(data.order.id);
-      setStep("payment");
+      setStep("review");
+      window.scrollTo(0, 0);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -408,16 +409,14 @@ export default function CheckoutPage() {
     }
   };
 
-  const steps: Step[] = ["contact", "delivery", "payment", "review"];
+  const steps: Step[] = ["contact", "delivery", "review"];
   const stepIndex = steps.indexOf(step);
 
   const canContinue =
     (step === "contact" && email.includes("@")) ||
     (step === "delivery" && name && line1 && city && postcode) ||
-    (step === "payment" &&
-      (isStripe ||
-        (card.length >= 12 && cardName && cardExpiry && cardCvc && terms))) ||
-    step === "review";
+    (step === "review" &&
+      (isStripe ? terms && !!clientSecret : card.length >= 12 && cardName && cardExpiry && cardCvc && terms));
 
   const submitStep = async (e: FormEvent) => {
     e.preventDefault();
@@ -432,11 +431,6 @@ export default function CheckoutPage() {
         await prepareStripeOrder();
         return;
       }
-      setStep("payment");
-      window.scrollTo(0, 0);
-      return;
-    }
-    if (step === "payment") {
       setStep("review");
       window.scrollTo(0, 0);
       return;
@@ -639,104 +633,6 @@ export default function CheckoutPage() {
         </section>
       )}
 
-      {step === "payment" && (
-        <section aria-label="Payment">
-          <h2 className="mb-2 font-display text-lg font-semibold uppercase tracking-tight">
-            Payment
-          </h2>
-          {isStripe ? (
-            <>
-              <p className="mb-6 text-xs leading-relaxed text-ink-faint">
-                Payments are processed securely by Stripe. Vicarious never
-                stores your card details.
-              </p>
-              <PaymentElement />
-            </>
-          ) : (
-            <>
-              <p className="mb-6 text-xs leading-relaxed text-ink-faint">
-                This checkout is in demo mode — no payment will be taken. Add
-                your Stripe keys in the environment to enable real payments.
-              </p>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label htmlFor="co-card" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                    Card number
-                  </label>
-                  <input
-                    id="co-card"
-                    inputMode="numeric"
-                    required
-                    value={card}
-                    onChange={(e) => setCard(e.target.value.replace(/\D/g, "").slice(0, 16))}
-                    className={input}
-                    placeholder="4242 4242 4242 4242"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="co-card-name" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                    Name on card
-                  </label>
-                  <input
-                    id="co-card-name"
-                    required
-                    value={cardName}
-                    onChange={(e) => setCardName(e.target.value)}
-                    className={input}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="co-expiry" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                    Expiry
-                  </label>
-                  <input
-                    id="co-expiry"
-                    required
-                    value={cardExpiry}
-                    onChange={(e) => setCardExpiry(e.target.value)}
-                    className={input}
-                    placeholder="MM/YY"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="co-cvc" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-                    CVC
-                  </label>
-                  <input
-                    id="co-cvc"
-                    inputMode="numeric"
-                    required
-                    value={cardCvc}
-                    onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    className={input}
-                    placeholder="123"
-                  />
-                </div>
-              </div>
-              <label className="mt-8 flex cursor-pointer items-start gap-3 text-sm text-ink-soft">
-                <input
-                  type="checkbox"
-                  checked={terms}
-                  onChange={(e) => setTerms(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-[#0097af]"
-                />
-                <span>
-                  I agree to the{" "}
-                  <Link href="/legal/terms" className="text-accent-deep underline underline-offset-2">
-                    terms and conditions
-                  </Link>{" "}
-                  and have read the{" "}
-                  <Link href="/legal/privacy" className="text-accent-deep underline underline-offset-2">
-                    privacy policy
-                  </Link>
-                  .
-                </span>
-              </label>
-            </>
-          )}
-        </section>
-      )}
-
       {step === "review" && (
         <section aria-label="Review">
           <h2 className="mb-5 font-display text-lg font-semibold uppercase tracking-tight">
@@ -781,8 +677,10 @@ export default function CheckoutPage() {
               </p>
               {isStripe ? (
                 <>
-                  <p className="text-sm">Card payment via Stripe — entered on previous step</p>
-                  <p className="mt-1 text-xs text-ink-faint">You’ll confirm payment with the Pay button below.</p>
+                  <p className="mb-4 text-xs leading-relaxed text-ink-faint">
+                    Payments are processed securely by Stripe. Vicarious never stores your card details.
+                  </p>
+                  {clientSecret ? <PaymentElement /> : <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint">Preparing secure payment…</p>}
                   <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-ink-soft">
                     <input
                       type="checkbox"
@@ -805,10 +703,83 @@ export default function CheckoutPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-sm">
-                    Card ending {card.slice(-4)} · {cardName}
+                  <p className="mb-4 text-xs leading-relaxed text-ink-faint">
+                    This checkout is in demo mode — no payment will be taken. Add your Stripe keys to enable real payments.
                   </p>
-                  <p className="mt-1 text-xs text-ink-faint">Demo mode — no payment taken</p>
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label htmlFor="co-card" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                        Card number
+                      </label>
+                      <input
+                        id="co-card"
+                        inputMode="numeric"
+                        required
+                        value={card}
+                        onChange={(e) => setCard(e.target.value.replace(/\D/g, "").slice(0, 16))}
+                        className={input}
+                        placeholder="4242 4242 4242 4242"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label htmlFor="co-card-name" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                        Name on card
+                      </label>
+                      <input
+                        id="co-card-name"
+                        required
+                        value={cardName}
+                        onChange={(e) => setCardName(e.target.value)}
+                        className={input}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="co-expiry" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                        Expiry
+                      </label>
+                      <input
+                        id="co-expiry"
+                        required
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(e.target.value)}
+                        className={input}
+                        placeholder="MM/YY"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="co-cvc" className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                        CVC
+                      </label>
+                      <input
+                        id="co-cvc"
+                        inputMode="numeric"
+                        required
+                        value={cardCvc}
+                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        className={input}
+                        placeholder="123"
+                      />
+                    </div>
+                  </div>
+                  <label className="mt-6 flex cursor-pointer items-start gap-3 text-sm text-ink-soft">
+                    <input
+                      type="checkbox"
+                      checked={terms}
+                      onChange={(e) => setTerms(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-[#0097af]"
+                    />
+                    <span>
+                      I agree to the{" "}
+                      <Link href="/legal/terms" className="text-accent-deep underline underline-offset-2">
+                        terms and conditions
+                      </Link>{" "}
+                      and have read the{" "}
+                      <Link href="/legal/privacy" className="text-accent-deep underline underline-offset-2">
+                        privacy policy
+                      </Link>
+                      .
+                    </span>
+                  </label>
                 </>
               )}
             </div>
