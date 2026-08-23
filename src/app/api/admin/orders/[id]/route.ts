@@ -87,21 +87,27 @@ export async function PATCH(
         CANCELLED: "order-cancelled",
       };
       const template = emailTemplates[status];
+      let emailSent = true;
       if (template) {
-        await sendEmail({
-          to: order.email,
-          template,
-          data: {
-            order,
-            refundAmount,
-            refundReference,
-            cancellationReason: body.cancellationReason,
-            refundInformation: body.refundInformation,
-          },
-        });
+        try {
+          await sendEmail({
+            to: order.email,
+            template,
+            data: {
+              order,
+              refundAmount,
+              refundReference,
+              cancellationReason: body.cancellationReason,
+              refundInformation: body.refundInformation,
+            },
+          });
+        } catch (emailError) {
+          emailSent = false;
+          console.error(`Order ${order.id} ${template} email failed:`, emailError);
+        }
       }
 
-      return Response.json({ ok: true, order, refundReference });
+      return Response.json({ ok: true, order, refundReference, emailSent });
     }
 
     if (body.carrier || body.tracking) {
