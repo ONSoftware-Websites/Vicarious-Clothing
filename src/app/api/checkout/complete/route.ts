@@ -1,7 +1,14 @@
 import type { NextRequest } from "next/server";
 import { getStripe } from "@/lib/server/payments";
-import { getOrder, markOrderPaid, setOrderPayment } from "@/lib/server/store";
+import {
+  getOrder,
+  markOrderPaid,
+  setOrderPayment,
+  updateOrderStatus,
+} from "@/lib/server/store";
 import { recordDiscountUsageOnce } from "@/lib/server/checkout-ledger";
+import { checkoutExpired } from "@/lib/server/checkout-expiry";
+import { releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { sendEmail } from "@/lib/server/mailer";
 
 export async function POST(request: NextRequest) {
@@ -34,6 +41,32 @@ export async function POST(request: NextRequest) {
     }
     if (Math.round(existing.total * 100) !== intent.amount) {
       return Response.json({ error: "Payment amount does not match order total" }, { status: 409 });
+    }
+
+    // A stale PaymentIntent can still technically succeed after its one-of-one
+    // stock reservation has expired. Never resurrect an expired/cancelled order:
+    // refund the captured payment and keep the stock available for the valid buyer.
+    if (existing.status === "CANCELLED" || checkoutExpired(existing)) {
+      if (existing.status !== "CANCELLED") {
+        await updateOrderStatus(existing.id, "CANCELLED", "checkout-expiry");
+        await releaseCheckoutStock(existing.items.map((item) => item.sku));
+      }
+      await stripe.refunds.create(
+        { payment_intent: intent.id },
+        { idempotencyKey: `expired-checkout-refund-${existing.id}` }
+      );
+      return Response.json(
+        {
+          error:
+            "This checkout expired before payment completed. The payment has been refunded automatically.",
+          refunded: true,
+        },
+        { status: 409 }
+      );
+    }
+
+    if (existing.status !== "PENDING_PAYMENT" && existing.status !== "PAID") {
+      return Response.json({ error: "This order can no longer accept payment" }, { status: 409 });
     }
 
     const wasAlreadyPaid = existing.status === "PAID";
