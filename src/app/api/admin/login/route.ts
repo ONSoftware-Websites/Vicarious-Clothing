@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkPassword, COOKIE, ROLE_COOKIE, COOKIE_OPTIONS } from "@/lib/server/admin-auth";
+import {
+  checkPassword,
+  COOKIE,
+  COOKIE_OPTIONS,
+  ROLE_COOKIE,
+  SIG_COOKIE,
+  signAdminRole,
+} from "@/lib/server/admin-auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,9 +20,20 @@ export async function POST(request: NextRequest) {
     if (!checkPassword(String(body.password ?? ""))) {
       return NextResponse.json({ error: "Wrong password" }, { status: 401 });
     }
+
+    const role = "OWNER" as const;
+    const signature = signAdminRole(role);
+    if (!signature) {
+      return NextResponse.json(
+        { error: "Admin session secret is not configured." },
+        { status: 503 }
+      );
+    }
+
     const response = NextResponse.json({ ok: true });
     response.cookies.set(COOKIE, "1", COOKIE_OPTIONS);
-    response.cookies.set(ROLE_COOKIE, "OWNER", COOKIE_OPTIONS);
+    response.cookies.set(ROLE_COOKIE, role, COOKIE_OPTIONS);
+    response.cookies.set(SIG_COOKIE, signature, COOKIE_OPTIONS);
     return response;
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
