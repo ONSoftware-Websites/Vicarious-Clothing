@@ -1,12 +1,14 @@
 import type { NextRequest } from "next/server";
 import type { StockPurchase } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
+import { adminDeletePurchase } from "@/lib/server/admin-delete";
 import {
   createPurchase,
-  deletePurchase,
   getProductBySku,
   markPurchasePaid,
 } from "@/lib/server/store";
+
+const ACTOR = "Admin";
 
 export async function POST(request: NextRequest) {
   const authError = await requireAdminApi();
@@ -17,13 +19,13 @@ export async function POST(request: NextRequest) {
     const action = String(body.action ?? "save");
 
     if (action === "paid") {
-      const purchase = await markPurchasePaid(String(body.id), "Henry");
+      const purchase = await markPurchasePaid(String(body.id), ACTOR);
       if (!purchase) return Response.json({ error: "Not found" }, { status: 404 });
       return Response.json({ ok: true, purchase });
     }
 
     if (action === "delete") {
-      await deletePurchase(String(body.id), "Henry");
+      await adminDeletePurchase(String(body.id), ACTOR);
       return Response.json({ ok: true });
     }
 
@@ -71,17 +73,21 @@ export async function POST(request: NextRequest) {
           notes: full.notes,
           leadId: full.leadId,
         },
-        "Henry"
+        ACTOR
       );
 
-      if (full.status === "PAID") await markPurchasePaid(saved.id, "Henry");
+      if (full.status === "PAID") await markPurchasePaid(saved.id, ACTOR);
 
       return Response.json({ ok: true, purchase: saved });
     }
 
     return Response.json({ error: "Unknown action" }, { status: 400 });
-  } catch {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
+  } catch (error) {
+    console.error("Admin purchase action failed:", error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Admin purchase action failed" },
+      { status: 500 }
+    );
   }
 }
 
@@ -90,6 +96,14 @@ export async function DELETE(request: NextRequest) {
   if (authError) return authError;
   const id = request.nextUrl.searchParams.get("id") ?? "";
   if (!id) return Response.json({ error: "Missing id" }, { status: 400 });
-  await deletePurchase(id, "Henry");
-  return Response.json({ ok: true });
+  try {
+    await adminDeletePurchase(id, ACTOR);
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error("Purchase delete failed:", error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Purchase delete failed" },
+      { status: 500 }
+    );
+  }
 }
