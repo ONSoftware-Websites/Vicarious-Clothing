@@ -1,9 +1,12 @@
 import type { NextRequest } from "next/server";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
-import { deleteOrder, getOrder, setOrderTracking, updateOrderStatus } from "@/lib/server/store";
+import { adminDeleteOrder } from "@/lib/server/admin-delete";
+import { getOrder, setOrderTracking, updateOrderStatus } from "@/lib/server/store";
 import { getStripe } from "@/lib/server/payments";
 import { sendEmail } from "@/lib/server/mailer";
+
+const ACTOR = "Admin";
 
 export async function PATCH(
   request: NextRequest,
@@ -35,7 +38,7 @@ export async function PATCH(
             id,
             String(body.carrier ?? existing.carrier ?? ""),
             String(body.tracking ?? existing.tracking ?? ""),
-            "Henry"
+            ACTOR
           )) ?? existing;
       }
 
@@ -72,7 +75,7 @@ export async function PATCH(
         refundReference = refund.id;
       }
 
-      const order = await updateOrderStatus(id, status, "Henry");
+      const order = await updateOrderStatus(id, status, ACTOR);
       if (!order) return Response.json({ error: "Not found" }, { status: 404 });
 
       const emailTemplates: Partial<
@@ -116,7 +119,7 @@ export async function PATCH(
       if (!carrier || !tracking) {
         return Response.json({ error: "Carrier and tracking number are both required." }, { status: 400 });
       }
-      const order = await setOrderTracking(id, carrier, tracking, "Henry");
+      const order = await setOrderTracking(id, carrier, tracking, ACTOR);
       if (!order) return Response.json({ error: "Not found" }, { status: 404 });
       return Response.json({ ok: true, order });
     }
@@ -138,6 +141,14 @@ export async function DELETE(
   const authError = await requireAdminApi();
   if (authError) return authError;
   const { id } = await params;
-  await deleteOrder(id, "Henry");
-  return Response.json({ ok: true });
+  try {
+    await adminDeleteOrder(id, ACTOR);
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error("Order delete failed:", error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Order delete failed" },
+      { status: 500 }
+    );
+  }
 }
