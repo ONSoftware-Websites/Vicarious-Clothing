@@ -1,11 +1,10 @@
 import type { NextRequest } from "next/server";
 import type { Discount, DiscountType } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
-import {
-  deleteDiscount,
-  listDiscounts,
-  upsertDiscount,
-} from "@/lib/server/store";
+import { adminDeleteDiscount } from "@/lib/server/admin-delete";
+import { listDiscounts, upsertDiscount } from "@/lib/server/store";
+
+const ACTOR = "Admin";
 
 export async function POST(request: NextRequest) {
   const authError = await requireAdminApi();
@@ -16,7 +15,7 @@ export async function POST(request: NextRequest) {
     const action = String(body.action ?? "save");
 
     if (action === "delete") {
-      await deleteDiscount(String(body.id), "Henry");
+      await adminDeleteDiscount(String(body.id), ACTOR);
       return Response.json({ ok: true });
     }
 
@@ -24,7 +23,7 @@ export async function POST(request: NextRequest) {
       const existing = (await listDiscounts()).find((d) => d.id === String(body.id));
       if (!existing) return Response.json({ error: "Not found" }, { status: 404 });
       const updated: Discount = { ...existing, active: !existing.active };
-      await upsertDiscount(updated, "Henry");
+      await upsertDiscount(updated, ACTOR);
       return Response.json({ ok: true, discount: updated });
     }
 
@@ -66,12 +65,16 @@ export async function POST(request: NextRequest) {
         createdAt: existing?.createdAt ?? new Date().toISOString(),
       };
 
-      await upsertDiscount(full, "Henry");
+      await upsertDiscount(full, ACTOR);
       return Response.json({ ok: true, discount: full });
     }
 
     return Response.json({ error: "Unknown action" }, { status: 400 });
-  } catch {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
+  } catch (error) {
+    console.error("Admin discount action failed:", error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Admin discount action failed" },
+      { status: 500 }
+    );
   }
 }
