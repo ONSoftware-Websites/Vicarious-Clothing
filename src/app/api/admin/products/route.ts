@@ -18,6 +18,12 @@ function isPositiveMoney(value: unknown) {
   return Number.isFinite(amount) && amount > 0;
 }
 
+function optionalMoney(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : undefined;
+}
+
 export async function POST(request: NextRequest) {
   const authError = await requireAdminApi();
   if (authError) return authError;
@@ -125,11 +131,8 @@ export async function POST(request: NextRequest) {
       if (!isPositiveMoney(product.price)) {
         return Response.json({ error: "Price must be greater than £0" }, { status: 400 });
       }
-      if (
-        product.compareAtPrice !== undefined &&
-        product.compareAtPrice !== null &&
-        Number(product.compareAtPrice) <= Number(product.price)
-      ) {
+      const compareAtPrice = optionalMoney(product.compareAtPrice);
+      if (compareAtPrice !== undefined && compareAtPrice <= Number(product.price)) {
         return Response.json({ error: "Compare-at price must be higher than the sale price" }, { status: 400 });
       }
       if (
@@ -172,17 +175,9 @@ export async function POST(request: NextRequest) {
           ? product.tags.filter(Boolean).map((item) => String(item).trim()).filter(Boolean)
           : [],
         price: Math.round(Number(product.price ?? 0) * 100) / 100,
-        compareAtPrice: product.compareAtPrice
-          ? Math.round(Number(product.compareAtPrice) * 100) / 100
-          : undefined,
-        cost:
-          product.cost !== undefined && product.cost !== null
-            ? Math.round(Number(product.cost) * 100) / 100
-            : undefined,
-        floorPrice:
-          product.floorPrice !== undefined && product.floorPrice !== null
-            ? Math.round(Number(product.floorPrice) * 100) / 100
-            : undefined,
+        compareAtPrice,
+        cost: optionalMoney(product.cost),
+        floorPrice: optionalMoney(product.floorPrice),
         images: Array.isArray(product.images) && product.images.length
           ? product.images
               .filter((i: { src?: string }) => i.src)
@@ -235,6 +230,9 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Unknown action" }, { status: 400 });
   } catch (error) {
     console.error("Admin product action failed:", error);
-    return Response.json({ error: "Invalid request" }, { status: 400 });
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Admin product action failed" },
+      { status: 500 }
+    );
   }
 }
