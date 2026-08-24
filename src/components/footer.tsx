@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
 import { Container } from "@/components/ui";
-import { EMAILS } from "@/lib/site";
+import { BUSINESS_ADDRESS, EMAILS, TRADING_NAME } from "@/lib/site";
 
 const FOOTER_COLUMNS = [
   {
@@ -38,8 +38,11 @@ const FOOTER_COLUMNS = [
     title: "Legal",
     links: [
       { label: "Terms", href: "/legal/terms" },
+      { label: "Returns & Cancellation", href: "/legal/returns" },
+      { label: "Delivery", href: "/legal/delivery" },
       { label: "Privacy", href: "/legal/privacy" },
       { label: "Cookies", href: "/legal/cookies" },
+      { label: "Sell To Us Terms", href: "/legal/sell-to-us" },
     ],
   },
 ];
@@ -106,16 +109,16 @@ export function Footer() {
         </div>
 
         <div className="mt-14 border-t border-paper/15 pt-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-paper/50">
               © {new Date().getFullYear()} Vicarious Clothing
             </p>
             <p className="text-xs text-paper/50">
-              {EMAILS.general} · {EMAILS.support}
+              {EMAILS.general} · {EMAILS.support} · {EMAILS.legal}
             </p>
             <p className="max-w-md text-xs leading-relaxed text-paper/40">
-              Vicarious Clothing is a UK-based independent retailer of pre-owned
-              clothing. Registered trader information available on request.
+              {TRADING_NAME} is a UK-based independent retailer of pre-owned
+              clothing. Legal contact address: {BUSINESS_ADDRESS}.
             </p>
           </div>
         </div>
