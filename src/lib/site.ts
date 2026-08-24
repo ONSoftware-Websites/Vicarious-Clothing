@@ -1,6 +1,15 @@
 import type { Category, Condition } from "@/lib/types";
 
 export const SITE_NAME = "Vicarious Clothing";
+export const TRADING_NAME = "Vicarious Clothing";
+export const BUSINESS_ADDRESS_LINES = [
+  "180 Swanlow Lane",
+  "Winsford",
+  "Cheshire",
+  "England",
+  "CW7 1JJ",
+] as const;
+export const BUSINESS_ADDRESS = BUSINESS_ADDRESS_LINES.join(", ");
 const DEFAULT_SITE_URL = "https://vicariousclothing.co.uk";
 
 function normalizeSiteUrl(value: string | undefined) {
@@ -23,6 +32,7 @@ export const EMAILS = {
   general: "hello@vicariousclothing.co.uk",
   orders: "orders@vicariousclothing.co.uk",
   support: "support@vicariousclothing.co.uk",
+  legal: "legal@vicariousclothing.co.uk",
   notifications: "notifications@vicariousclothing.co.uk",
 };
 
@@ -74,8 +84,11 @@ export const HELP_TOPICS = [
 
 export const LEGAL_TOPICS = [
   { slug: "terms", title: "Terms & Conditions" },
+  { slug: "returns", title: "Returns & Cancellation Policy" },
+  { slug: "delivery", title: "Delivery Policy" },
   { slug: "privacy", title: "Privacy Policy" },
   { slug: "cookies", title: "Cookie Policy" },
+  { slug: "sell-to-us", title: "Sell To Us Terms" },
 ];
 
 export const MEASUREMENT_FIELDS: Record<string, string[]> = {
