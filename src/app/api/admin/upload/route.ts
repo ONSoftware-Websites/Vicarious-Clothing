@@ -6,6 +6,7 @@ import path from "node:path";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"]);
+const ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "avif", "gif"]);
 const HEIC_TYPES = new Set(["image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"]);
 const HEIC_EXTENSIONS = new Set(["heic", "heif"]);
 
@@ -17,6 +18,14 @@ function isHeicLike(file: File) {
   const type = file.type.toLowerCase();
   const ext = extensionOf(file.name);
   return HEIC_TYPES.has(type) || type.includes("heic") || type.includes("heif") || HEIC_EXTENSIONS.has(ext);
+}
+
+function contentTypeFor(file: File) {
+  if (file.type && ALLOWED.has(file.type)) return file.type;
+  const ext = extensionOf(file.name);
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ALLOWED_EXTENSIONS.has(ext)) return `image/${ext}`;
+  return "";
 }
 
 export async function POST(request: NextRequest) {
@@ -44,10 +53,9 @@ export async function POST(request: NextRequest) {
         { status: 415 }
       );
     }
-    if (file.type && !ALLOWED.has(file.type)) {
-      return NextResponse.json({ error: "Not an accepted image type" }, { status: 400 });
-    }
-    if (!file.type && !ALLOWED.has(`image/${extensionOf(file.name)}`)) {
+
+    const contentType = contentTypeFor(file);
+    if (!contentType) {
       return NextResponse.json({ error: "Not an accepted image type" }, { status: 400 });
     }
 
@@ -60,13 +68,13 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabase();
     if (supabase) {
       let { error } = await supabase.storage.from(bucket).upload(key, buffer, {
-        contentType: file.type || "image/jpeg",
+        contentType,
         upsert: false,
       });
       if (error && error.message.includes("Bucket not found")) {
         await supabase.storage.createBucket(bucket, { public: true }).catch(() => {});
         const retry = await supabase.storage.from(bucket).upload(key, buffer, {
-          contentType: file.type || "image/jpeg",
+          contentType,
           upsert: false,
         });
         error = retry.error;
