@@ -29,7 +29,7 @@ function adminSecret() {
   return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || "";
 }
 
-function signRole(role: Role) {
+export function signAdminRole(role: Role) {
   const secret = adminSecret();
   if (!secret) return "";
   return createHmac("sha256", secret).update(`vc_admin|${role}`).digest("hex");
@@ -57,7 +57,7 @@ export async function isAdminSession() {
   if (store.get(COOKIE)?.value !== "1") return false;
   const role = parseRole(store.get(ROLE_COOKIE)?.value);
   const signature = store.get(SIG_COOKIE)?.value ?? "";
-  const expected = signRole(role);
+  const expected = signAdminRole(role);
   return Boolean(expected) && safeEqualHex(signature, expected);
 }
 
@@ -83,7 +83,7 @@ export async function setAdminCookie(role: Role = "OWNER") {
   const store = await cookies();
   store.set(COOKIE, "1", COOKIE_OPTIONS);
   store.set(ROLE_COOKIE, role, COOKIE_OPTIONS);
-  store.set(SIG_COOKIE, signRole(role), COOKIE_OPTIONS);
+  store.set(SIG_COOKIE, signAdminRole(role), COOKIE_OPTIONS);
 }
 
 export async function clearAdminCookie() {
