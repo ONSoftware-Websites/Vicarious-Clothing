@@ -5,27 +5,58 @@ import fs from "node:fs";
 import path from "node:path";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
-const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"]);
-const ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "avif", "gif"]);
-const HEIC_TYPES = new Set(["image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"]);
-const HEIC_EXTENSIONS = new Set(["heic", "heif"]);
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  avif: "image/avif",
+  gif: "image/gif",
+  heic: "image/heic",
+  heif: "image/heif",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  dng: "image/x-adobe-dng",
+};
+
+const ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+  "image/tiff",
+  "image/x-tiff",
+  "image/dng",
+  "image/x-adobe-dng",
+  "application/octet-stream", // Some browsers use this for iPhone HEIC/ProRAW files.
+]);
 
 function extensionOf(name: string) {
   return name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
 }
 
-function isHeicLike(file: File) {
-  const type = file.type.toLowerCase();
+function contentTypeFor(file: File) {
   const ext = extensionOf(file.name);
-  return HEIC_TYPES.has(type) || type.includes("heic") || type.includes("heif") || HEIC_EXTENSIONS.has(ext);
+  const type = file.type.toLowerCase();
+
+  if (MIME_BY_EXTENSION[ext]) return MIME_BY_EXTENSION[ext];
+  if (type && ALLOWED_MIME_TYPES.has(type) && type !== "application/octet-stream") return type;
+  if (type.startsWith("image/")) return type;
+  return "";
 }
 
-function contentTypeFor(file: File) {
-  if (file.type && ALLOWED.has(file.type)) return file.type;
-  const ext = extensionOf(file.name);
-  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
-  if (ALLOWED_EXTENSIONS.has(ext)) return `image/${ext}`;
-  return "";
+function safeStorageName(file: File, fallbackExt: string) {
+  const base = file.name || `image.${fallbackExt}`;
+  const safe = base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+  if (safe.includes(".")) return safe;
+  return `${safe || "image"}.${fallbackExt}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -44,26 +75,19 @@ export async function POST(request: NextRequest) {
     if (file.size > MAX_BYTES) {
       return NextResponse.json({ error: "File too large (max 8MB)" }, { status: 400 });
     }
-    if (isHeicLike(file)) {
-      return NextResponse.json(
-        {
-          error:
-            "HEIC images must be converted to JPEG before upload. Re-select the file in the admin uploader so it can convert it, or export the photo as JPEG first.",
-        },
-        { status: 415 }
-      );
-    }
 
     const contentType = contentTypeFor(file);
     if (!contentType) {
-      return NextResponse.json({ error: "Not an accepted image type" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Not an accepted image type. JPEG, PNG, WebP, HEIC, HEIF, TIFF and Apple ProRAW DNG are accepted." },
+        { status: 400 }
+      );
     }
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const ext = extensionOf(file.name) || "jpg";
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
-    const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName || `image.${ext}`}`;
+    const ext = extensionOf(file.name) || Object.entries(MIME_BY_EXTENSION).find(([, mime]) => mime === contentType)?.[0] || "jpg";
+    const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeStorageName(file, ext)}`;
 
     const supabase = getSupabase();
     if (supabase) {
@@ -90,7 +114,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: (error as { message: string }).message }, { status: 500 });
       }
       const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(key);
-      return NextResponse.json({ url: urlData.publicUrl, path: key, bucket });
+      return NextResponse.json({ url: urlData.publicUrl, path: key, bucket, contentType });
     }
 
     if (productionRequiresSupabase()) {
@@ -105,7 +129,7 @@ export async function POST(request: NextRequest) {
       fs.mkdirSync(uploadsDir, { recursive: true });
       const localKey = `${Date.now()}-${key}`;
       fs.writeFileSync(path.join(uploadsDir, localKey), buffer);
-      return NextResponse.json({ url: `/uploads/${localKey}`, path: localKey, bucket: "local" });
+      return NextResponse.json({ url: `/uploads/${localKey}`, path: localKey, bucket: "local", contentType });
     } catch (e) {
       return NextResponse.json({ error: String(e) }, { status: 500 });
     }
