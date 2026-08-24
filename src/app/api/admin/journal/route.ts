@@ -1,8 +1,11 @@
 import type { NextRequest } from "next/server";
 import type { JournalPost } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
-import { deletePost, upsertPost } from "@/lib/server/store";
+import { adminDeletePost } from "@/lib/server/admin-delete";
+import { upsertPost } from "@/lib/server/store";
 import { slugify } from "@/lib/utils";
+
+const ACTOR = "Admin";
 
 export async function POST(request: NextRequest) {
   const authError = await requireAdminApi();
@@ -13,7 +16,7 @@ export async function POST(request: NextRequest) {
     const action = String(body.action ?? "save");
 
     if (action === "delete") {
-      await deletePost(String(body.id), "Henry");
+      await adminDeletePost(String(body.id), ACTOR);
       return Response.json({ ok: true });
     }
 
@@ -41,12 +44,16 @@ export async function POST(request: NextRequest) {
           : new Date().toISOString(),
       };
 
-      await upsertPost(full, "Henry");
+      await upsertPost(full, ACTOR);
       return Response.json({ ok: true, post: full });
     }
 
     return Response.json({ error: "Unknown action" }, { status: 400 });
-  } catch {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
+  } catch (error) {
+    console.error("Admin journal action failed:", error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Admin journal action failed" },
+      { status: 500 }
+    );
   }
 }
