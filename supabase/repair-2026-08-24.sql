@@ -21,3 +21,18 @@ alter table public.newsletter_subscribers
 create index if not exists newsletter_subscribers_active_idx
   on public.newsletter_subscribers (email)
   where unsubscribed_at is null;
+
+-- Product visibility/status is stored in inventory_items, not products.
+-- Backfill any catalogue rows that were created without their inventory unit.
+insert into public.inventory_items (sku, status, created_at, updated_at)
+select
+  p.sku,
+  case
+    when p.listed_at is not null then 'AVAILABLE'::public.inventory_status
+    else 'DRAFT'::public.inventory_status
+  end,
+  now(),
+  now()
+from public.products p
+left join public.inventory_items i on i.sku = p.sku
+where i.sku is null;
