@@ -6,6 +6,18 @@ import path from "node:path";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"]);
+const HEIC_TYPES = new Set(["image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"]);
+const HEIC_EXTENSIONS = new Set(["heic", "heif"]);
+
+function extensionOf(name: string) {
+  return name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
+}
+
+function isHeicLike(file: File) {
+  const type = file.type.toLowerCase();
+  const ext = extensionOf(file.name);
+  return HEIC_TYPES.has(type) || type.includes("heic") || type.includes("heif") || HEIC_EXTENSIONS.has(ext);
+}
 
 export async function POST(request: NextRequest) {
   const authError = await requireAdminApi();
@@ -23,13 +35,25 @@ export async function POST(request: NextRequest) {
     if (file.size > MAX_BYTES) {
       return NextResponse.json({ error: "File too large (max 8MB)" }, { status: 400 });
     }
-    if (file.type && !ALLOWED.has(file.type) && !file.type.startsWith("image/")) {
-      return NextResponse.json({ error: "Not an image" }, { status: 400 });
+    if (isHeicLike(file)) {
+      return NextResponse.json(
+        {
+          error:
+            "HEIC images must be converted to JPEG before upload. Re-select the file in the admin uploader so it can convert it, or export the photo as JPEG first.",
+        },
+        { status: 415 }
+      );
+    }
+    if (file.type && !ALLOWED.has(file.type)) {
+      return NextResponse.json({ error: "Not an accepted image type" }, { status: 400 });
+    }
+    if (!file.type && !ALLOWED.has(`image/${extensionOf(file.name)}`)) {
+      return NextResponse.json({ error: "Not an accepted image type" }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+    const ext = extensionOf(file.name) || "jpg";
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
     const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName || `image.${ext}`}`;
 
