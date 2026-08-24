@@ -11,6 +11,95 @@ interface ImageDropzoneProps {
   single?: boolean;
 }
 
+const HEIC_EXTENSIONS = new Set(["heic", "heif"]);
+
+function extensionOf(name: string) {
+  return name.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function isHeicFile(file: File) {
+  const ext = extensionOf(file.name);
+  const type = file.type.toLowerCase();
+  return HEIC_EXTENSIONS.has(ext) || type.includes("heic") || type.includes("heif");
+}
+
+function isAcceptedImage(file: File) {
+  return file.type.startsWith("image/") || isHeicFile(file);
+}
+
+function replacementJpegName(name: string) {
+  if (/\.(heic|heif)$/i.test(name)) return name.replace(/\.(heic|heif)$/i, ".jpg");
+  return `${name || "image"}.jpg`;
+}
+
+async function loadFileIntoImage(file: File) {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = document.createElement("img");
+    image.decoding = "async";
+    image.src = url;
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Could not read this HEIC image."));
+    });
+    return image;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function convertHeicToJpeg(file: File) {
+  let bitmap: ImageBitmap | undefined;
+  try {
+    if ("createImageBitmap" in window) {
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    }
+  } catch {
+    bitmap = undefined;
+  }
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("This browser cannot convert images here.");
+
+  if (bitmap) {
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+  } else {
+    const image = await loadFileIntoImage(file);
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    ctx.drawImage(image, 0, 0);
+  }
+
+  if (!canvas.width || !canvas.height) {
+    throw new Error("This HEIC image could not be converted.");
+  }
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.88)
+  );
+  if (!blob) throw new Error("This HEIC image could not be converted.");
+
+  return new File([blob], replacementJpegName(file.name), {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  });
+}
+
+async function prepareForUpload(file: File) {
+  if (!isHeicFile(file)) return file;
+  try {
+    return await convertHeicToJpeg(file);
+  } catch {
+    throw new Error(
+      "HEIC photos need converting to JPEG before upload. Try exporting/sharing the photo as JPEG, or on iPhone use Settings > Camera > Formats > Most Compatible."
+    );
+  }
+}
+
 export function ImageDropzone({ images, onChange, bucket = "product-images", max = 10, single = false }: ImageDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -18,7 +107,7 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
   const [error, setError] = useState("");
 
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
-    const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    const list = Array.from(files).filter(isAcceptedImage);
     if (list.length === 0) {
       setError("Please drop image files only.");
       return;
@@ -31,8 +120,9 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
     }
     setError("");
     setUploading((n) => n + toUpload.length);
-    for (const file of toUpload) {
+    for (const originalFile of toUpload) {
       try {
+        const file = await prepareForUpload(originalFile);
         const fd = new FormData();
         fd.append("file", file);
         fd.append("bucket", bucket);
@@ -88,12 +178,12 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
           {uploading > 0 ? `Uploading ${uploading}…` : single ? "Drop cover image or click to browse" : "Drop images or click to browse"}
         </p>
         <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-          {single ? "JPEG, PNG, WebP — max 8MB" : `Up to ${max} images — JPEG, PNG, WebP — 8MB each`}
+          {single ? "JPEG, PNG, WebP, HEIC — max 8MB" : `Up to ${max} images — JPEG, PNG, WebP, HEIC — 8MB each`}
         </p>
         <input
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
+          accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/heic,image/heif,.heic,.heif"
           multiple={!single}
           className="hidden"
           onChange={(e) => {
