@@ -11,93 +11,54 @@ interface ImageDropzoneProps {
   single?: boolean;
 }
 
-const HEIC_EXTENSIONS = new Set(["heic", "heif"]);
+const APPLE_PHOTO_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "avif",
+  "gif",
+  "heic",
+  "heif",
+  "tif",
+  "tiff",
+  "dng",
+]);
+
+const BROWSER_PREVIEW_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "avif", "gif"]);
+const UNSUPPORTED_BROWSER_PREVIEW_EXTENSIONS = new Set(["heic", "heif", "tif", "tiff", "dng"]);
 
 function extensionOf(name: string) {
-  return name.split(".").pop()?.toLowerCase() ?? "";
+  const clean = name.split(/[?#]/)[0] ?? name;
+  return clean.split(".").pop()?.toLowerCase() ?? "";
 }
 
-function isHeicFile(file: File) {
+function isAcceptedPhotoFile(file: File) {
   const ext = extensionOf(file.name);
   const type = file.type.toLowerCase();
-  return HEIC_EXTENSIONS.has(ext) || type.includes("heic") || type.includes("heif");
-}
-
-function isAcceptedImage(file: File) {
-  return file.type.startsWith("image/") || isHeicFile(file);
-}
-
-function replacementJpegName(name: string) {
-  if (/\.(heic|heif)$/i.test(name)) return name.replace(/\.(heic|heif)$/i, ".jpg");
-  return `${name || "image"}.jpg`;
-}
-
-async function loadFileIntoImage(file: File) {
-  const url = URL.createObjectURL(file);
-  try {
-    const image = document.createElement("img");
-    image.decoding = "async";
-    image.src = url;
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error("Could not read this HEIC image."));
-    });
-    return image;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-async function convertHeicToJpeg(file: File) {
-  let bitmap: ImageBitmap | undefined;
-  try {
-    if ("createImageBitmap" in window) {
-      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-    }
-  } catch {
-    bitmap = undefined;
-  }
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("This browser cannot convert images here.");
-
-  if (bitmap) {
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    ctx.drawImage(bitmap, 0, 0);
-    bitmap.close();
-  } else {
-    const image = await loadFileIntoImage(file);
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    ctx.drawImage(image, 0, 0);
-  }
-
-  if (!canvas.width || !canvas.height) {
-    throw new Error("This HEIC image could not be converted.");
-  }
-
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", 0.88)
+  return (
+    type.startsWith("image/") ||
+    type.includes("heic") ||
+    type.includes("heif") ||
+    type.includes("tiff") ||
+    type.includes("dng") ||
+    APPLE_PHOTO_EXTENSIONS.has(ext)
   );
-  if (!blob) throw new Error("This HEIC image could not be converted.");
-
-  return new File([blob], replacementJpegName(file.name), {
-    type: "image/jpeg",
-    lastModified: Date.now(),
-  });
 }
 
-async function prepareForUpload(file: File) {
-  if (!isHeicFile(file)) return file;
-  try {
-    return await convertHeicToJpeg(file);
-  } catch {
-    throw new Error(
-      "HEIC photos need converting to JPEG before upload. Try exporting/sharing the photo as JPEG, or on iPhone use Settings > Camera > Formats > Most Compatible."
-    );
-  }
+function canPreviewInBrowser(src: string) {
+  const ext = extensionOf(src);
+  if (UNSUPPORTED_BROWSER_PREVIEW_EXTENSIONS.has(ext)) return false;
+  if (BROWSER_PREVIEW_EXTENSIONS.has(ext)) return true;
+  // Supabase public URLs normally keep the original extension, but remote image
+  // URLs without a useful extension should still be attempted.
+  return true;
+}
+
+function formatLabel(src: string) {
+  const ext = extensionOf(src);
+  if (!ext) return "Image file uploaded";
+  return `${ext.toUpperCase()} file uploaded`;
 }
 
 export function ImageDropzone({ images, onChange, bucket = "product-images", max = 10, single = false }: ImageDropzoneProps) {
@@ -107,22 +68,26 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
   const [error, setError] = useState("");
 
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
-    const list = Array.from(files).filter(isAcceptedImage);
+    const list = Array.from(files).filter(isAcceptedPhotoFile);
     if (list.length === 0) {
-      setError("Please drop image files only.");
+      setError("Please select image files only. JPEG, PNG, WebP, HEIC, HEIF, TIFF and Apple ProRAW DNG are accepted.");
       return;
     }
+
     const remaining = single ? 1 : max - images.length;
     const toUpload = list.slice(0, remaining);
     if (toUpload.length === 0) {
       setError(single ? "Replace the existing image first." : `Maximum ${max} images`);
       return;
     }
+
     setError("");
     setUploading((n) => n + toUpload.length);
-    for (const originalFile of toUpload) {
+
+    let nextImages = single ? [] : [...images];
+
+    for (const file of toUpload) {
       try {
-        const file = await prepareForUpload(originalFile);
         const fd = new FormData();
         fd.append("file", file);
         fd.append("bucket", bucket);
@@ -131,10 +96,11 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
         if (!res.ok) throw new Error(data.error || "Upload failed");
         const url = data.url as string;
         if (single) {
-          onChange([{ src: url }]);
+          nextImages = [{ src: url }];
         } else {
-          onChange([...images, { src: url }]);
+          nextImages = [...nextImages, { src: url }];
         }
+        onChange(nextImages);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -178,12 +144,14 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
           {uploading > 0 ? `Uploading ${uploading}…` : single ? "Drop cover image or click to browse" : "Drop images or click to browse"}
         </p>
         <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-          {single ? "JPEG, PNG, WebP, HEIC — max 8MB" : `Up to ${max} images — JPEG, PNG, WebP, HEIC — 8MB each`}
+          {single
+            ? "JPEG, PNG, WebP, HEIC, HEIF, TIFF, DNG — max 8MB"
+            : `Up to ${max} images — JPEG, PNG, WebP, HEIC, HEIF, TIFF, DNG — 8MB each`}
         </p>
         <input
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/heic,image/heif,.heic,.heif"
+          accept="image/*,.heic,.heif,.tif,.tiff,.dng"
           multiple={!single}
           className="hidden"
           onChange={(e) => {
@@ -201,7 +169,7 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
         <div className={single ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3 sm:grid-cols-3"}>
           {images.map((img, i) => (
             <div key={`${img.src}-${i}`} className="group relative border border-line bg-paper">
-              {img.src ? (
+              {img.src && canPreviewInBrowser(img.src) ? (
                 <Image
                   src={img.src}
                   alt={img.alt || `Image ${i + 1}`}
@@ -210,6 +178,11 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
                   className="h-[180px] w-full object-cover"
                   unoptimized
                 />
+              ) : img.src ? (
+                <div className="flex h-[180px] flex-col items-center justify-center bg-cream px-4 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+                  <span>{formatLabel(img.src)}</span>
+                  <span className="mt-2 normal-case tracking-normal">Stored successfully. Browser preview may not support this Apple format.</span>
+                </div>
               ) : (
                 <div className="flex h-[180px] items-center justify-center bg-cream font-mono text-[10px] uppercase text-ink-faint">No image</div>
               )}
