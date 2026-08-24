@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { createClient } from "@supabase/supabase-js";
 import { useCallback, useRef, useState } from "react";
 
 interface ImageDropzoneProps {
@@ -10,6 +11,16 @@ interface ImageDropzoneProps {
   max?: number;
   single?: boolean;
 }
+
+interface SignedUploadResponse {
+  bucket: "product-images" | "journal-images";
+  path: string;
+  token: string;
+  publicUrl: string;
+  contentType: string;
+}
+
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 const APPLE_PHOTO_EXTENSIONS = new Set([
   "jpg",
@@ -50,8 +61,6 @@ function canPreviewInBrowser(src: string) {
   const ext = extensionOf(src);
   if (UNSUPPORTED_BROWSER_PREVIEW_EXTENSIONS.has(ext)) return false;
   if (BROWSER_PREVIEW_EXTENSIONS.has(ext)) return true;
-  // Supabase public URLs normally keep the original extension, but remote image
-  // URLs without a useful extension should still be attempted.
   return true;
 }
 
@@ -59,6 +68,56 @@ function formatLabel(src: string) {
   const ext = extensionOf(src);
   if (!ext) return "Image file uploaded";
   return `${ext.toUpperCase()} file uploaded`;
+}
+
+function getSupabaseBrowserClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Supabase browser upload is not configured. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
+async function getSignedUpload(file: File, bucket: "product-images" | "journal-images") {
+  const res = await fetch("/api/admin/upload/sign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      bucket,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Could not prepare upload");
+  return data as SignedUploadResponse;
+}
+
+async function uploadDirectToSupabase(file: File, bucket: "product-images" | "journal-images") {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error("File too large. Please keep product photos under 50MB each.");
+  }
+
+  const signed = await getSignedUpload(file, bucket);
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase.storage
+    .from(signed.bucket)
+    .uploadToSignedUrl(signed.path, signed.token, file, {
+      contentType: signed.contentType,
+    });
+
+  if (error) throw new Error(error.message);
+  return signed.publicUrl;
 }
 
 export function ImageDropzone({ images, onChange, bucket = "product-images", max = 10, single = false }: ImageDropzoneProps) {
@@ -88,13 +147,7 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
 
     for (const file of toUpload) {
       try {
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("bucket", bucket);
-        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Upload failed");
-        const url = data.url as string;
+        const url = await uploadDirectToSupabase(file, bucket);
         if (single) {
           nextImages = [{ src: url }];
         } else {
@@ -145,8 +198,8 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
         </p>
         <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
           {single
-            ? "JPEG, PNG, WebP, HEIC, HEIF, TIFF, DNG — max 8MB"
-            : `Up to ${max} images — JPEG, PNG, WebP, HEIC, HEIF, TIFF, DNG — 8MB each`}
+            ? "JPEG, PNG, WebP, HEIC, HEIF, TIFF, DNG — max 50MB"
+            : `Up to ${max} images — JPEG, PNG, WebP, HEIC, HEIF, TIFF, DNG — 50MB each`}
         </p>
         <input
           ref={inputRef}
@@ -198,7 +251,6 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
                 </div>
                 <button type="button" onClick={() => remove(i)} className="bg-red-600 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-white hover:bg-red-700">Remove</button>
               </div>
-              {/* Alt text (optional) */}
               {!single && (
                 <input
                   value={img.alt ?? ""}
