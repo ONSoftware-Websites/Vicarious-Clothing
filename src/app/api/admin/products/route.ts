@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import type { Product } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
+import { adminDeleteProduct } from "@/lib/server/admin-delete";
 import {
-  deleteProduct,
   duplicateProduct,
   getProductBySku,
   nextSku,
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const action = String(body.action ?? "save");
 
     if (action === "delete") {
-      await deleteProduct(String(body.sku), actor);
+      await adminDeleteProduct(String(body.sku), actor);
       return Response.json({ ok: true });
     }
 
