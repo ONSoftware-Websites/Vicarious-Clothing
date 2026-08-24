@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
 import { LEAD_STATUSES, type LeadStatus } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
+import { adminDeleteLead } from "@/lib/server/admin-delete";
 import {
   createPurchase,
-  deleteLead,
   listLeads,
   listPurchases,
   updateLeadStatus,
@@ -119,6 +119,14 @@ export async function DELETE(
   const authError = await requireAdminApi();
   if (authError) return authError;
   const { id } = await params;
-  await deleteLead(id, ACTOR);
-  return Response.json({ ok: true });
+  try {
+    await adminDeleteLead(id, ACTOR);
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error("Lead delete failed:", error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Lead delete failed" },
+      { status: 500 }
+    );
+  }
 }
