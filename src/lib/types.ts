@@ -122,6 +122,7 @@ export interface Product {
   reservedUntil?: string;
   acquisitionSource?: string;
   purchaseDate?: string;
+  prdCode?: string;
   marketplace: MarketplaceListing[];
   isPick?: boolean;
   featured?: boolean;
