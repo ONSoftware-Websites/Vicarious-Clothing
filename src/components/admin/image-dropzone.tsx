@@ -18,6 +18,14 @@ interface SignedUploadResponse {
   token: string;
   publicUrl: string;
   contentType: string;
+  needsPngConversion?: boolean;
+}
+
+interface ConvertResponse {
+  url: string;
+  path: string;
+  contentType: string;
+  converted: boolean;
 }
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -36,8 +44,7 @@ const APPLE_PHOTO_EXTENSIONS = new Set([
   "dng",
 ]);
 
-const BROWSER_PREVIEW_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "avif", "gif"]);
-const UNSUPPORTED_BROWSER_PREVIEW_EXTENSIONS = new Set(["heic", "heif", "tif", "tiff", "dng"]);
+const APPLE_SOURCE_EXTENSIONS = new Set(["heic", "heif", "tif", "tiff", "dng"]);
 
 function extensionOf(name: string) {
   const clean = name.split(/[?#]/)[0] ?? name;
@@ -55,19 +62,6 @@ function isAcceptedPhotoFile(file: File) {
     type.includes("dng") ||
     APPLE_PHOTO_EXTENSIONS.has(ext)
   );
-}
-
-function canPreviewInBrowser(src: string) {
-  const ext = extensionOf(src);
-  if (UNSUPPORTED_BROWSER_PREVIEW_EXTENSIONS.has(ext)) return false;
-  if (BROWSER_PREVIEW_EXTENSIONS.has(ext)) return true;
-  return true;
-}
-
-function formatLabel(src: string) {
-  const ext = extensionOf(src);
-  if (!ext) return "Image file uploaded";
-  return `${ext.toUpperCase()} file uploaded`;
 }
 
 function getSupabaseBrowserClient() {
@@ -103,6 +97,17 @@ async function getSignedUpload(file: File, bucket: "product-images" | "journal-i
   return data as SignedUploadResponse;
 }
 
+async function convertUploadedSourceToPng(signed: SignedUploadResponse) {
+  const res = await fetch("/api/admin/upload/convert", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bucket: signed.bucket, path: signed.path }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Could not convert Apple image to PNG");
+  return data as ConvertResponse;
+}
+
 async function uploadDirectToSupabase(file: File, bucket: "product-images" | "journal-images") {
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new Error("File too large. Please keep product photos under 50MB each.");
@@ -117,6 +122,12 @@ async function uploadDirectToSupabase(file: File, bucket: "product-images" | "jo
     });
 
   if (error) throw new Error(error.message);
+
+  if (signed.needsPngConversion || APPLE_SOURCE_EXTENSIONS.has(extensionOf(file.name))) {
+    const converted = await convertUploadedSourceToPng(signed);
+    return converted.url;
+  }
+
   return signed.publicUrl;
 }
 
@@ -198,8 +209,8 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
         </p>
         <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
           {single
-            ? "JPEG, PNG, WebP, HEIC, HEIF, TIFF, DNG — max 50MB"
-            : `Up to ${max} images — JPEG, PNG, WebP, HEIC, HEIF, TIFF, DNG — 50MB each`}
+            ? "JPEG, PNG, WebP, HEIC, HEIF, TIFF, DNG — Apple formats become PNG"
+            : `Up to ${max} images — Apple formats become PNG — 50MB each`}
         </p>
         <input
           ref={inputRef}
@@ -222,7 +233,7 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
         <div className={single ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3 sm:grid-cols-3"}>
           {images.map((img, i) => (
             <div key={`${img.src}-${i}`} className="group relative border border-line bg-paper">
-              {img.src && canPreviewInBrowser(img.src) ? (
+              {img.src ? (
                 <Image
                   src={img.src}
                   alt={img.alt || `Image ${i + 1}`}
@@ -231,11 +242,6 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
                   className="h-[180px] w-full object-cover"
                   unoptimized
                 />
-              ) : img.src ? (
-                <div className="flex h-[180px] flex-col items-center justify-center bg-cream px-4 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-                  <span>{formatLabel(img.src)}</span>
-                  <span className="mt-2 normal-case tracking-normal">Stored successfully. Browser preview may not support this Apple format.</span>
-                </div>
               ) : (
                 <div className="flex h-[180px] items-center justify-center bg-cream font-mono text-[10px] uppercase text-ink-faint">No image</div>
               )}
