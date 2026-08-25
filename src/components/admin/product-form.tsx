@@ -46,6 +46,7 @@ interface FormProduct {
   location: string;
   acquisitionSource: string;
   purchaseDate: string;
+  prdCode: string;
   marketplace: Array<{ channel: string; status: "LISTED" | "NOT_LISTED" }>;
   isPick: boolean;
   featured: boolean;
@@ -76,6 +77,7 @@ function toForm(p?: Product): FormProduct {
     location: p?.location ?? "",
     acquisitionSource: p?.acquisitionSource ?? "",
     purchaseDate: p?.purchaseDate ?? "",
+    prdCode: p?.prdCode ?? "",
     marketplace: p?.marketplace.length
       ? p.marketplace
       : MARKETPLACES.map((channel) => ({
@@ -146,6 +148,7 @@ export function ProductForm({ product }: { product?: Product }) {
       const payload: Partial<Product> = {
         ...form,
         sku: form.sku || undefined,
+        prdCode: form.prdCode.trim() || undefined,
         price: Number.parseFloat(form.price) || 0,
         compareAtPrice: form.compareAtPrice
           ? Number.parseFloat(form.compareAtPrice)
@@ -272,6 +275,20 @@ export function ProductForm({ product }: { product?: Product }) {
                   readOnly
                   className={`${input} bg-cream text-ink-faint`}
                 />
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="pf-prd" className={label}>SellerHQ PRD code</label>
+                <input
+                  id="pf-prd"
+                  value={form.prdCode}
+                  onChange={(e) => set("prdCode", e.target.value)}
+                  className={input}
+                  placeholder="PRD-000001"
+                  autoCapitalize="characters"
+                />
+                <p className="mt-1 text-xs text-ink-faint">
+                  Internal only. This appears in the admin inventory and is never shown to customers.
+                </p>
               </div>
             </div>
           </Section>
