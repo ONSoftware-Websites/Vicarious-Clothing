@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { InventoryActions } from "@/components/admin/inventory-actions";
+import { getSellerHqPrdCodes } from "@/lib/server/sellerhq-prd-code";
 import { listProducts } from "@/lib/server/store";
 import { conditionLabel, formatPrice, STATUS_LABELS } from "@/lib/utils";
 
@@ -18,9 +19,13 @@ export default async function InventoryPage({
   const q = typeof raw.q === "string" ? raw.q.toLowerCase() : "";
   const status = typeof raw.status === "string" ? raw.status : "";
 
-  const products = await (await listProducts()).filter((p) => {
+  const allProducts = await listProducts();
+  const prdCodes = await getSellerHqPrdCodes(allProducts.map((p) => p.sku));
+
+  const products = allProducts.filter((p) => {
     if (status && p.status !== status) return false;
-    if (q && ![p.sku, p.name, p.brand, p.location ?? ""].join(" ").toLowerCase().includes(q)) {
+    const prdCode = prdCodes[p.sku] ?? "";
+    if (q && ![p.sku, prdCode, p.name, p.brand, p.location ?? ""].join(" ").toLowerCase().includes(q)) {
       return false;
     }
     return true;
@@ -53,7 +58,7 @@ export default async function InventoryPage({
           id="inv-q"
           name="q"
           defaultValue={raw.q && typeof raw.q === "string" ? raw.q : ""}
-          placeholder="Search SKU, name, brand, location…"
+          placeholder="Search SKU, PRD, name, brand, location…"
           className="h-11 w-full max-w-sm border border-line bg-paper px-4 text-sm focus:border-ink focus:outline-none"
         />
         <label className="sr-only" htmlFor="inv-status">
@@ -81,10 +86,11 @@ export default async function InventoryPage({
       </form>
 
       <div className="overflow-x-auto border border-line">
-        <table className="w-full min-w-[900px] border-collapse text-sm">
+        <table className="w-full min-w-[1020px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-line bg-cream text-left">
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">SKU</th>
+              <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">SellerHQ PRD</th>
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Product</th>
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Cost</th>
               <th className="px-4 py-3 font-display text-[10px] font-semibold uppercase tracking-[0.16em]">Price</th>
@@ -97,6 +103,7 @@ export default async function InventoryPage({
             {products.map((p) => (
               <tr key={p.sku} className="border-b border-line align-top hover:bg-cream/50">
                 <td className="px-4 py-4 font-mono text-xs">{p.sku}</td>
+                <td className="px-4 py-4 font-mono text-xs">{prdCodes[p.sku] || "—"}</td>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-3">
                     <Image
@@ -149,7 +156,7 @@ export default async function InventoryPage({
             ))}
             {products.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
+                <td colSpan={8} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
                   Nothing matches
                 </td>
               </tr>
