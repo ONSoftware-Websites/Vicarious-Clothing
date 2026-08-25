@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import type { Product } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
 import { adminDeleteProduct } from "@/lib/server/admin-delete";
+import { setSellerHqPrdCode } from "@/lib/server/sellerhq-prd-code";
 import {
   duplicateProduct,
   getProductBySku,
@@ -22,6 +23,12 @@ function optionalMoney(value: unknown) {
   if (value === undefined || value === null || value === "") return undefined;
   const amount = Number(value);
   return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : undefined;
+}
+
+function optionalText(value: unknown) {
+  if (value === undefined || value === null) return undefined;
+  const text = String(value).trim();
+  return text || undefined;
 }
 
 export async function POST(request: NextRequest) {
@@ -200,6 +207,7 @@ export async function POST(request: NextRequest) {
         purchaseDate: product.purchaseDate
           ? String(product.purchaseDate).trim()
           : undefined,
+        prdCode: optionalText(product.prdCode),
         marketplace: Array.isArray(product.marketplace) && product.marketplace.length
           ? product.marketplace.map((m: { channel: string; status: string }) => ({
               channel: m.channel as never,
@@ -224,6 +232,7 @@ export async function POST(request: NextRequest) {
         actor,
         existing ? `${sku} updated` : `${sku} created`
       );
+      await setSellerHqPrdCode(full.sku, full.prdCode);
       return Response.json({ ok: true, sku: full.sku, slug: full.slug });
     }
 
