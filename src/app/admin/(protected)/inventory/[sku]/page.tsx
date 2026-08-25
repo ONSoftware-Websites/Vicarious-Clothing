@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { InventoryDeleteButton } from "@/components/admin/inventory-delete-button";
 import { ProductForm } from "@/components/admin/product-form";
+import { getSellerHqPrdCode } from "@/lib/server/sellerhq-prd-code";
 import { getProductBySku, listAuditLog } from "@/lib/server/store";
 import { formatDateTime } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ export default async function EditProductPage({
   const product = await getProductBySku(sku);
   if (!product) notFound();
 
+  const prdCode = await getSellerHqPrdCode(sku);
   const history = (await listAuditLog(500)).filter(
     (entry) => entry.detail?.toUpperCase().includes(sku.toUpperCase())
   );
@@ -34,7 +36,7 @@ export default async function EditProductPage({
       <div className="mb-6 flex justify-end">
         <InventoryDeleteButton sku={sku} />
       </div>
-      <ProductForm product={product} />
+      <ProductForm product={{ ...product, prdCode }} />
 
       <section className="mt-12 border-t border-line pt-8">
         <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.2em]">
