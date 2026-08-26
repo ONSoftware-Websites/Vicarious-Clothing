@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Container } from "@/components/ui";
+import { ProductImageWatermark } from "@/components/product-image-watermark";
 import { useCart } from "@/hooks/use-cart";
 import { useMounted } from "@/hooks/use-local-storage";
 import { FREE_DELIVERY_THRESHOLD, STANDARD_DELIVERY_COST } from "@/lib/site";
@@ -99,7 +100,7 @@ export default function BagPage() {
             <ul className="divide-y divide-line border-t border-line">
               {items.map(({ line, product }) => (
                 <li key={line.sku} className="flex gap-5 py-6">
-                  <Link href={`/product/${product.slug}`} className="shrink-0">
+                  <Link href={`/product/${product.slug}`} className="relative shrink-0 overflow-hidden bg-cream">
                     <Image
                       src={product.images[0]?.src ?? ""}
                       alt={product.name}
@@ -107,6 +108,7 @@ export default function BagPage() {
                       height={137}
                       className="h-[137px] w-[110px] object-cover"
                     />
+                    <ProductImageWatermark size="sm" className="scale-75 sm:scale-75" />
                   </Link>
                   <div className="flex flex-1 flex-col">
                     <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
