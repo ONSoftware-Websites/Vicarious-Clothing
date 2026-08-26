@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ProductImageWatermark } from "@/components/product-image-watermark";
 import { useShopUi } from "@/hooks/use-shop-ui";
 import { useCart } from "@/hooks/use-cart";
 import { FREE_DELIVERY_THRESHOLD } from "@/lib/site";
@@ -127,7 +128,7 @@ export function BagDrawer() {
             <ul className="divide-y divide-line">
               {items.map(({ line, product }) => (
                 <li key={line.sku} className="flex gap-4 py-5">
-                  <Link href={`/product/${product.slug}`} onClick={closeBag} className="shrink-0 overflow-hidden">
+                  <Link href={`/product/${product.slug}`} onClick={closeBag} className="relative shrink-0 overflow-hidden bg-cream">
                     <Image
                       src={product.images[0]?.src ?? ""}
                       alt={product.name}
@@ -135,6 +136,7 @@ export function BagDrawer() {
                       height={100}
                       className="h-[100px] w-20 object-cover transition-transform hover:scale-[1.03]"
                     />
+                    <ProductImageWatermark size="sm" className="scale-[0.65] sm:scale-[0.65]" />
                   </Link>
                   <div className="flex flex-1 flex-col">
                     <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
