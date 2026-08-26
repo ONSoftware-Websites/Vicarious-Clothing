@@ -4,6 +4,7 @@ import type { Product } from "@/lib/types";
 import { conditionLabel, formatPrice } from "@/lib/utils";
 import { Badge } from "@/components/ui";
 import { WishlistButton } from "@/components/wishlist-button";
+import { ProductImageWatermark } from "@/components/product-image-watermark";
 
 export function ProductCard({
   product,
@@ -45,6 +46,7 @@ export function ProductCard({
             loading={priority ? "eager" : "lazy"}
             priority={priority}
           />
+          <ProductImageWatermark size="sm" />
           {sold && (
             <div className="absolute inset-0 flex items-center justify-center bg-ink/55">
               <span className="border border-paper/70 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] text-paper">
