@@ -13,6 +13,7 @@ import { checkoutExpired } from "@/lib/server/checkout-expiry";
 import { releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { sendEmail } from "@/lib/server/mailer";
 import { sendAdminOrderAlertOnce } from "@/lib/server/order-alerts";
+import { syncOrderSaleToSellerHq } from "@/lib/server/sellerhq-sync";
 
 async function sendConfirmationOnce(
   order: NonNullable<Awaited<ReturnType<typeof getOrder>>>
@@ -41,6 +42,21 @@ async function sendAdminOrderAlertSafely(
   } catch (error) {
     // Payment capture must not be rolled back because Henry's alert email failed.
     console.error("Admin paid-order alert failed:", error);
+  }
+}
+
+async function syncOrderSaleToSellerHqSafely(
+  order: NonNullable<Awaited<ReturnType<typeof getOrder>>>
+) {
+  try {
+    const result = await syncOrderSaleToSellerHq(order);
+    if (!result.ok && !result.skipped) {
+      console.error("SellerHQ paid-order sync failed:", result.error ?? result.data);
+    }
+  } catch (error) {
+    // Stripe webhook processing should not retry forever just because the
+    // inventory-management app is temporarily unreachable.
+    console.error("SellerHQ paid-order sync failed:", error);
   }
 }
 
@@ -122,6 +138,7 @@ export async function POST(request: NextRequest) {
           await recordDiscountUsageOnce(order.discount?.code, order.email);
           await sendConfirmationOnce(order);
           await sendAdminOrderAlertSafely(order);
+          await syncOrderSaleToSellerHqSafely(order);
         }
         break;
       }
@@ -172,6 +189,7 @@ export async function POST(request: NextRequest) {
           await recordDiscountUsageOnce(order.discount?.code, order.email);
           await sendConfirmationOnce(order);
           await sendAdminOrderAlertSafely(order);
+          await syncOrderSaleToSellerHqSafely(order);
         }
         break;
       }
