@@ -52,6 +52,32 @@ interface FormProduct {
   featured: boolean;
 }
 
+type SellerHqMappedProduct = Partial<
+  Pick<
+    FormProduct,
+    | "prdCode"
+    | "name"
+    | "brand"
+    | "category"
+    | "size"
+    | "colour"
+    | "material"
+    | "condition"
+    | "conditionNotes"
+    | "measurements"
+    | "description"
+    | "defects"
+    | "tags"
+    | "price"
+    | "cost"
+    | "images"
+    | "location"
+    | "acquisitionSource"
+    | "purchaseDate"
+    | "marketplace"
+  >
+>;
+
 function toForm(p?: Product): FormProduct {
   return {
     sku: p?.sku ?? "",
@@ -111,6 +137,9 @@ export function ProductForm({ product }: { product?: Product }) {
   const [form, setForm] = useState<FormProduct>(() => toForm(product));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [pullFromSellerHq, setPullFromSellerHq] = useState(false);
+  const [pullingSellerHq, setPullingSellerHq] = useState(false);
+  const [sellerHqMessage, setSellerHqMessage] = useState("");
 
   const set = <K extends keyof FormProduct>(key: K, value: FormProduct[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -120,15 +149,15 @@ export function ProductForm({ product }: { product?: Product }) {
     [form.category]
   );
 
-  const setMeasurement = (label: string, value: string) => {
-    const existing = form.measurements.find((m) => m.label === label);
+  const setMeasurement = (fieldLabel: string, value: string) => {
+    const existing = form.measurements.find((m) => m.label === fieldLabel);
     if (existing) {
       set(
         "measurements",
-        form.measurements.map((m) => (m.label === label ? { ...m, value } : m))
+        form.measurements.map((m) => (m.label === fieldLabel ? { ...m, value } : m))
       );
     } else if (value) {
-      set("measurements", [...form.measurements, { label, value }]);
+      set("measurements", [...form.measurements, { label: fieldLabel, value }]);
     }
   };
 
@@ -140,6 +169,56 @@ export function ProductForm({ product }: { product?: Product }) {
     const margin = price > 0 ? (profit / price) * 100 : 0;
     return { price, cost, fees, profit, margin };
   }, [form.price, form.cost]);
+
+  const applySellerHqProduct = (mapped: SellerHqMappedProduct) => {
+    setForm((current) => ({
+      ...current,
+      prdCode: mapped.prdCode ?? current.prdCode,
+      name: mapped.name ?? current.name,
+      brand: mapped.brand ?? current.brand,
+      category: mapped.category ?? current.category,
+      size: mapped.size ?? current.size,
+      colour: mapped.colour ?? current.colour,
+      material: mapped.material ?? current.material,
+      condition: mapped.condition ?? current.condition,
+      conditionNotes: mapped.conditionNotes ?? current.conditionNotes,
+      measurements: mapped.measurements?.length ? mapped.measurements : current.measurements,
+      description: mapped.description ?? current.description,
+      defects: mapped.defects ?? current.defects,
+      tags: mapped.tags ?? current.tags,
+      price: mapped.price || current.price,
+      cost: mapped.cost || current.cost,
+      images: mapped.images?.length ? mapped.images : current.images,
+      location: mapped.location ?? current.location,
+      acquisitionSource: mapped.acquisitionSource ?? current.acquisitionSource,
+      purchaseDate: mapped.purchaseDate ?? current.purchaseDate,
+      marketplace: mapped.marketplace?.length ? mapped.marketplace : current.marketplace,
+    }));
+  };
+
+  const pullSellerHqProduct = async () => {
+    const prdCode = form.prdCode.trim();
+    if (!prdCode) {
+      setSellerHqMessage("Enter a SellerHQ PRD code first.");
+      return;
+    }
+
+    setPullingSellerHq(true);
+    setSellerHqMessage("");
+    setError("");
+
+    try {
+      const res = await fetch(`/api/admin/sellerhq/products/${encodeURIComponent(prdCode)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not pull SellerHQ product");
+      applySellerHqProduct(data.mapped as SellerHqMappedProduct);
+      setSellerHqMessage("SellerHQ details pulled in. Review everything before saving or publishing.");
+    } catch (err) {
+      setSellerHqMessage(err instanceof Error ? err.message : "Could not pull SellerHQ product");
+    } finally {
+      setPullingSellerHq(false);
+    }
+  };
 
   const save = async (publish: boolean) => {
     setSaving(true);
@@ -225,6 +304,53 @@ export function ProductForm({ product }: { product?: Product }) {
         className="grid grid-cols-1 gap-6 xl:grid-cols-3"
       >
         <div className="space-y-6 xl:col-span-2">
+          <Section title="SellerHQ link">
+            <label className="flex cursor-pointer items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={pullFromSellerHq}
+                onChange={(e) => setPullFromSellerHq(e.target.checked)}
+                className="mt-1 h-4 w-4 accent-[#0097af]"
+              />
+              <span>
+                <span className="block font-display text-xs font-semibold uppercase tracking-[0.14em]">
+                  Pull details from SellerHQ
+                </span>
+                <span className="mt-1 block text-ink-faint">
+                  Enter a PRD code, pull the SellerHQ product into this form, then review it before saving. Existing Vicarious-only fields are preserved.
+                </span>
+              </span>
+            </label>
+
+            {pullFromSellerHq && (
+              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                <div>
+                  <label htmlFor="pf-prd-pull" className={label}>SellerHQ PRD code</label>
+                  <input
+                    id="pf-prd-pull"
+                    value={form.prdCode}
+                    onChange={(e) => set("prdCode", e.target.value.toUpperCase())}
+                    className={input}
+                    placeholder="PRD-000001"
+                    autoCapitalize="characters"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={pullingSellerHq || !form.prdCode.trim()}
+                  onClick={pullSellerHqProduct}
+                  className="flex h-11 items-center justify-center bg-ink px-5 font-display text-xs font-semibold uppercase tracking-[0.16em] text-paper transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  {pullingSellerHq ? "Pulling…" : "Fetch"}
+                </button>
+              </div>
+            )}
+
+            {sellerHqMessage && (
+              <p className="mt-3 text-xs text-ink-faint">{sellerHqMessage}</p>
+            )}
+          </Section>
+
           <Section title="Identity">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
@@ -281,13 +407,13 @@ export function ProductForm({ product }: { product?: Product }) {
                 <input
                   id="pf-prd"
                   value={form.prdCode}
-                  onChange={(e) => set("prdCode", e.target.value)}
+                  onChange={(e) => set("prdCode", e.target.value.toUpperCase())}
                   className={input}
                   placeholder="PRD-000001"
                   autoCapitalize="characters"
                 />
                 <p className="mt-1 text-xs text-ink-faint">
-                  Internal only. This appears in the admin inventory and is never shown to customers.
+                  Internal only. This appears in the admin inventory and is never shown to customers. Any product with a PRD code can sync with SellerHQ.
                 </p>
               </div>
             </div>
