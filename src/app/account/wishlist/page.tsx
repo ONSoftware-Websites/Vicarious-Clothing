@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AccountShell } from "@/components/account-shell";
+import { ProductImageWatermark } from "@/components/product-image-watermark";
 import { useWishlist } from "@/hooks/use-wishlist";
 import { useMounted } from "@/hooks/use-local-storage";
 import { conditionLabel, formatPrice } from "@/lib/utils";
@@ -89,7 +90,7 @@ export default function WishlistPage() {
             const sold = product.status === "SOLD";
             return (
               <li key={product.sku} className="flex gap-5 py-5">
-                <Link href={`/product/${product.slug}`} className="shrink-0">
+                <Link href={`/product/${product.slug}`} className="relative shrink-0 overflow-hidden bg-cream">
                   <Image
                     src={product.images[0]?.src ?? ""}
                     alt={product.name}
@@ -97,6 +98,7 @@ export default function WishlistPage() {
                     height={112}
                     className="h-[112px] w-[90px] object-cover"
                   />
+                  <ProductImageWatermark size="sm" className="scale-[0.65] sm:scale-[0.65]" />
                 </Link>
                 <div className="flex flex-1 flex-col">
                   <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
