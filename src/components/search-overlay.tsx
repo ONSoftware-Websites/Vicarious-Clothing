@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ProductImageWatermark } from "@/components/product-image-watermark";
 import { useShopUi } from "@/hooks/use-shop-ui";
 import { CATEGORY_LABELS, TRENDING_TERMS } from "@/lib/site";
 import { conditionLabel, formatPrice } from "@/lib/utils";
@@ -173,13 +174,16 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
                   onClick={onClose}
                   className="flex items-center gap-4 py-3 transition-colors hover:bg-cream"
                 >
-                  <Image
-                    src={r.image}
-                    alt={r.name}
-                    width={56}
-                    height={70}
-                    className="h-[70px] w-14 object-cover"
-                  />
+                  <span className="relative shrink-0 overflow-hidden bg-cream">
+                    <Image
+                      src={r.image}
+                      alt={r.name}
+                      width={56}
+                      height={70}
+                      className="h-[70px] w-14 object-cover"
+                    />
+                    <ProductImageWatermark size="sm" className="scale-[0.55] sm:scale-[0.55]" />
+                  </span>
                   <div className="flex-1">
                     <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
                       {r.brand}
@@ -225,10 +229,9 @@ export function SearchOverlay() {
   }, [searchOpen, closeSearch]);
 
   if (!searchOpen) return null;
-
   return (
     <div
-      className="fixed inset-0 z-50 bg-ink/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 bg-ink/70 backdrop-blur-sm md:px-6"
       onClick={closeSearch}
       role="dialog"
       aria-modal="true"
