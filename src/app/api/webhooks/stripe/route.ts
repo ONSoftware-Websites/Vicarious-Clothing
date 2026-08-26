@@ -12,6 +12,7 @@ import { recordDiscountUsageOnce } from "@/lib/server/checkout-ledger";
 import { checkoutExpired } from "@/lib/server/checkout-expiry";
 import { releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { sendEmail } from "@/lib/server/mailer";
+import { sendAdminOrderAlertOnce } from "@/lib/server/order-alerts";
 
 async function sendConfirmationOnce(
   order: NonNullable<Awaited<ReturnType<typeof getOrder>>>
@@ -29,6 +30,17 @@ async function sendConfirmationOnce(
       template: "order-confirmed",
       data: { order },
     });
+  }
+}
+
+async function sendAdminOrderAlertSafely(
+  order: NonNullable<Awaited<ReturnType<typeof getOrder>>>
+) {
+  try {
+    await sendAdminOrderAlertOnce(order);
+  } catch (error) {
+    // Payment capture must not be rolled back because Henry's alert email failed.
+    console.error("Admin paid-order alert failed:", error);
   }
 }
 
@@ -109,6 +121,7 @@ export async function POST(request: NextRequest) {
         if (order) {
           await recordDiscountUsageOnce(order.discount?.code, order.email);
           await sendConfirmationOnce(order);
+          await sendAdminOrderAlertSafely(order);
         }
         break;
       }
@@ -158,6 +171,7 @@ export async function POST(request: NextRequest) {
         if (order) {
           await recordDiscountUsageOnce(order.discount?.code, order.email);
           await sendConfirmationOnce(order);
+          await sendAdminOrderAlertSafely(order);
         }
         break;
       }
