@@ -11,6 +11,7 @@ import { checkoutExpired } from "@/lib/server/checkout-expiry";
 import { releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { sendEmail } from "@/lib/server/mailer";
 import { sendAdminOrderAlertOnce } from "@/lib/server/order-alerts";
+import { syncOrderSaleToSellerHq } from "@/lib/server/sellerhq-sync";
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
     const order = await markOrderPaid(orderId);
     let emailSent = wasAlreadyPaid;
     let adminAlertSent = false;
+    let sellerHqSynced = wasAlreadyPaid;
 
     if (order) {
       await recordDiscountUsageOnce(order.discount?.code, order.email);
@@ -101,9 +103,21 @@ export async function POST(request: NextRequest) {
         // Do not fail customer checkout because an internal alert failed.
         console.error("Admin paid-order alert failed after payment:", alertError);
       }
+
+      if (!wasAlreadyPaid) {
+        try {
+          const syncResult = await syncOrderSaleToSellerHq(order);
+          sellerHqSynced = syncResult.ok || Boolean(syncResult.skipped);
+          if (!syncResult.ok && !syncResult.skipped) {
+            console.error("SellerHQ paid-order sync failed after payment:", syncResult.error ?? syncResult.data);
+          }
+        } catch (syncError) {
+          console.error("SellerHQ paid-order sync failed after payment:", syncError);
+        }
+      }
     }
 
-    return Response.json({ order: order ?? existing, emailSent, adminAlertSent });
+    return Response.json({ order: order ?? existing, emailSent, adminAlertSent, sellerHqSynced });
   } catch (error) {
     console.error("Checkout completion failed:", error);
     return Response.json({ error: "Could not confirm payment" }, { status: 500 });
