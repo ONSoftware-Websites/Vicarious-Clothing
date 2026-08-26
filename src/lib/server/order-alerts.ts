@@ -115,7 +115,12 @@ async function alreadySent(order: Order, recipient: string) {
 
 async function sendViaResend(to: string, subject: string, html: string) {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return false;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("RESEND_API_KEY is required to send paid order admin alerts.");
+    }
+    return false;
+  }
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -154,7 +159,7 @@ export async function sendAdminOrderAlertOnce(order: Order) {
       subject,
       template: TEMPLATE,
       status: sent ? "sent" : "logged",
-      provider: sent ? "resend" : "no-provider",
+      provider: sent ? "resend" : "local-dev",
       sentAt: new Date().toISOString(),
       preview: `${order.id} ${formatPrice(order.total)}`,
     });
