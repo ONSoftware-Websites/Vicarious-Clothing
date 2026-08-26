@@ -10,6 +10,7 @@ import { recordDiscountUsageOnce } from "@/lib/server/checkout-ledger";
 import { checkoutExpired } from "@/lib/server/checkout-expiry";
 import { releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { sendEmail } from "@/lib/server/mailer";
+import { sendAdminOrderAlertOnce } from "@/lib/server/order-alerts";
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
     await setOrderPayment(orderId, intent.id);
     const order = await markOrderPaid(orderId);
     let emailSent = wasAlreadyPaid;
+    let adminAlertSent = false;
 
     if (order) {
       await recordDiscountUsageOnce(order.discount?.code, order.email);
@@ -91,9 +93,17 @@ export async function POST(request: NextRequest) {
           emailSent = false;
         }
       }
+
+      try {
+        const alertResult = await sendAdminOrderAlertOnce(order);
+        adminAlertSent = alertResult.notified;
+      } catch (alertError) {
+        // Do not fail customer checkout because an internal alert failed.
+        console.error("Admin paid-order alert failed after payment:", alertError);
+      }
     }
 
-    return Response.json({ order: order ?? existing, emailSent });
+    return Response.json({ order: order ?? existing, emailSent, adminAlertSent });
   } catch (error) {
     console.error("Checkout completion failed:", error);
     return Response.json({ error: "Could not confirm payment" }, { status: 500 });
