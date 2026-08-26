@@ -3,6 +3,7 @@ import type { Product } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
 import { adminDeleteProduct } from "@/lib/server/admin-delete";
 import { setSellerHqPrdCode } from "@/lib/server/sellerhq-prd-code";
+import { syncProductToSellerHq } from "@/lib/server/sellerhq-sync";
 import {
   duplicateProduct,
   getProductBySku,
@@ -31,6 +32,14 @@ function optionalText(value: unknown) {
   return text || undefined;
 }
 
+async function syncLinkedProductSafely(product: Product, reason: string) {
+  if (!product.prdCode) return;
+  const result = await syncProductToSellerHq(product, reason);
+  if (!result.ok && !result.skipped) {
+    console.error("SellerHQ product sync failed:", result.error ?? result.data);
+  }
+}
+
 export async function POST(request: NextRequest) {
   const authError = await requireAdminApi();
   if (authError) return authError;
@@ -57,6 +66,8 @@ export async function POST(request: NextRequest) {
         return Response.json({ error: "Invalid status" }, { status: 400 });
       }
       await setProductStatus(String(body.sku), status as Product["status"]);
+      const updated = await getProductBySku(String(body.sku));
+      if (updated) await syncLinkedProductSafely(updated, "status_changed_in_vicarious");
       return Response.json({ ok: true });
     }
 
@@ -78,6 +89,7 @@ export async function POST(request: NextRequest) {
         actor,
         `${sku} discounted to £${updated.price.toFixed(2)}`
       );
+      await syncLinkedProductSafely(updated, "price_changed_in_vicarious");
       return Response.json({ ok: true });
     }
 
@@ -101,6 +113,7 @@ export async function POST(request: NextRequest) {
         actor,
         `${sku} ${channel}: ${status}`
       );
+      await syncLinkedProductSafely(updated, "marketplace_changed_in_vicarious");
       return Response.json({ ok: true });
     }
 
@@ -124,6 +137,7 @@ export async function POST(request: NextRequest) {
         actor,
         `${sku} sold on ${channel} — website delisted`
       );
+      await syncLinkedProductSafely(updated, `sold_elsewhere_${channel}`);
       return Response.json({ ok: true });
     }
 
@@ -233,6 +247,7 @@ export async function POST(request: NextRequest) {
         existing ? `${sku} updated` : `${sku} created`
       );
       await setSellerHqPrdCode(full.sku, full.prdCode);
+      await syncLinkedProductSafely(full, existing ? "product_updated_in_vicarious" : "product_created_in_vicarious");
       return Response.json({ ok: true, sku: full.sku, slug: full.slug });
     }
 
