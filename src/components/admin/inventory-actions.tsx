@@ -74,6 +74,14 @@ export function InventoryActions({ sku }: { sku: string }) {
       <button
         type="button"
         disabled={busy}
+        onClick={() => run(() => post("/api/admin/products", { action: "sync_sellerhq", sku }))}
+        className={`${btn} text-accent-deep hover:text-accent-deep disabled:opacity-40`}
+      >
+        Sync SHQ
+      </button>
+      <button
+        type="button"
+        disabled={busy}
         onClick={() => run(() => post("/api/admin/products", { action: "duplicate", sku }))}
         className={`${btn} text-ink-soft hover:text-ink disabled:opacity-40`}
       >
