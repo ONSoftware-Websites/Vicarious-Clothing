@@ -1,7 +1,7 @@
 import type { Order } from "@/lib/types";
 import { EMAILS, EXPRESS_DELIVERY_COST, SITE_URL } from "@/lib/site";
 import { formatPrice } from "@/lib/utils";
-import { listEmails, logEmail } from "@/lib/server/store";
+import { logEmail } from "@/lib/server/store";
 
 const TEMPLATE = "admin-order-alert";
 
@@ -29,9 +29,7 @@ function notificationRecipients() {
 }
 
 function alertFromAddress() {
-  // Customer emails are already confirmed working with this plain sender value.
-  // Keep Henry's internal alert on the same sender format instead of using a
-  // display-name format that can fail on some Resend/domain configurations.
+  // Match the known-working transactional customer email sender.
   return EMAILS.notifications;
 }
 
@@ -112,30 +110,13 @@ function orderAlertEmail(order: Order) {
   return { subject, html };
 }
 
-async function alreadySent(order: Order, recipient: string) {
-  try {
-    const recent = await listEmails(300);
-    const target = recipient.toLowerCase();
-    return recent.some(
-      (entry) =>
-        entry.template === TEMPLATE &&
-        entry.to.toLowerCase() === target &&
-        (entry.subject.includes(order.id) || entry.preview.includes(order.id))
-    );
-  } catch (error) {
-    // A logging-store problem should not prevent Henry from getting a new sale alert.
-    console.error("Could not check prior paid-order admin alerts:", error);
-    return false;
-  }
-}
-
 async function sendViaResend(to: string, subject: string, html: string) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("RESEND_API_KEY is required to send paid order admin alerts.");
     }
-    return false;
+    return { sent: false, provider: "local-dev", id: null };
   }
 
   const res = await fetch("https://api.resend.com/emails", {
@@ -152,41 +133,55 @@ async function sendViaResend(to: string, subject: string, html: string) {
     }),
   });
 
+  const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(`Order alert email provider error ${res.status}: ${await res.text()}`);
+    throw new Error(
+      `Order alert email provider error ${res.status}: ${JSON.stringify(data)}`
+    );
   }
 
-  return true;
+  return {
+    sent: true,
+    provider: "resend",
+    id: typeof data?.id === "string" ? data.id : null,
+  };
 }
 
 export async function sendAdminOrderAlertOnce(order: Order) {
   const recipients = notificationRecipients();
-  if (!recipients.length) return { notified: false, recipients: [] };
+  if (!recipients.length) return { notified: false, recipients: [], results: [] };
 
   const { subject, html } = orderAlertEmail(order);
-  const notified: string[] = [];
+  const results: Array<{
+    recipient: string;
+    sent: boolean;
+    provider: string;
+    id: string | null;
+  }> = [];
 
   for (const recipient of recipients) {
-    if (await alreadySent(order, recipient)) continue;
-
-    const sent = await sendViaResend(recipient, subject, html);
+    // Do not silently suppress alerts based on the email log. Missing Henry's
+    // alert is worse than receiving a duplicate internal notification.
+    const result = await sendViaResend(recipient, subject, html);
     try {
       await logEmail({
         to: recipient,
         subject,
         template: TEMPLATE,
-        status: sent ? "sent" : "logged",
-        provider: sent ? "resend" : "local-dev",
+        status: result.sent ? "sent" : "logged",
+        provider: result.provider,
         sentAt: new Date().toISOString(),
-        preview: `${order.id} ${formatPrice(order.total)}`,
+        preview: `${order.id} ${formatPrice(order.total)} ${result.id ?? ""}`,
       });
     } catch (error) {
-      // The alert itself has already been sent; failing to write the email log
-      // should not make checkout/reporting think Henry was not notified.
       console.error("Could not log paid-order admin alert:", error);
     }
-    notified.push(recipient);
+    results.push({ recipient, ...result });
   }
 
-  return { notified: notified.length > 0, recipients: notified };
+  return {
+    notified: results.some((result) => result.sent),
+    recipients,
+    results,
+  };
 }
