@@ -2,13 +2,17 @@ import type { NextRequest } from "next/server";
 import type { Product } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
 import { adminDeleteProduct } from "@/lib/server/admin-delete";
-import { setSellerHqPrdCode } from "@/lib/server/sellerhq-prd-code";
+import {
+  getSellerHqPrdCode,
+  getSellerHqPrdCodes,
+  setSellerHqPrdCode,
+} from "@/lib/server/sellerhq-prd-code";
 import { syncProductToSellerHq } from "@/lib/server/sellerhq-sync";
 import {
   duplicateProduct,
   getProductBySku,
+  listProducts,
   nextSku,
-  setProductStatus,
   upsertProduct,
 } from "@/lib/server/store";
 import { slugify } from "@/lib/utils";
@@ -32,12 +36,34 @@ function optionalText(value: unknown) {
   return text || undefined;
 }
 
+async function productWithPrdCode(product: Product): Promise<Product> {
+  if (product.prdCode?.trim()) return product;
+  const prdCode = await getSellerHqPrdCode(product.sku).catch(() => "");
+  return prdCode ? { ...product, prdCode } : product;
+}
+
 async function syncLinkedProductSafely(product: Product, reason: string) {
-  if (!product.prdCode) return;
-  const result = await syncProductToSellerHq(product, reason);
+  const linked = await productWithPrdCode(product);
+  if (!linked.prdCode) return { ok: false, skipped: true, error: "Product has no SellerHQ PRD code" };
+
+  const result = await syncProductToSellerHq(linked, reason);
   if (!result.ok && !result.skipped) {
     console.error("SellerHQ product sync failed:", result.error ?? result.data);
   }
+  return result;
+}
+
+function relistedProduct(product: Product): Product {
+  return {
+    ...product,
+    status: "AVAILABLE",
+    soldAt: undefined,
+    reservedUntil: undefined,
+    listedAt: new Date().toISOString(),
+    marketplace: product.marketplace.map((market) =>
+      market.channel === "website" ? { ...market, status: "LISTED" } : market
+    ),
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -60,15 +86,66 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: true, sku: copy.sku });
     }
 
+    if (action === "sync_sellerhq") {
+      const sku = String(body.sku);
+      const product = await getProductBySku(sku);
+      if (!product) return Response.json({ error: "Not found" }, { status: 404 });
+      const result = await syncLinkedProductSafely(product, "manual_sync_from_vicarious");
+      return Response.json({ ok: result.ok || Boolean(result.skipped), sellerHq: result });
+    }
+
+    if (action === "sync_all_sellerhq") {
+      const products = await listProducts();
+      const prdCodes = await getSellerHqPrdCodes(products.map((product) => product.sku));
+      let synced = 0;
+      let skipped = 0;
+      let failed = 0;
+
+      for (const product of products) {
+        const prdCode = product.prdCode || prdCodes[product.sku] || "";
+        if (!prdCode) {
+          skipped += 1;
+          continue;
+        }
+        const result = await syncLinkedProductSafely({ ...product, prdCode }, "manual_bulk_sync_from_vicarious");
+        if (result.ok) synced += 1;
+        else if (result.skipped) skipped += 1;
+        else failed += 1;
+      }
+
+      return Response.json({ ok: failed === 0, synced, skipped, failed });
+    }
+
     if (action === "status") {
+      const sku = String(body.sku);
       const status = String(body.status);
       if (!VALID_STATUSES.includes(status as Product["status"])) {
         return Response.json({ error: "Invalid status" }, { status: 400 });
       }
-      await setProductStatus(String(body.sku), status as Product["status"]);
-      const updated = await getProductBySku(String(body.sku));
-      if (updated) await syncLinkedProductSafely(updated, "status_changed_in_vicarious");
-      return Response.json({ ok: true });
+
+      const product = await getProductBySku(sku);
+      if (!product) return Response.json({ error: "Not found" }, { status: 404 });
+
+      const updated: Product =
+        status === "AVAILABLE"
+          ? relistedProduct(product)
+          : {
+              ...product,
+              status: status as Product["status"],
+              soldAt: status === "SOLD" ? new Date().toISOString() : product.soldAt,
+              reservedUntil: status === "AVAILABLE" ? undefined : product.reservedUntil,
+            };
+
+      await upsertProduct(
+        updated,
+        actor,
+        status === "AVAILABLE" ? `${sku} relisted` : `${sku} status changed to ${status}`
+      );
+      const result = await syncLinkedProductSafely(
+        updated,
+        status === "AVAILABLE" ? "relisted_in_vicarious" : "status_changed_in_vicarious"
+      );
+      return Response.json({ ok: true, sellerHqSynced: result.ok || Boolean(result.skipped) });
     }
 
     if (action === "discount") {
@@ -168,6 +245,7 @@ export async function POST(request: NextRequest) {
       const slug = existing
         ? existing.slug
         : `${sku.toLowerCase()}-${slugify(product.brand)}-${slugify(product.name)}`;
+      const status = (product.status as Product["status"]) ?? "DRAFT";
 
       const full: Product = {
         sku,
@@ -207,14 +285,14 @@ export async function POST(request: NextRequest) {
                 alt: i.alt || `${product.brand} ${product.name} - image ${idx + 1}`,
               }))
           : existing?.images ?? [],
-        status: (product.status as Product["status"]) ?? "DRAFT",
+        status,
         location: product.location ? String(product.location).trim() : undefined,
         listedAt:
-          product.status === "AVAILABLE" && !existing?.listedAt
-            ? new Date().toISOString()
+          status === "AVAILABLE"
+            ? existing?.listedAt ?? new Date().toISOString()
             : existing?.listedAt ?? new Date().toISOString(),
-        soldAt: existing?.soldAt,
-        reservedUntil: existing?.reservedUntil,
+        soldAt: status === "AVAILABLE" ? undefined : existing?.soldAt,
+        reservedUntil: status === "AVAILABLE" ? undefined : existing?.reservedUntil,
         acquisitionSource: product.acquisitionSource
           ? String(product.acquisitionSource).trim()
           : undefined,
