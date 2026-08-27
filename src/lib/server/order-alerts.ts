@@ -25,6 +25,10 @@ function notificationRecipients() {
     .filter(Boolean);
 }
 
+function alertFromAddress() {
+  return process.env.RESEND_FROM_EMAIL || `Vicarious Clothing <${EMAILS.notifications}>`;
+}
+
 function formatAddress(order: Order) {
   const address = order.address;
   const lines = [
@@ -135,8 +139,9 @@ async function sendViaResend(to: string, subject: string, html: string) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: EMAILS.notifications,
+      from: alertFromAddress(),
       to,
+      reply_to: EMAILS.support,
       subject,
       html,
     }),
