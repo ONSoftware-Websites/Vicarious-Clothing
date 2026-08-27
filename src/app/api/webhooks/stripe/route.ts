@@ -72,6 +72,14 @@ async function syncOrderSaleToSellerHqSafely(
   }
 }
 
+async function recoverPaidOrderSideEffects(
+  order: NonNullable<Awaited<ReturnType<typeof getOrder>>>
+) {
+  if (order.status !== "PAID") return;
+  await sendAdminOrderAlertSafely(order);
+  await syncOrderSaleToSellerHqSafely(order);
+}
+
 async function cancelPendingOrder(
   order: NonNullable<Awaited<ReturnType<typeof getOrder>>>,
   actor: string
@@ -135,6 +143,7 @@ export async function POST(request: NextRequest) {
           // Stripe retries are normal. Never regress PICKING/DISPATCHED/etc. back
           // to PAID just because the original payment event is delivered again.
           await setOrderPayment(orderId, intent.id);
+          await recoverPaidOrderSideEffects(existing);
           break;
         }
 
@@ -184,6 +193,7 @@ export async function POST(request: NextRequest) {
 
         if (existing.status !== "PENDING_PAYMENT") {
           if (paymentIntentId) await setOrderPayment(orderId, paymentIntentId);
+          await recoverPaidOrderSideEffects(existing);
           break;
         }
 
