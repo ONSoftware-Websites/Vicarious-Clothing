@@ -103,14 +103,20 @@ function orderAlertEmail(order: Order) {
 }
 
 async function alreadySent(order: Order, recipient: string) {
-  const recent = await listEmails(300);
-  const target = recipient.toLowerCase();
-  return recent.some(
-    (entry) =>
-      entry.template === TEMPLATE &&
-      entry.to.toLowerCase() === target &&
-      (entry.subject.includes(order.id) || entry.preview.includes(order.id))
-  );
+  try {
+    const recent = await listEmails(300);
+    const target = recipient.toLowerCase();
+    return recent.some(
+      (entry) =>
+        entry.template === TEMPLATE &&
+        entry.to.toLowerCase() === target &&
+        (entry.subject.includes(order.id) || entry.preview.includes(order.id))
+    );
+  } catch (error) {
+    // A logging-store problem should not prevent Henry from getting a new sale alert.
+    console.error("Could not check prior paid-order admin alerts:", error);
+    return false;
+  }
 }
 
 async function sendViaResend(to: string, subject: string, html: string) {
@@ -154,15 +160,21 @@ export async function sendAdminOrderAlertOnce(order: Order) {
     if (await alreadySent(order, recipient)) continue;
 
     const sent = await sendViaResend(recipient, subject, html);
-    await logEmail({
-      to: recipient,
-      subject,
-      template: TEMPLATE,
-      status: sent ? "sent" : "logged",
-      provider: sent ? "resend" : "local-dev",
-      sentAt: new Date().toISOString(),
-      preview: `${order.id} ${formatPrice(order.total)}`,
-    });
+    try {
+      await logEmail({
+        to: recipient,
+        subject,
+        template: TEMPLATE,
+        status: sent ? "sent" : "logged",
+        provider: sent ? "resend" : "local-dev",
+        sentAt: new Date().toISOString(),
+        preview: `${order.id} ${formatPrice(order.total)}`,
+      });
+    } catch (error) {
+      // The alert itself has already been sent; failing to write the email log
+      // should not make checkout/reporting think Henry was not notified.
+      console.error("Could not log paid-order admin alert:", error);
+    }
     notified.push(recipient);
   }
 
