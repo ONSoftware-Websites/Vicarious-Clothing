@@ -2,7 +2,7 @@ import type { Order, Product } from "@/lib/types";
 
 const DEFAULT_TIMEOUT_MS = 12_000;
 
-type SellerHqSyncResult = {
+export type SellerHqSyncResult = {
   ok: boolean;
   skipped?: boolean;
   status?: number;
@@ -65,6 +65,31 @@ async function postToSellerHq(body: Record<string, unknown>): Promise<SellerHqSy
   }
 }
 
+function orderPayload(order: Order) {
+  return {
+    id: order.id,
+    channel: order.channel,
+    status: order.status,
+    total: order.total,
+    subtotal: order.subtotal,
+    delivery: order.delivery,
+    paymentProvider: order.paymentProvider,
+    paymentIntentId: order.paymentIntentId,
+    carrier: order.carrier,
+    tracking: order.tracking,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+    items: order.items.map((item) => ({
+      sku: item.sku,
+      name: item.name,
+      brand: item.brand,
+      size: item.size,
+      condition: item.condition,
+      price: item.price,
+    })),
+  };
+}
+
 export async function fetchProductFromSellerHq(prdCode: string): Promise<SellerHqSyncResult> {
   return postToSellerHq({ action: "get_product", prdCode });
 }
@@ -90,6 +115,7 @@ export async function syncProductToSellerHq(product: Product, reason: string): P
       category: product.category,
       size: product.size,
       colour: product.colour,
+      material: product.material,
       condition: product.condition,
       conditionNotes: product.conditionNotes,
       description: product.description,
@@ -105,6 +131,8 @@ export async function syncProductToSellerHq(product: Product, reason: string): P
       acquisitionSource: product.acquisitionSource,
       purchaseDate: product.purchaseDate,
       marketplace: product.marketplace,
+      soldAt: product.soldAt,
+      reservedUntil: product.reservedUntil,
       updatedAt: new Date().toISOString(),
     },
   });
@@ -121,25 +149,10 @@ export async function syncOrderSaleToSellerHq(order: Order): Promise<SellerHqSyn
 
   return postToSellerHq({
     action: "record_sale",
-    order: {
-      id: order.id,
-      channel: order.channel,
-      status: order.status,
-      total: order.total,
-      subtotal: order.subtotal,
-      delivery: order.delivery,
-      paymentProvider: order.paymentProvider,
-      paymentIntentId: order.paymentIntentId,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
-      items: order.items.map((item) => ({
-        sku: item.sku,
-        name: item.name,
-        brand: item.brand,
-        size: item.size,
-        condition: item.condition,
-        price: item.price,
-      })),
-    },
+    order: orderPayload(order),
   });
+}
+
+export async function syncOrderStatusToSellerHq(order: Order): Promise<SellerHqSyncResult> {
+  return syncOrderSaleToSellerHq(order);
 }
