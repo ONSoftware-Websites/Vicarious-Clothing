@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { InventoryActions } from "@/components/admin/inventory-actions";
+import { InventorySyncAll } from "@/components/admin/inventory-sync-all";
 import { getSellerHqPrdCodes } from "@/lib/server/sellerhq-prd-code";
 import { listProducts } from "@/lib/server/store";
 import { conditionLabel, formatPrice, STATUS_LABELS } from "@/lib/utils";
@@ -42,12 +43,15 @@ export default async function InventoryPage({
             {products.length} {products.length === 1 ? "record" : "records"}
           </p>
         </div>
-        <Link
-          href="/admin/inventory/new"
-          className="flex h-11 items-center justify-center bg-accent px-6 font-display text-xs font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-accent-deep"
-        >
-          + Add product
-        </Link>
+        <div className="flex flex-wrap items-start gap-3">
+          <InventorySyncAll />
+          <Link
+            href="/admin/inventory/new"
+            className="flex h-11 items-center justify-center bg-accent px-6 font-display text-xs font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-accent-deep"
+          >
+            + Add product
+          </Link>
+        </div>
       </div>
 
       <form className="mb-6 flex flex-wrap gap-3">
