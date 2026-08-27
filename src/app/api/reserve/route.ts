@@ -1,9 +1,24 @@
 import type { NextRequest } from "next/server";
+import type { Product } from "@/lib/types";
 import { getProductBySku } from "@/lib/server/store";
 
 function normalizeSkus(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.map((sku) => String(sku).trim().toUpperCase()).filter(Boolean))];
+}
+
+function hasActiveReservation(product: Product) {
+  return (
+    product.status === "RESERVED" &&
+    Boolean(product.reservedUntil) &&
+    new Date(product.reservedUntil as string).getTime() > Date.now()
+  );
+}
+
+function isAvailableForCheckout(product: Product | undefined) {
+  if (!product) return false;
+  if (product.status === "AVAILABLE") return true;
+  return product.status === "RESERVED" && !hasActiveReservation(product);
 }
 
 // This endpoint is now an availability check only. The actual stock claim is
@@ -21,7 +36,7 @@ export async function POST(request: NextRequest) {
     const gone: string[] = [];
     for (const sku of skus) {
       const product = await getProductBySku(sku);
-      if (product?.status === "AVAILABLE") ok.push(sku);
+      if (isAvailableForCheckout(product)) ok.push(sku);
       else gone.push(sku);
     }
 
