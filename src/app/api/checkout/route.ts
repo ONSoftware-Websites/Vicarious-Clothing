@@ -16,12 +16,14 @@ import {
   STANDARD_DELIVERY_COST,
 } from "@/lib/site";
 import { sendEmail } from "@/lib/server/mailer";
+import { sendAdminOrderAlertOnce } from "@/lib/server/order-alerts";
 import { claimCheckoutStock, releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { undoPendingDiscountUsage } from "@/lib/server/checkout-ledger";
 import {
   createOrderAccessToken,
   orderAccessCookieName,
 } from "@/lib/server/order-access";
+import { syncOrderSaleToSellerHq } from "@/lib/server/sellerhq-sync";
 import {
   productionRequiresSupabase,
   supabaseConfigured,
@@ -40,6 +42,42 @@ async function grantBrowserOrderAccess(order: Order) {
     path: `/order/${order.id}`,
     maxAge: 60 * 60 * 24 * 30,
   });
+}
+
+async function sendPaidOrderSideEffects(order: Order) {
+  let emailSent = false;
+  let adminAlertSent = false;
+  let sellerHqSynced = false;
+
+  try {
+    await sendEmail({
+      to: order.email,
+      template: "order-confirmed",
+      data: { order },
+    });
+    emailSent = true;
+  } catch (error) {
+    console.error("Demo order confirmation email failed:", error);
+  }
+
+  try {
+    const result = await sendAdminOrderAlertOnce(order);
+    adminAlertSent = result.notified;
+  } catch (error) {
+    console.error("Demo paid-order admin alert failed:", error);
+  }
+
+  try {
+    const result = await syncOrderSaleToSellerHq(order);
+    sellerHqSynced = result.ok || Boolean(result.skipped);
+    if (!result.ok && !result.skipped) {
+      console.error("Demo paid-order SellerHQ sync failed:", result.error ?? result.data);
+    }
+  } catch (error) {
+    console.error("Demo paid-order SellerHQ sync failed:", error);
+  }
+
+  return { emailSent, adminAlertSent, sellerHqSynced };
 }
 
 export async function POST(request: NextRequest) {
@@ -201,12 +239,8 @@ export async function POST(request: NextRequest) {
 
     if (!stripe) {
       claimedSkus = [];
-      await sendEmail({
-        to: order.email,
-        template: "order-confirmed",
-        data: { order },
-      });
-      return Response.json({ order, mode: "demo" }, { status: 201 });
+      const sideEffects = await sendPaidOrderSideEffects(order);
+      return Response.json({ order, mode: "demo", ...sideEffects }, { status: 201 });
     }
 
     await undoPendingDiscountUsage(order.discount?.code, order.email);
