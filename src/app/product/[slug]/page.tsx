@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Product } from "@/lib/types";
 import { Container, Badge, SectionHeading } from "@/components/ui";
 import { ProductGallery } from "@/components/product-gallery";
 import { AddToBag } from "@/components/add-to-bag";
@@ -20,6 +21,14 @@ export const dynamic = "force-dynamic";
 
 function isPublicProductStatus(status: string) {
   return status === "AVAILABLE" || status === "RESERVED" || status === "SOLD";
+}
+
+function hasActiveReservation(product: Product) {
+  return (
+    product.status === "RESERVED" &&
+    Boolean(product.reservedUntil) &&
+    new Date(product.reservedUntil as string).getTime() > Date.now()
+  );
 }
 
 export async function generateMetadata({
@@ -52,6 +61,7 @@ export default async function ProductPage({
   if (!product || !isPublicProductStatus(product.status)) notFound();
 
   const sold = product.status === "SOLD";
+  const activelyReserved = hasActiveReservation(product);
   const similar = await getSimilar(product, 4);
 
   const jsonLd = {
@@ -63,7 +73,7 @@ export default async function ProductPage({
     description: product.description,
     brand: { "@type": "Brand", name: product.brand },
     itemCondition: "https://schema.org/UsedCondition",
-    offers: sold
+    offers: sold || activelyReserved
       ? { "@type": "Offer", availability: "https://schema.org/SoldOut", price: product.price, priceCurrency: "GBP", url: `${SITE_URL}/product/${product.slug}` }
       : { "@type": "Offer", availability: "https://schema.org/InStock", price: product.price, priceCurrency: "GBP", url: `${SITE_URL}/product/${product.slug}` },
   };
@@ -154,7 +164,7 @@ export default async function ProductPage({
               <p className="flex h-14 w-full items-center justify-center border border-ink font-display text-xs font-semibold uppercase tracking-[0.18em] text-ink">
                 This one&apos;s gone
               </p>
-            ) : product.status === "RESERVED" ? (
+            ) : activelyReserved ? (
               <p className="flex h-14 w-full items-center justify-center border border-ink font-display text-xs font-semibold uppercase tracking-[0.18em] text-ink">
                 Reserved — checking out now
               </p>
