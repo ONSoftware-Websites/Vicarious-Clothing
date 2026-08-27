@@ -5,8 +5,38 @@ import { adminDeleteOrder } from "@/lib/server/admin-delete";
 import { getOrder, setOrderTracking, updateOrderStatus } from "@/lib/server/store";
 import { getStripe } from "@/lib/server/payments";
 import { sendEmail } from "@/lib/server/mailer";
+import { syncOrderSaleToSellerHq } from "@/lib/server/sellerhq-sync";
 
 const ACTOR = "Admin";
+const SELLERHQ_ORDER_SYNC_STATUSES: OrderStatus[] = [
+  "PAID",
+  "PICKING",
+  "READY_TO_DISPATCH",
+  "DISPATCHED",
+  "DELIVERED",
+];
+
+async function syncOrderToSellerHqSafely(
+  order: NonNullable<Awaited<ReturnType<typeof getOrder>>>
+) {
+  if (!SELLERHQ_ORDER_SYNC_STATUSES.includes(order.status)) {
+    return { ok: false, skipped: true, error: "Order status is not part of the SellerHQ stock flow" };
+  }
+
+  try {
+    const result = await syncOrderSaleToSellerHq(order);
+    if (!result.ok && !result.skipped) {
+      console.error("SellerHQ order status sync failed:", result.error ?? result.data);
+    }
+    return result;
+  } catch (error) {
+    console.error("SellerHQ order status sync failed:", error);
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "SellerHQ order status sync failed",
+    };
+  }
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -110,7 +140,15 @@ export async function PATCH(
         }
       }
 
-      return Response.json({ ok: true, order, refundReference, emailSent });
+      const sellerHqResult = await syncOrderToSellerHqSafely(order);
+
+      return Response.json({
+        ok: true,
+        order,
+        refundReference,
+        emailSent,
+        sellerHqSynced: sellerHqResult.ok || Boolean(sellerHqResult.skipped),
+      });
     }
 
     if (body.carrier || body.tracking) {
