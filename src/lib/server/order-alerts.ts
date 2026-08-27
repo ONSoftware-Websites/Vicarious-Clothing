@@ -10,23 +10,29 @@ function esc(value: unknown) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;");
+    .replace(/"/g, "&quot;");
 }
 
 function notificationRecipients() {
-  const configured =
-    process.env.ORDER_ALERT_EMAIL ||
-    process.env.HENRY_ORDER_NOTIFY_EMAIL ||
-    EMAILS.owner;
+  const configured = [
+    process.env.ORDER_ALERT_EMAIL,
+    process.env.HENRY_ORDER_NOTIFY_EMAIL,
+    EMAILS.owner,
+  ];
 
-  return configured
-    .split(",")
+  const recipients = configured
+    .flatMap((value) => String(value ?? "").split(","))
     .map((email) => email.trim())
     .filter(Boolean);
+
+  return [...new Set(recipients.map((email) => email.toLowerCase()))];
 }
 
 function alertFromAddress() {
-  return process.env.RESEND_FROM_EMAIL || `Vicarious Clothing <${EMAILS.notifications}>`;
+  // Customer emails are already confirmed working with this plain sender value.
+  // Keep Henry's internal alert on the same sender format instead of using a
+  // display-name format that can fail on some Resend/domain configurations.
+  return EMAILS.notifications;
 }
 
 function formatAddress(order: Order) {
@@ -141,7 +147,6 @@ async function sendViaResend(to: string, subject: string, html: string) {
     body: JSON.stringify({
       from: alertFromAddress(),
       to,
-      reply_to: EMAILS.support,
       subject,
       html,
     }),
