@@ -34,6 +34,18 @@ async function sendConfirmationOnce(
   }
 }
 
+async function sendConfirmationOnceSafely(
+  order: NonNullable<Awaited<ReturnType<typeof getOrder>>>
+) {
+  try {
+    await sendConfirmationOnce(order);
+  } catch (error) {
+    // Henry's internal order alert and inventory sync must still run even if the
+    // customer confirmation email provider has a transient problem.
+    console.error("Order confirmation email failed:", error);
+  }
+}
+
 async function sendAdminOrderAlertSafely(
   order: NonNullable<Awaited<ReturnType<typeof getOrder>>>
 ) {
@@ -136,7 +148,7 @@ export async function POST(request: NextRequest) {
         const order = await markOrderPaid(orderId);
         if (order) {
           await recordDiscountUsageOnce(order.discount?.code, order.email);
-          await sendConfirmationOnce(order);
+          await sendConfirmationOnceSafely(order);
           await sendAdminOrderAlertSafely(order);
           await syncOrderSaleToSellerHqSafely(order);
         }
@@ -187,7 +199,7 @@ export async function POST(request: NextRequest) {
         const order = await markOrderPaid(orderId);
         if (order) {
           await recordDiscountUsageOnce(order.discount?.code, order.email);
-          await sendConfirmationOnce(order);
+          await sendConfirmationOnceSafely(order);
           await sendAdminOrderAlertSafely(order);
           await syncOrderSaleToSellerHqSafely(order);
         }
