@@ -43,15 +43,26 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   skirts: "Skirts",
   shoes: "Shoes",
   accessories: "Accessories",
-  hoodies: "Hoodies",
-  knitwear: "Knitwear",
   jackets: "Jackets",
+  hoodies: "Hoodies",
+  coats: "Coats",
+  knitwear: "Knitwear",
   jeans: "Jeans",
   footwear: "Footwear",
   vintage: "Vintage",
 };
 
-export const SHOP_CATEGORIES: Category[] = ["tops", "trousers", "dresses", "skirts", "shoes", "accessories"];
+export const SHOP_CATEGORIES: Category[] = [
+  "tops",
+  "trousers",
+  "dresses",
+  "skirts",
+  "shoes",
+  "accessories",
+  "jackets",
+  "hoodies",
+  "coats",
+];
 
 export const COLLECTIONS = [
   { key: "latest", label: "Latest Drop", description: "The newest pieces in, listed this month." },
@@ -98,6 +109,9 @@ export const MEASUREMENT_FIELDS: Record<string, string[]> = {
   skirts: ["Waist", "Length"],
   shoes: ["UK size", "Insole length"],
   accessories: [],
+  jackets: ["Pit to pit", "Length", "Sleeve", "Shoulder"],
+  hoodies: ["Pit to pit", "Length", "Sleeve"],
+  coats: ["Pit to pit", "Length", "Sleeve", "Shoulder"],
 };
 
 export const CONDITION_DESCRIPTIONS: Record<Condition, string> = {
@@ -112,4 +126,4 @@ export const CONDITION_DESCRIPTIONS: Record<Condition, string> = {
 
 export const RESERVATION_MINUTES = 30;
 
-export const TRENDING_TERMS = ["Carhartt", "Nike", "Jackets", "Vintage"];
+export const TRENDING_TERMS = ["Carhartt", "Nike", "Jackets", "Hoodies", "Coats", "Vintage"];
