@@ -6,9 +6,20 @@ import { NewsletterForm } from "@/components/newsletter-form";
 import { getNewIn, getPicks, getRecentlySold } from "@/lib/catalog";
 import { listProducts } from "@/lib/server/store";
 import { CATEGORY_LABELS, SHOP_CATEGORIES } from "@/lib/site";
-import { seedImage } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+const CATEGORY_IMAGE_PATHS: Record<string, string> = {
+  tops: "/images/categories/Tops.jpg",
+  trousers: "/images/categories/Trousers.jpg",
+  dresses: "/images/categories/Dresses.jpg",
+  skirts: "/images/categories/Skirts.jpg",
+  shoes: "/images/categories/Shoes.jpg",
+  accessories: "/images/categories/Accessories.jpg",
+  jackets: "/images/categories/Jackets.jpg",
+  hoodies: "/images/categories/Hoodies.jpg",
+  coats: "/images/categories/Coats.jpg",
+};
 
 export default async function Home() {
   const products = await listProducts();
@@ -20,7 +31,7 @@ export default async function Home() {
     <div>
       <section className="relative flex min-h-[82vh] items-end overflow-hidden bg-ink">
         <Image
-          src="/images/hero.jpg"
+          src="/images/Hero.jpg"
           alt="Vicarious Clothing campaign"
           fill
           priority
@@ -152,7 +163,7 @@ export default async function Home() {
               >
                 <div className="relative aspect-[4/5] overflow-hidden bg-cream sm:aspect-square">
                   <Image
-                    src={seedImage(`category-${cat}`, 900, 1100)}
+                    src={CATEGORY_IMAGE_PATHS[cat] ?? `/images/categories/${cat}.jpg`}
                     alt={CATEGORY_LABELS[cat]}
                     fill
                     sizes="(min-width: 1024px) 25vw, 50vw"
@@ -173,7 +184,7 @@ export default async function Home() {
         <Container className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-20">
           <div className="relative aspect-[4/3] overflow-hidden lg:aspect-[5/4]">
             <Image
-              src="/images/story.jpg"
+              src="/images/Story.jpg"
               alt="Inside the Vicarious studio"
               fill
               sizes="(min-width: 1024px) 50vw, 100vw"
