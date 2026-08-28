@@ -16,10 +16,11 @@ export const CATEGORIES = [
   "skirts",
   "shoes",
   "accessories",
-  // legacy (kept for existing products)
-  "hoodies",
-  "knitwear",
   "jackets",
+  "hoodies",
+  "coats",
+  // legacy (kept for existing products)
+  "knitwear",
   "jeans",
   "footwear",
   "vintage",
