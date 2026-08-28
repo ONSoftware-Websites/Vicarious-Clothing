@@ -152,7 +152,7 @@ export default async function Home() {
               >
                 <div className="relative aspect-[4/5] overflow-hidden bg-cream sm:aspect-square">
                   <Image
-                    src={`/images/categories/${cat}.jpg`}
+                    src={seedImage(`category-${cat}`, 900, 1100)}
                     alt={CATEGORY_LABELS[cat]}
                     fill
                     sizes="(min-width: 1024px) 25vw, 50vw"
