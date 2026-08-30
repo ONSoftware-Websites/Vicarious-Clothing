@@ -3,6 +3,9 @@ import { BrandMark } from "@/components/brand-mark";
 import { Container } from "@/components/ui";
 import { BUSINESS_ADDRESS, EMAILS, TRADING_NAME } from "@/lib/site";
 
+const INSTAGRAM_URL = "https://www.instagram.com/vicarious_clothing/";
+const TIKTOK_URL = "https://www.tiktok.com/@vicarious.clothing";
+
 const FOOTER_COLUMNS = [
   {
     title: "Shop",
@@ -30,8 +33,8 @@ const FOOTER_COLUMNS = [
       { label: "About", href: "/about" },
       { label: "Sell To Us", href: "/sell-to-us" },
       { label: "Journal", href: "/journal" },
-      { label: "Instagram", href: "https://instagram.com", external: true },
-      { label: "TikTok", href: "https://tiktok.com", external: true },
+      { label: "Instagram", href: INSTAGRAM_URL, external: true },
+      { label: "TikTok", href: TIKTOK_URL, external: true },
     ],
   },
   {
@@ -63,7 +66,7 @@ export function Footer() {
             </p>
             <div className="mt-6 flex gap-6 font-mono text-[11px] uppercase tracking-[0.14em] text-paper/70">
               <a
-                href="https://instagram.com"
+                href={INSTAGRAM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-paper"
@@ -71,7 +74,7 @@ export function Footer() {
                 Instagram
               </a>
               <a
-                href="https://tiktok.com"
+                href={TIKTOK_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-paper"
