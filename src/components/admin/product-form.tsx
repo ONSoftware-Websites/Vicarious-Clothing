@@ -21,6 +21,8 @@ const input =
   "h-11 w-full border border-line bg-paper px-3 text-sm focus:border-ink focus:outline-none";
 const label =
   "mb-1.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft";
+const textarea =
+  "w-full border border-line bg-paper p-3 text-sm focus:border-ink focus:outline-none";
 
 interface FormProduct {
   sku: string;
@@ -115,6 +117,13 @@ function toForm(p?: Product): FormProduct {
   };
 }
 
+function parseListText(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function Section({
   title,
   children,
@@ -135,6 +144,8 @@ function Section({
 export function ProductForm({ product }: { product?: Product }) {
   const router = useRouter();
   const [form, setForm] = useState<FormProduct>(() => toForm(product));
+  const [defectsText, setDefectsText] = useState(() => toForm(product).defects.join("\n"));
+  const [tagsText, setTagsText] = useState(() => toForm(product).tags.join("\n"));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [pullFromSellerHq, setPullFromSellerHq] = useState(false);
@@ -171,6 +182,9 @@ export function ProductForm({ product }: { product?: Product }) {
   }, [form.price, form.cost]);
 
   const applySellerHqProduct = (mapped: SellerHqMappedProduct) => {
+    if (mapped.defects) setDefectsText(mapped.defects.join("\n"));
+    if (mapped.tags) setTagsText(mapped.tags.join("\n"));
+
     setForm((current) => ({
       ...current,
       prdCode: mapped.prdCode ?? current.prdCode,
@@ -238,8 +252,8 @@ export function ProductForm({ product }: { product?: Product }) {
           : undefined,
         status: publish ? "AVAILABLE" : "DRAFT",
         images: form.images.filter((i) => i.src.trim()),
-        defects: form.defects.filter((d) => d.trim()),
-        tags: form.tags.filter((t) => t.trim()),
+        defects: parseListText(defectsText),
+        tags: parseListText(tagsText),
         measurements: form.measurements.filter((m) => m.value.trim()),
         marketplace: form.marketplace as never,
       };
@@ -478,22 +492,18 @@ export function ProductForm({ product }: { product?: Product }) {
                 />
               </div>
               <div className="sm:col-span-3">
-                <label htmlFor="pf-defects" className={label}>Defects (comma separated)</label>
-                <input
+                <label htmlFor="pf-defects" className={label}>Defects</label>
+                <textarea
                   id="pf-defects"
-                  value={form.defects.join(", ")}
-                  onChange={(e) =>
-                    set(
-                      "defects",
-                      e.target.value
-                        .split(",")
-                        .map((d) => d.trim())
-                        .filter(Boolean)
-                    )
-                  }
-                  className={input}
-                  placeholder="Small mark on front, pilling under arms"
+                  rows={3}
+                  value={defectsText}
+                  onChange={(e) => setDefectsText(e.target.value)}
+                  className={textarea}
+                  placeholder={"Small mark on front\nPilling under arms"}
                 />
+                <p className="mt-1 text-xs text-ink-faint">
+                  Put each defect on a new line. Commas are allowed inside the text.
+                </p>
               </div>
             </div>
           </Section>
@@ -701,28 +711,24 @@ export function ProductForm({ product }: { product?: Product }) {
                   rows={4}
                   value={form.description}
                   onChange={(e) => set("description", e.target.value)}
-                  className="w-full border border-line bg-paper p-3 text-sm focus:border-ink focus:outline-none"
+                  className={textarea}
                 />
               </div>
               <div>
                 <label htmlFor="pf-tags" className={label}>
-                  Tags (comma separated)
+                  Tags
                 </label>
-                <input
+                <textarea
                   id="pf-tags"
-                  value={form.tags.join(", ")}
-                  onChange={(e) =>
-                    set(
-                      "tags",
-                      e.target.value
-                        .split(",")
-                        .map((t) => t.trim())
-                        .filter(Boolean)
-                    )
-                  }
-                  className={input}
-                  placeholder="workwear, canvas, brown"
+                  rows={3}
+                  value={tagsText}
+                  onChange={(e) => setTagsText(e.target.value)}
+                  className={textarea}
+                  placeholder={"workwear\ncanvas\nbrown"}
                 />
+                <p className="mt-1 text-xs text-ink-faint">
+                  Put each tag on a new line. Commas are allowed inside the text.
+                </p>
               </div>
             </div>
           </Section>
