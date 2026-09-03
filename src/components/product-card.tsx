@@ -1,10 +1,13 @@
-import Image from "next/image";
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import type { Product } from "@/lib/types";
 import { conditionLabel, formatPrice } from "@/lib/utils";
 import { Badge } from "@/components/ui";
 import { WishlistButton } from "@/components/wishlist-button";
 import { ProductImageWatermark } from "@/components/product-image-watermark";
+import { ResilientImage } from "@/components/resilient-image";
 
 export function ProductCard({
   product,
@@ -15,21 +18,28 @@ export function ProductCard({
   showSoldOverlay?: boolean;
   priority?: boolean;
 }) {
+  const [hoverIntent, setHoverIntent] = useState(false);
   const sold = product.status === "SOLD";
-  const primary = product.images[0]?.src ?? "";
-  const secondary = product.images[1]?.src ?? primary;
+  const primary = product.images[0];
+  const secondary = product.images[1];
 
   return (
-    <div className="group relative">
+    <div
+      className="group relative"
+      onPointerEnter={(event) => {
+        if (event.pointerType === "mouse") setHoverIntent(true);
+      }}
+    >
       <Link
         href={`/product/${product.slug}`}
         className="block"
         aria-label={`${product.brand} ${product.name}, ${formatPrice(product.price)}`}
       >
         <div className="relative aspect-[4/5] overflow-hidden bg-cream">
-          {secondary && secondary !== primary && (
-            <Image
-              src={secondary}
+          {hoverIntent && secondary?.src && secondary.src !== primary?.src && (
+            <ResilientImage
+              src={secondary.thumbSrc ?? secondary.displaySrc ?? secondary.src}
+              fallbackSrc={secondary.src}
               alt=""
               fill
               sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
@@ -37,15 +47,22 @@ export function ProductCard({
               loading="lazy"
             />
           )}
-          <Image
-            src={primary}
-            alt={product.images[0]?.alt ?? `${product.brand} ${product.name}`}
-            fill
-            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-            className="object-cover transition-opacity duration-300 group-hover:opacity-0"
-            loading={priority ? "eager" : "lazy"}
-            priority={priority}
-          />
+          {primary?.src ? (
+            <ResilientImage
+              src={primary.thumbSrc ?? primary.displaySrc ?? primary.src}
+              fallbackSrc={primary.src}
+              alt={primary.alt ?? `${product.brand} ${product.name}`}
+              fill
+              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+              className="object-cover transition-opacity duration-300 group-hover:opacity-0"
+              loading={priority ? "eager" : "lazy"}
+              priority={priority}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-cream px-4 text-center font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+              Image unavailable
+            </div>
+          )}
           <ProductImageWatermark size="sm" />
           {sold && (
             <div className="absolute inset-0 flex items-center justify-center bg-ink/55">
