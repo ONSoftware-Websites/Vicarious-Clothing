@@ -18,14 +18,17 @@ interface SignedUploadResponse {
   token: string;
   publicUrl: string;
   contentType: string;
-  needsPngConversion?: boolean;
+  needsOptimization?: boolean;
 }
 
-interface ConvertResponse {
+interface OptimizeResponse {
   url: string;
   path: string;
   contentType: string;
-  converted: boolean;
+  optimized: boolean;
+  width?: number;
+  height?: number;
+  size?: number;
 }
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -43,8 +46,6 @@ const APPLE_PHOTO_EXTENSIONS = new Set([
   "tiff",
   "dng",
 ]);
-
-const APPLE_SOURCE_EXTENSIONS = new Set(["heic", "heif", "tif", "tiff", "dng"]);
 
 function extensionOf(name: string) {
   const clean = name.split(/[?#]/)[0] ?? name;
@@ -97,15 +98,15 @@ async function getSignedUpload(file: File, bucket: "product-images" | "journal-i
   return data as SignedUploadResponse;
 }
 
-async function convertUploadedSourceToPng(signed: SignedUploadResponse) {
+async function optimizeUploadedSource(signed: SignedUploadResponse) {
   const res = await fetch("/api/admin/upload/convert", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ bucket: signed.bucket, path: signed.path }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Could not convert Apple image to PNG");
-  return data as ConvertResponse;
+  if (!res.ok) throw new Error(data.error || "Could not optimize image");
+  return data as OptimizeResponse;
 }
 
 async function uploadDirectToSupabase(file: File, bucket: "product-images" | "journal-images") {
@@ -123,12 +124,10 @@ async function uploadDirectToSupabase(file: File, bucket: "product-images" | "jo
 
   if (error) throw new Error(error.message);
 
-  if (signed.needsPngConversion || APPLE_SOURCE_EXTENSIONS.has(extensionOf(file.name))) {
-    const converted = await convertUploadedSourceToPng(signed);
-    return converted.url;
-  }
-
-  return signed.publicUrl;
+  // Every uploaded original is temporary. The server resizes, normalizes and
+  // compresses it to WebP once, then removes the original from storage.
+  const optimized = await optimizeUploadedSource(signed);
+  return optimized.url;
 }
 
 export function ImageDropzone({ images, onChange, bucket = "product-images", max = 10, single = false }: ImageDropzoneProps) {
@@ -140,7 +139,7 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files).filter(isAcceptedPhotoFile);
     if (list.length === 0) {
-      setError("Please select image files only. JPEG, PNG, WebP, HEIC, HEIF, TIFF and Apple ProRAW DNG are accepted.");
+      setError("Please select image files only. JPEG, PNG, WebP, AVIF, GIF, HEIC, HEIF, TIFF and Apple ProRAW DNG are accepted.");
       return;
     }
 
@@ -205,12 +204,12 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
         }
       >
         <p className="font-display text-xs font-semibold uppercase tracking-[0.16em]">
-          {uploading > 0 ? `Uploading ${uploading}…` : single ? "Drop cover image or click to browse" : "Drop images or click to browse"}
+          {uploading > 0 ? `Optimizing ${uploading}…` : single ? "Drop cover image or click to browse" : "Drop images or click to browse"}
         </p>
         <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
           {single
-            ? "JPEG, PNG, WebP, HEIC, HEIF, TIFF, DNG — Apple formats become PNG"
-            : `Up to ${max} images — Apple formats become PNG — 50MB each`}
+            ? "JPEG, PNG, WebP, AVIF, GIF, HEIC, HEIF, TIFF, DNG — stored as optimized WebP"
+            : `Up to ${max} images — optimized to WebP — 50MB each`}
         </p>
         <input
           ref={inputRef}
