@@ -49,6 +49,38 @@ The repair migration installs the atomic one-of-one inventory claim used by chec
 
 Only run `supabase/seed.sql` in an environment where you intentionally want demo stock.
 
+### One-time migration for existing storefront images
+
+After deploying the self-managed image optimization change, run the existing-image migration once from a trusted local checkout that has the production `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, `.env`, or the process environment.
+
+First inspect what would be changed:
+
+```bash
+npm run migrate:images
+```
+
+The dry run reads `product_images`, journal cover images and historical `order_items.image` snapshots. It only selects public image URLs belonging to this Supabase project's `product-images` or `journal-images` buckets. External/seed URLs are ignored.
+
+Then apply the migration:
+
+```bash
+npm run migrate:images:apply
+```
+
+For each candidate, the migration:
+
+1. downloads the existing Supabase object;
+2. normalizes orientation and colour space;
+3. bounds it to 2200×2800 without enlargement;
+4. converts it to WebP quality 82;
+5. uploads the result under a deterministic `migrated/` path with a one-year cache lifetime;
+6. updates every matching catalogue, journal and historical order-image database reference;
+7. deletes the old object only after all known references have moved successfully.
+
+The migration is idempotent: migrated `migrated/` URLs are skipped, and partially completed work can be rerun safely. To test only a small number of candidates, run `node scripts/migrate-existing-images.mjs --apply --limit=5 --keep-originals`. `--keep-originals` leaves source objects in Storage even after database references are updated.
+
+Do not add this migration to `prebuild` or any Vercel deployment hook. It is intentionally a manual, one-time production maintenance task.
+
 ### Auth URL configuration
 
 In Supabase → Authentication → URL Configuration:
@@ -127,4 +159,5 @@ Before taking real orders:
 - Website customers must use `/api/checkout`; the legacy `/api/orders` creation route is staff-only.
 - Customer order pages require either the matching authenticated account, a signed email link or the signed HttpOnly cookie issued at checkout.
 - One-of-one stock is claimed atomically when a pending order is created, not simply because someone opened checkout.
+- One-time image migration is manual and must not be placed in a deployment hook.
 - Every push to `master` triggers a Vercel production deployment. Use a separate preview branch plus Stripe test credentials for staging.
