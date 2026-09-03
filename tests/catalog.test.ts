@@ -7,7 +7,9 @@ import {
   getFacets,
   getRecentlySold,
   getSimilar,
+  splitColourValues,
 } from "@/lib/catalog";
+import type { Product } from "@/lib/types";
 import {
   getProductBySku,
   listProducts,
@@ -34,6 +36,20 @@ describe("filterProducts", async () => {
   it("filters by price range", async () => {
     const result = filterProducts(await ALL(), { minPrice: 10, maxPrice: 20 });
     expect(result.every((p) => p.price >= 10 && p.price <= 20)).toBe(true);
+  });
+
+  it("filters multi-colour products by any individual colour", async () => {
+    const base = (await ALL())[0] as Product;
+    const multiColourProduct: Product = {
+      ...base,
+      sku: "VC-MULTI",
+      colour: "Black, White, Green",
+    };
+
+    expect(filterProducts([multiColourProduct], { colours: ["Black"] })).toHaveLength(1);
+    expect(filterProducts([multiColourProduct], { colours: ["White"] })).toHaveLength(1);
+    expect(filterProducts([multiColourProduct], { colours: ["Green"] })).toHaveLength(1);
+    expect(filterProducts([multiColourProduct], { colours: ["Blue"] })).toHaveLength(0);
   });
 
   it("searches across title, brand, sku and tags", async () => {
@@ -81,6 +97,26 @@ describe("facets", async () => {
     expect(facets.sizes.length).toBeGreaterThan(0);
     expect(facets.conditions).toContain("very_good");
     expect(facets.minPrice).toBeLessThanOrEqual(facets.maxPrice);
+  });
+
+  it("splits comma-separated colours into individual deduped filters", async () => {
+    const base = (await ALL())[0] as Product;
+    const facets = getFacets([
+      base,
+      { ...base, sku: "VC-MULTI", colour: "Black, White, Green" },
+      { ...base, sku: "VC-BLACK", colour: "black" },
+    ]);
+
+    expect(splitColourValues("black, Black / WHITE and green")).toEqual([
+      "Black",
+      "Green",
+      "White",
+    ]);
+    expect(facets.colours).toContain("Black");
+    expect(facets.colours).toContain("White");
+    expect(facets.colours).toContain("Green");
+    expect(facets.colours).not.toContain("Black, White, Green");
+    expect(facets.colours.filter((colour) => colour === "Black")).toHaveLength(1);
   });
 });
 
