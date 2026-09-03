@@ -17,6 +17,7 @@ const NAV = [
   { href: "/admin/emails", label: "Emails" },
   { href: "/admin/newsletter", label: "Newsletter" },
   { href: "/admin/journal", label: "Journal" },
+  { href: "/admin/maintenance", label: "Maintenance" },
 ];
 
 export default async function ProtectedAdminLayout({ children }: { children: ReactNode }) {
