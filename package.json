@@ -7,6 +7,8 @@
   },
   "scripts": {
     "optimize:images": "node scripts/optimize-static-images.mjs",
+    "migrate:images": "node scripts/migrate-existing-images.mjs",
+    "migrate:images:apply": "node scripts/migrate-existing-images.mjs --apply",
     "predev": "npm run optimize:images",
     "dev": "next dev",
     "prebuild": "npm run optimize:images",
