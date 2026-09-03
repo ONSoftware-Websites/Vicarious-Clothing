@@ -8,9 +8,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_SOURCE_BYTES = 50 * 1024 * 1024;
-const MAX_OUTPUT_WIDTH = 2200;
-const MAX_OUTPUT_HEIGHT = 2800;
-const WEBP_QUALITY = 82;
+const MAX_OUTPUT_WIDTH = 1800;
+const MAX_OUTPUT_HEIGHT = 2400;
+const WEBP_QUALITY = 76;
 const HEIC_EXTENSIONS = new Set(["heic", "heif"]);
 
 function extensionOf(path: string) {
@@ -30,8 +30,6 @@ function optimizationMessage(error: unknown) {
 }
 
 async function decodeHeic(sourceBuffer: Buffer) {
-  // Sharp/libvips on Vercel is often built without HEIC/HEIF decompression
-  // support. Decode HEIC explicitly first, then let Sharp normalize it.
   return Buffer.from(
     await heicConvert({
       buffer: sourceBuffer,
@@ -41,32 +39,27 @@ async function decodeHeic(sourceBuffer: Buffer) {
   );
 }
 
-async function optimizeToWebp(sourcePath: string, sourceBuffer: Buffer) {
-  const ext = extensionOf(sourcePath);
-  const input = HEIC_EXTENSIONS.has(ext) ? await decodeHeic(sourceBuffer) : sourceBuffer;
+async function normalizedInput(sourcePath: string, sourceBuffer: Buffer) {
+  return HEIC_EXTENSIONS.has(extensionOf(sourcePath)) ? await decodeHeic(sourceBuffer) : sourceBuffer;
+}
 
+async function optimizeFull(input: Buffer) {
   const { data, info } = await sharp(input, { limitInputPixels: 80_000_000 })
     .rotate()
-    .resize({
-      width: MAX_OUTPUT_WIDTH,
-      height: MAX_OUTPUT_HEIGHT,
-      fit: "inside",
-      withoutEnlargement: true,
-    })
+    .resize({ width: MAX_OUTPUT_WIDTH, height: MAX_OUTPUT_HEIGHT, fit: "inside", withoutEnlargement: true })
     .toColourspace("srgb")
-    .webp({
-      quality: WEBP_QUALITY,
-      effort: 5,
-      smartSubsample: true,
-    })
+    .webp({ quality: WEBP_QUALITY, effort: 5, smartSubsample: true })
     .toBuffer({ resolveWithObject: true });
+  return { buffer: data, width: info.width, height: info.height, size: data.byteLength };
+}
 
-  return {
-    buffer: data,
-    width: info.width,
-    height: info.height,
-    size: data.byteLength,
-  };
+async function variant(input: Buffer, width: number, quality: number) {
+  return sharp(input, { limitInputPixels: 80_000_000 })
+    .rotate()
+    .resize({ width, fit: "inside", withoutEnlargement: true })
+    .toColourspace("srgb")
+    .webp({ quality, effort: 4, smartSubsample: true })
+    .toBuffer();
 }
 
 export async function POST(request: NextRequest) {
@@ -104,39 +97,56 @@ export async function POST(request: NextRequest) {
     const sourceBuffer = Buffer.from(await downloaded.data.arrayBuffer());
     const finalPath = optimizedPathFor(sourcePath);
 
-    let optimized: Awaited<ReturnType<typeof optimizeToWebp>>;
     try {
-      optimized = await optimizeToWebp(sourcePath, sourceBuffer);
+      const input = await normalizedInput(sourcePath, sourceBuffer);
+      const optimized = await optimizeFull(input);
+      const filename = finalPath.split("/").pop() || "image.webp";
+
+      const uploaded = await supabase.storage.from(bucket).upload(finalPath, optimized.buffer, {
+        contentType: "image/webp",
+        cacheControl: "31536000",
+        upsert: false,
+      });
+      if (uploaded.error) throw new Error(uploaded.error.message);
+
+      if (bucket === "product-images") {
+        const [thumb, display] = await Promise.all([
+          variant(input, 480, 68),
+          variant(input, 1200, 76),
+        ]);
+        const [thumbUpload, displayUpload] = await Promise.all([
+          supabase.storage.from(bucket).upload(`variants/thumb/${filename}`, thumb, {
+            contentType: "image/webp",
+            cacheControl: "31536000",
+            upsert: true,
+          }),
+          supabase.storage.from(bucket).upload(`variants/display/${filename}`, display, {
+            contentType: "image/webp",
+            cacheControl: "31536000",
+            upsert: true,
+          }),
+        ]);
+        if (thumbUpload.error) throw new Error(`Thumbnail variant failed: ${thumbUpload.error.message}`);
+        if (displayUpload.error) throw new Error(`Display variant failed: ${displayUpload.error.message}`);
+      }
+
+      await supabase.storage.from(bucket).remove([sourcePath]).catch(() => {});
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(finalPath);
+      return NextResponse.json({
+        ok: true,
+        bucket,
+        path: finalPath,
+        url: urlData.publicUrl,
+        contentType: "image/webp",
+        optimized: true,
+        width: optimized.width,
+        height: optimized.height,
+        size: optimized.size,
+      });
     } catch (error) {
       await supabase.storage.from(bucket).remove([sourcePath]).catch(() => {});
       return NextResponse.json({ error: optimizationMessage(error) }, { status: 415 });
     }
-
-    const uploaded = await supabase.storage.from(bucket).upload(finalPath, optimized.buffer, {
-      contentType: "image/webp",
-      cacheControl: "31536000",
-      upsert: false,
-    });
-
-    if (uploaded.error) {
-      await supabase.storage.from(bucket).remove([sourcePath]).catch(() => {});
-      return NextResponse.json({ error: uploaded.error.message }, { status: 500 });
-    }
-
-    await supabase.storage.from(bucket).remove([sourcePath]).catch(() => {});
-
-    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(finalPath);
-    return NextResponse.json({
-      ok: true,
-      bucket,
-      path: finalPath,
-      url: urlData.publicUrl,
-      contentType: "image/webp",
-      optimized: true,
-      width: optimized.width,
-      height: optimized.height,
-      size: optimized.size,
-    });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
   }
