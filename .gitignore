@@ -20,6 +20,9 @@
 # production
 /build
 
+# generated static image variants
+/public/optimized-images/
+
 # misc
 .DS_Store
 *.pem
