@@ -87,6 +87,8 @@ export interface Measurement {
 
 export interface ProductImage {
   src: string;
+  thumbSrc?: string;
+  displaySrc?: string;
   alt?: string;
 }
 
