@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 process.env.DATA_STORE = "memory";
 
 import {
+  compareSizes,
   filterProducts,
   getFacets,
   getRecentlySold,
@@ -52,6 +53,18 @@ describe("filterProducts", async () => {
     expect(filterProducts([multiColourProduct], { colours: ["Blue"] })).toHaveLength(0);
   });
 
+  it("filters equivalent size labels without creating mismatches", async () => {
+    const base = (await ALL())[0] as Product;
+    const smallProduct: Product = {
+      ...base,
+      sku: "VC-SMALL",
+      size: "Small",
+    };
+
+    expect(filterProducts([smallProduct], { sizes: ["S"] })).toHaveLength(1);
+    expect(filterProducts([smallProduct], { sizes: ["M"] })).toHaveLength(0);
+  });
+
   it("searches across title, brand, sku and tags", async () => {
     const result = filterProducts(await ALL(), { q: "carhartt" });
     expect(result.length).toBeGreaterThan(0);
@@ -97,6 +110,49 @@ describe("facets", async () => {
     expect(facets.sizes.length).toBeGreaterThan(0);
     expect(facets.conditions).toContain("very_good");
     expect(facets.minPrice).toBeLessThanOrEqual(facets.maxPrice);
+  });
+
+  it("sorts size filters numerically first, then standard clothing sizes", async () => {
+    const base = (await ALL())[0] as Product;
+    const sizes = ["M", "10", "8", "XL", "S", "L", "XS", "12", "One Size", "XXL"];
+    const facets = getFacets(
+      sizes.map((size, index) => ({ ...base, sku: `VC-SIZE-${index}`, size }))
+    );
+
+    expect(facets.sizes).toEqual([
+      "8",
+      "10",
+      "12",
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL",
+      "One Size",
+    ]);
+  });
+
+  it("dedupes equivalent size filters", async () => {
+    const base = (await ALL())[0] as Product;
+    const facets = getFacets([
+      { ...base, sku: "VC-S", size: "S" },
+      { ...base, sku: "VC-SMALL", size: "Small" },
+      { ...base, sku: "VC-EXTRA-LARGE", size: "Extra Large" },
+      { ...base, sku: "VC-XL", size: "XL" },
+    ]);
+
+    expect(facets.sizes).toEqual(["S", "Extra Large"]);
+  });
+
+  it("orders composite letter sizes where they belong", () => {
+    expect(["L", "S/M", "S", "M", "XL"].sort(compareSizes)).toEqual([
+      "S",
+      "S/M",
+      "M",
+      "L",
+      "XL",
+    ]);
   });
 
   it("splits comma-separated colours into individual deduped filters", async () => {
