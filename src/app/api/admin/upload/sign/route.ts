@@ -36,8 +36,6 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/octet-stream",
 ]);
 
-const CONVERT_TO_PNG_EXTENSIONS = new Set(["heic", "heif", "tif", "tiff", "dng"]);
-
 function extensionOf(name: string) {
   return name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
 }
@@ -50,18 +48,6 @@ function contentTypeFor(name: string, declaredType: string) {
   if (type && ALLOWED_MIME_TYPES.has(type) && type !== "application/octet-stream") return type;
   if (type.startsWith("image/")) return type;
   return "";
-}
-
-function shouldConvertToPng(name: string, declaredType: string) {
-  const ext = extensionOf(name);
-  const type = declaredType.toLowerCase();
-  return (
-    CONVERT_TO_PNG_EXTENSIONS.has(ext) ||
-    type.includes("heic") ||
-    type.includes("heif") ||
-    type.includes("tiff") ||
-    type.includes("dng")
-  );
 }
 
 function safeStorageName(name: string, fallbackExt: string) {
@@ -93,7 +79,7 @@ export async function POST(request: NextRequest) {
     const contentType = contentTypeFor(name, declaredType);
     if (!contentType) {
       return NextResponse.json(
-        { error: "Not an accepted image type. JPEG, PNG, WebP, HEIC, HEIF, TIFF and Apple ProRAW DNG are accepted." },
+        { error: "Not an accepted image type. JPEG, PNG, WebP, AVIF, GIF, HEIC, HEIF, TIFF and Apple ProRAW DNG are accepted." },
         { status: 400 }
       );
     }
@@ -103,10 +89,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Supabase Storage is not configured." }, { status: 503 });
     }
 
-    const needsPngConversion = shouldConvertToPng(name, declaredType);
     const ext = extensionOf(name) || Object.entries(MIME_BY_EXTENSION).find(([, mime]) => mime === contentType)?.[0] || "jpg";
     const storageName = safeStorageName(name, ext);
-    const path = `${needsPngConversion ? "incoming/" : ""}${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${storageName}`;
+
+    // Every original is temporary. After the direct upload completes the
+    // server converts it to a bounded, compressed WebP and removes this file.
+    const path = `incoming/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${storageName}`;
 
     let signed = await supabase.storage.from(bucket).createSignedUploadUrl(path);
     if (signed.error && signed.error.message.includes("Bucket not found")) {
@@ -133,7 +121,7 @@ export async function POST(request: NextRequest) {
       signedUrl: signed.data.signedUrl,
       publicUrl: urlData.publicUrl,
       contentType,
-      needsPngConversion,
+      needsOptimization: true,
     });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
