@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ProductImage } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { productImageVariant } from "@/lib/product-image";
 import { ProductImageWatermark } from "@/components/product-image-watermark";
 import { ResilientImage } from "@/components/resilient-image";
 
@@ -52,7 +53,7 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
           aria-label="Open fullscreen image viewer"
         >
           <ResilientImage
-            src={current?.displaySrc ?? current?.src ?? ""}
+            src={current?.displaySrc ?? productImageVariant(current?.src, "display")}
             fallbackSrc={current?.src}
             alt={current?.alt ?? "Product image"}
             width={900}
@@ -86,7 +87,7 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
                 aria-current={active === i}
               >
                 <ResilientImage
-                  src={img.thumbSrc ?? img.displaySrc ?? img.src}
+                  src={img.thumbSrc ?? productImageVariant(img.src, "thumb")}
                   fallbackSrc={img.src}
                   alt={img.alt ?? `Product image ${i + 1}`}
                   fill
@@ -165,7 +166,7 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
                 aria-label={`Go to image ${i + 1}`}
               >
                 <ResilientImage
-                  src={img.thumbSrc ?? img.displaySrc ?? img.src}
+                  src={img.thumbSrc ?? productImageVariant(img.src, "thumb")}
                   fallbackSrc={img.src}
                   alt=""
                   fill
