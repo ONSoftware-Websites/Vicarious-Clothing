@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import type { ProductImage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ProductImageWatermark } from "@/components/product-image-watermark";
+import { ResilientImage } from "@/components/resilient-image";
 
 export function ProductGallery({ images }: { images: ProductImage[] }) {
   const [active, setActive] = useState(0);
@@ -51,8 +51,9 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
           onClick={() => setFullscreen(true)}
           aria-label="Open fullscreen image viewer"
         >
-          <Image
-            src={current?.src ?? ""}
+          <ResilientImage
+            src={current?.displaySrc ?? current?.src ?? ""}
+            fallbackSrc={current?.src}
             alt={current?.alt ?? "Product image"}
             width={900}
             height={1125}
@@ -84,13 +85,14 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
                 aria-label={`View image ${i + 1}`}
                 aria-current={active === i}
               >
-                <Image
-                  src={img.src}
+                <ResilientImage
+                  src={img.thumbSrc ?? img.displaySrc ?? img.src}
+                  fallbackSrc={img.src}
                   alt={img.alt ?? `Product image ${i + 1}`}
-                  width={400}
-                  height={500}
-                  className="h-full w-full object-cover"
+                  fill
+                  className="object-cover"
                   sizes="120px"
+                  loading="lazy"
                 />
                 <ProductImageWatermark size="sm" className="scale-75 sm:scale-75" />
               </button>
@@ -119,11 +121,8 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
               Close
             </button>
           </div>
-          <div
-            className="relative flex-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Image
+          <div className="relative flex-1" onClick={(e) => e.stopPropagation()}>
+            <ResilientImage
               src={current?.src ?? ""}
               alt={current?.alt ?? "Product image"}
               fill
@@ -165,12 +164,14 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
                 )}
                 aria-label={`Go to image ${i + 1}`}
               >
-                <Image
-                  src={img.src}
+                <ResilientImage
+                  src={img.thumbSrc ?? img.displaySrc ?? img.src}
+                  fallbackSrc={img.src}
                   alt=""
                   fill
                   className="object-cover"
                   sizes="80px"
+                  loading="lazy"
                 />
                 <ProductImageWatermark size="sm" className="scale-[0.65] sm:scale-[0.65]" />
               </button>
