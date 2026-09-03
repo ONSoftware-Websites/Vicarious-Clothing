@@ -6,7 +6,10 @@
     "node": ">=20.9.0"
   },
   "scripts": {
+    "optimize:images": "node scripts/optimize-static-images.mjs",
+    "predev": "npm run optimize:images",
     "dev": "next dev",
+    "prebuild": "npm run optimize:images",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

@@ -8,6 +8,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_SOURCE_BYTES = 50 * 1024 * 1024;
+const MAX_OUTPUT_WIDTH = 2200;
+const MAX_OUTPUT_HEIGHT = 2800;
+const WEBP_QUALITY = 82;
 const HEIC_EXTENSIONS = new Set(["heic", "heif"]);
 
 function extensionOf(path: string) {
@@ -15,48 +18,55 @@ function extensionOf(path: string) {
   return clean.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
 }
 
-function pngPathFor(sourcePath: string) {
+function optimizedPathFor(sourcePath: string) {
   const withoutIncoming = sourcePath.replace(/^incoming\//, "");
   const withoutExt = withoutIncoming.replace(/\.[a-z0-9]+$/i, "");
-  return `${withoutExt}.png`;
+  return `${withoutExt}.webp`;
 }
 
-function conversionMessage(error: unknown) {
+function optimizationMessage(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return `Could not convert this Apple image to PNG. Original error: ${message}`;
+  return `Could not optimize this image. Original error: ${message}`;
 }
 
-async function convertHeicToPng(sourceBuffer: Buffer) {
-  // Sharp/libvips on Vercel is often built without HEIC/HEIF compression
-  // support. Use a HEIC-specific decoder first, then normalize the result with
-  // Sharp so the final file is a storefront-safe PNG.
-  const decoded = Buffer.from(
+async function decodeHeic(sourceBuffer: Buffer) {
+  // Sharp/libvips on Vercel is often built without HEIC/HEIF decompression
+  // support. Decode HEIC explicitly first, then let Sharp normalize it.
+  return Buffer.from(
     await heicConvert({
       buffer: sourceBuffer,
       format: "PNG",
       quality: 1,
     })
   );
-
-  return sharp(decoded, { limitInputPixels: 80_000_000 })
-    .rotate()
-    .png({ compressionLevel: 9, adaptiveFiltering: true })
-    .toBuffer();
 }
 
-async function convertWithSharpToPng(sourceBuffer: Buffer) {
-  return sharp(sourceBuffer, { limitInputPixels: 80_000_000 })
-    .rotate()
-    .png({ compressionLevel: 9, adaptiveFiltering: true })
-    .toBuffer();
-}
-
-async function convertToPng(sourcePath: string, sourceBuffer: Buffer) {
+async function optimizeToWebp(sourcePath: string, sourceBuffer: Buffer) {
   const ext = extensionOf(sourcePath);
-  if (HEIC_EXTENSIONS.has(ext)) {
-    return convertHeicToPng(sourceBuffer);
-  }
-  return convertWithSharpToPng(sourceBuffer);
+  const input = HEIC_EXTENSIONS.has(ext) ? await decodeHeic(sourceBuffer) : sourceBuffer;
+
+  const { data, info } = await sharp(input, { limitInputPixels: 80_000_000 })
+    .rotate()
+    .resize({
+      width: MAX_OUTPUT_WIDTH,
+      height: MAX_OUTPUT_HEIGHT,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .toColourspace("srgb")
+    .webp({
+      quality: WEBP_QUALITY,
+      effort: 5,
+      smartSubsample: true,
+    })
+    .toBuffer({ resolveWithObject: true });
+
+  return {
+    buffer: data,
+    width: info.width,
+    height: info.height,
+    size: data.byteLength,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -81,29 +91,30 @@ export async function POST(request: NextRequest) {
     const downloaded = await supabase.storage.from(bucket).download(sourcePath);
     if (downloaded.error || !downloaded.data) {
       return NextResponse.json(
-        { error: downloaded.error?.message ?? "Could not download temporary image for conversion." },
+        { error: downloaded.error?.message ?? "Could not download temporary image for optimization." },
         { status: 500 }
       );
     }
 
     if (downloaded.data.size > MAX_SOURCE_BYTES) {
       await supabase.storage.from(bucket).remove([sourcePath]).catch(() => {});
-      return NextResponse.json({ error: "File too large to convert (max 50MB)." }, { status: 400 });
+      return NextResponse.json({ error: "File too large to optimize (max 50MB)." }, { status: 400 });
     }
 
     const sourceBuffer = Buffer.from(await downloaded.data.arrayBuffer());
-    const finalPath = pngPathFor(sourcePath);
+    const finalPath = optimizedPathFor(sourcePath);
 
-    let pngBuffer: Buffer;
+    let optimized: Awaited<ReturnType<typeof optimizeToWebp>>;
     try {
-      pngBuffer = await convertToPng(sourcePath, sourceBuffer);
+      optimized = await optimizeToWebp(sourcePath, sourceBuffer);
     } catch (error) {
       await supabase.storage.from(bucket).remove([sourcePath]).catch(() => {});
-      return NextResponse.json({ error: conversionMessage(error) }, { status: 415 });
+      return NextResponse.json({ error: optimizationMessage(error) }, { status: 415 });
     }
 
-    const uploaded = await supabase.storage.from(bucket).upload(finalPath, pngBuffer, {
-      contentType: "image/png",
+    const uploaded = await supabase.storage.from(bucket).upload(finalPath, optimized.buffer, {
+      contentType: "image/webp",
+      cacheControl: "31536000",
       upsert: false,
     });
 
@@ -120,8 +131,11 @@ export async function POST(request: NextRequest) {
       bucket,
       path: finalPath,
       url: urlData.publicUrl,
-      contentType: "image/png",
-      converted: true,
+      contentType: "image/webp",
+      optimized: true,
+      width: optimized.width,
+      height: optimized.height,
+      size: optimized.size,
     });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
