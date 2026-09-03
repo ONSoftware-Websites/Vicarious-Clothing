@@ -3,7 +3,7 @@
 import Image, { type ImageProps } from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
-const RETRY_DELAYS = [600, 1800];
+const RETRY_DELAYS = [700, 1800];
 
 type Props = Omit<ImageProps, "src" | "onError"> & {
   src: string;
@@ -43,15 +43,19 @@ export function ResilientImage({ src, fallbackSrc, fallbackLabel = "Image unavai
       {...props}
       src={activeSrc}
       onError={() => {
-        if (retry < RETRY_DELAYS.length) {
-          const nextRetry = retry + 1;
-          window.setTimeout(() => setRetry(nextRetry), RETRY_DELAYS[retry]);
-          return;
-        }
-
+        // Preferred variants may not exist yet during a rollout. Fall back to
+        // the known-good full image immediately instead of retrying a 404.
         if (sourceIndex + 1 < sources.length) {
           setSourceIndex((index) => index + 1);
           setRetry(0);
+          return;
+        }
+
+        // Once on the known-good source, retry a couple of times with backoff.
+        // This is specifically for transient Storage 429/edge failures.
+        if (retry < RETRY_DELAYS.length) {
+          const nextRetry = retry + 1;
+          window.setTimeout(() => setRetry(nextRetry), RETRY_DELAYS[retry]);
           return;
         }
 
