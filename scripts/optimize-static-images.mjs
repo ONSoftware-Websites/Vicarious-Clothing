@@ -1,8 +1,9 @@
-import { readdir, rename, stat, unlink } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
 const IMAGE_ROOT = path.join(process.cwd(), "public", "images");
+const OUTPUT_ROOT = path.join(process.cwd(), "public", "optimized-images");
 const MAX_WIDTH = 2400;
 const MAX_HEIGHT = 3000;
 const JPEG_QUALITY = 82;
@@ -28,8 +29,12 @@ async function optimizeImage(filePath) {
   const extension = path.extname(filePath).toLowerCase();
   if (![".jpg", ".jpeg", ".png", ".webp"].includes(extension)) return null;
 
+  const relativePath = path.relative(IMAGE_ROOT, filePath);
+  const outputPath = path.join(OUTPUT_ROOT, relativePath);
+  await mkdir(path.dirname(outputPath), { recursive: true });
+
   const before = (await stat(filePath)).size;
-  const tempPath = `${filePath}.optimized`;
+  const tempPath = `${outputPath}.tmp`;
 
   let pipeline = sharp(filePath, { limitInputPixels: 80_000_000 })
     .rotate()
@@ -49,16 +54,17 @@ async function optimizeImage(filePath) {
   }
 
   await pipeline.toFile(tempPath);
-  const after = (await stat(tempPath)).size;
+  const optimizedSize = (await stat(tempPath)).size;
 
-  // Never replace a source file with a larger result.
-  if (after >= before) {
-    await unlink(tempPath);
-    return { filePath, before, after: before, changed: false };
+  if (optimizedSize < before) {
+    await copyFile(tempPath, outputPath);
+  } else {
+    await copyFile(filePath, outputPath);
   }
+  await rm(tempPath, { force: true });
 
-  await rename(tempPath, filePath);
-  return { filePath, before, after, changed: true };
+  const after = (await stat(outputPath)).size;
+  return { filePath, before, after, changed: after < before };
 }
 
 async function main() {
@@ -72,6 +78,9 @@ async function main() {
     }
     throw error;
   }
+
+  await rm(OUTPUT_ROOT, { recursive: true, force: true });
+  await mkdir(OUTPUT_ROOT, { recursive: true });
 
   let beforeTotal = 0;
   let afterTotal = 0;
