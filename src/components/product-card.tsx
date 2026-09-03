@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Product } from "@/lib/types";
 import { conditionLabel, formatPrice } from "@/lib/utils";
+import { productImageVariant } from "@/lib/product-image";
 import { Badge } from "@/components/ui";
 import { WishlistButton } from "@/components/wishlist-button";
 import { ProductImageWatermark } from "@/components/product-image-watermark";
@@ -38,7 +39,7 @@ export function ProductCard({
         <div className="relative aspect-[4/5] overflow-hidden bg-cream">
           {hoverIntent && secondary?.src && secondary.src !== primary?.src && (
             <ResilientImage
-              src={secondary.thumbSrc ?? secondary.displaySrc ?? secondary.src}
+              src={secondary.thumbSrc ?? productImageVariant(secondary.src, "thumb")}
               fallbackSrc={secondary.src}
               alt=""
               fill
@@ -49,7 +50,7 @@ export function ProductCard({
           )}
           {primary?.src ? (
             <ResilientImage
-              src={primary.thumbSrc ?? primary.displaySrc ?? primary.src}
+              src={primary.thumbSrc ?? productImageVariant(primary.src, "thumb")}
               fallbackSrc={primary.src}
               alt={primary.alt ?? `${product.brand} ${product.name}`}
               fill
