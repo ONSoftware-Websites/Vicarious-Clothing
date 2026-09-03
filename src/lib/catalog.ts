@@ -16,15 +16,44 @@ export interface CatalogFilters {
 
 export type SortKey = "newest" | "price-asc" | "price-desc";
 
+function normaliseFacetKey(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function titleCaseColour(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/(^|[\s-])\p{L}/gu, (match) => match.toUpperCase());
+}
+
+function uniqueSorted(values: string[]) {
+  const seen = new Map<string, string>();
+
+  for (const value of values) {
+    const clean = value.trim().replace(/\s+/g, " ");
+    if (!clean) continue;
+    const key = normaliseFacetKey(clean);
+    if (!seen.has(key)) seen.set(key, clean);
+  }
+
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+
+export function splitColourValues(colour: string) {
+  return uniqueSorted(
+    colour
+      .split(/\s*(?:,|\/|\+|\||&|;|\band\b)\s*/i)
+      .map(titleCaseColour)
+  );
+}
+
 export function getFacets(products: Product[]) {
-  const brands = [...new Set(products.map((p) => p.brand))].sort((a, b) =>
-    a.localeCompare(b)
-  );
-  const sizes = [...new Set(products.map((p) => p.size))].sort();
-  const conditions = [...new Set(products.map((p) => p.condition))];
-  const colours = [...new Set(products.map((p) => p.colour))].sort((a, b) =>
-    a.localeCompare(b)
-  );
+  const brands = uniqueSorted(products.map((p) => p.brand));
+  const sizes = uniqueSorted(products.map((p) => p.size));
+  const conditions = uniqueSorted(products.map((p) => p.condition));
+  const colours = uniqueSorted(products.flatMap((p) => splitColourValues(p.colour)));
   const prices = products.map((p) => p.price);
   const minPrice = prices.length ? Math.floor(Math.min(...prices)) : 0;
   const maxPrice = prices.length ? Math.ceil(Math.max(...prices)) : 0;
@@ -51,16 +80,21 @@ export function filterProducts(
   }
 
   if (filters.brands?.length) {
-    result = result.filter((p) => filters.brands!.includes(p.brand));
+    const selected = new Set(filters.brands.map(normaliseFacetKey));
+    result = result.filter((p) => selected.has(normaliseFacetKey(p.brand)));
   }
   if (filters.sizes?.length) {
-    result = result.filter((p) => filters.sizes!.includes(p.size));
+    const selected = new Set(filters.sizes.map(normaliseFacetKey));
+    result = result.filter((p) => selected.has(normaliseFacetKey(p.size)));
   }
   if (filters.conditions?.length) {
     result = result.filter((p) => filters.conditions!.includes(p.condition));
   }
   if (filters.colours?.length) {
-    result = result.filter((p) => filters.colours!.includes(p.colour));
+    const selected = new Set(filters.colours.map(normaliseFacetKey));
+    result = result.filter((p) =>
+      splitColourValues(p.colour).some((colour) => selected.has(normaliseFacetKey(colour)))
+    );
   }
   if (filters.minPrice !== undefined) {
     result = result.filter((p) => p.price >= filters.minPrice!);
@@ -130,7 +164,5 @@ export async function getSimilar(product: Product, limit = 4) {
 }
 
 export function getBrands(products: Product[]) {
-  return [...new Set(products.map((p) => p.brand))].sort((a, b) =>
-    a.localeCompare(b)
-  );
+  return uniqueSorted(products.map((p) => p.brand));
 }
