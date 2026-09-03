@@ -7,7 +7,8 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "optimize:images": "node scripts/optimize-static-images.mjs",
+    "build": "npm run optimize:images && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run"
