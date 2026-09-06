@@ -21,6 +21,7 @@ export function ProductCard({
 }) {
   const [hoverIntent, setHoverIntent] = useState(false);
   const sold = product.status === "SOLD";
+  const reserved = product.status === "RESERVED";
   const primary = product.images[0];
   const secondary = product.images[1];
 
@@ -65,14 +66,14 @@ export function ProductCard({
             </div>
           )}
           <ProductImageWatermark size="sm" />
-          {sold && (
+          {(sold || reserved) && (
             <div className="absolute inset-0 flex items-center justify-center bg-ink/55">
               <span className="border border-paper/70 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] text-paper">
-                Sold
+                {sold ? "Sold" : "Reserved"}
               </span>
             </div>
           )}
-          {product.compareAtPrice && !sold && (
+          {product.compareAtPrice && !sold && !reserved && (
             <span className="absolute left-3 top-3">
               <Badge tone="sale">Sale</Badge>
             </span>
@@ -92,7 +93,7 @@ export function ProductCard({
       <WishlistButton
         sku={product.sku}
         className="absolute right-3 top-3 bg-paper/90 p-2 transition-opacity hover:text-accent-deep sm:opacity-0 sm:group-hover:opacity-100"
-        sold={sold}
+        sold={sold || reserved}
       />
 
       <div className="pt-3">
@@ -110,7 +111,7 @@ export function ProductCard({
         </p>
         <p className="mt-1.5 font-mono text-sm">
           {formatPrice(product.price)}
-          {product.compareAtPrice && (
+          {product.compareAtPrice && !reserved && (
             <span className="ml-2 text-ink-faint line-through">
               {formatPrice(product.compareAtPrice)}
             </span>
