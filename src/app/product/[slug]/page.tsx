@@ -24,11 +24,7 @@ function isPublicProductStatus(status: string) {
 }
 
 function hasActiveReservation(product: Product) {
-  return (
-    product.status === "RESERVED" &&
-    Boolean(product.reservedUntil) &&
-    new Date(product.reservedUntil as string).getTime() > Date.now()
-  );
+  return product.status === "RESERVED";
 }
 
 export async function generateMetadata({
@@ -171,10 +167,10 @@ export default async function ProductPage({
             ) : (
               <AddToBag sku={product.sku} />
             )}
-            {!sold && <WishlistButton sku={product.sku} className="h-14 w-14 shrink-0 border border-ink" />}
+            {!sold && !activelyReserved && <WishlistButton sku={product.sku} className="h-14 w-14 shrink-0 border border-ink" />}
           </div>
 
-          {!sold && (
+          {!sold && !activelyReserved && (
             <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
               One of one — when it&apos;s gone, it&apos;s gone
             </p>
