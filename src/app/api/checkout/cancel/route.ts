@@ -6,9 +6,13 @@ import {
   readCheckoutHoldToken,
 } from "@/lib/server/checkout-hold";
 
+function bodyHoldToken(body: Record<string, unknown>) {
+  return body.checkoutHoldToken ?? body.holdToken;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const orderId = String(body.orderId ?? "").trim().toUpperCase();
 
     // Checkout cancellation must be tied to this browser's checkout hold. Email
@@ -21,7 +25,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: true, cancelled: false });
     }
 
-    const holdToken = await readCheckoutHoldToken();
+    const holdToken = await readCheckoutHoldToken(bodyHoldToken(body));
     if (!holdToken) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
