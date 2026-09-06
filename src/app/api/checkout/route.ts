@@ -17,12 +17,20 @@ import {
 } from "@/lib/site";
 import { sendEmail } from "@/lib/server/mailer";
 import { sendAdminOrderAlertOnce } from "@/lib/server/order-alerts";
-import { claimCheckoutStock, releaseCheckoutStock } from "@/lib/server/checkout-stock";
+import {
+  attachCheckoutHoldToOrder,
+  claimCheckoutStock,
+  releaseCheckoutStock,
+} from "@/lib/server/checkout-stock";
 import { undoPendingDiscountUsage } from "@/lib/server/checkout-ledger";
 import {
   createOrderAccessToken,
   orderAccessCookieName,
 } from "@/lib/server/order-access";
+import {
+  getOrCreateCheckoutHoldToken,
+  refreshCheckoutHoldToken,
+} from "@/lib/server/checkout-hold";
 import { syncOrderSaleToSellerHq } from "@/lib/server/sellerhq-sync";
 import {
   productionRequiresSupabase,
@@ -82,6 +90,7 @@ async function sendPaidOrderSideEffects(order: Order) {
 
 export async function POST(request: NextRequest) {
   let claimedSkus: string[] = [];
+  let holdToken = "";
   try {
     const body = await request.json();
     const { email, name, items, address, discountCode } = body;
@@ -200,10 +209,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const claim = await claimCheckoutStock(skus);
+    holdToken = await getOrCreateCheckoutHoldToken();
+    await refreshCheckoutHoldToken(holdToken);
+
+    const claim = await claimCheckoutStock(skus, { holdToken });
     claimedSkus = claim.ok;
     if (claim.gone.length) {
-      if (claimedSkus.length) await releaseCheckoutStock(claimedSkus);
+      if (claimedSkus.length) await releaseCheckoutStock(claimedSkus, { holdToken });
       claimedSkus = [];
       return Response.json({ gone: claim.gone }, { status: 409 });
     }
@@ -221,12 +233,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (orderResult.gone?.length) {
-      await releaseCheckoutStock(claimedSkus);
+      await releaseCheckoutStock(claimedSkus, { holdToken });
       claimedSkus = [];
       return Response.json({ gone: orderResult.gone }, { status: 409 });
     }
     if (!orderResult.order) {
-      await releaseCheckoutStock(claimedSkus);
+      await releaseCheckoutStock(claimedSkus, { holdToken });
       claimedSkus = [];
       return Response.json(
         { error: orderResult.error ?? "Could not create order" },
@@ -235,6 +247,13 @@ export async function POST(request: NextRequest) {
     }
 
     const order = orderResult.order;
+    if (stripe) {
+      await attachCheckoutHoldToOrder(
+        order.items.map((item) => item.sku),
+        holdToken,
+        order.id
+      );
+    }
     await grantBrowserOrderAccess(order);
 
     if (!stripe) {
@@ -269,16 +288,19 @@ export async function POST(request: NextRequest) {
       );
     } catch (error) {
       await updateOrderStatus(order.id, "CANCELLED", "checkout-system");
-      await releaseCheckoutStock(order.items.map((item) => item.sku));
+      await releaseCheckoutStock(order.items.map((item) => item.sku), {
+        holdToken,
+        orderId: order.id,
+      });
       claimedSkus = [];
       throw error;
     }
   } catch (err) {
     if (claimedSkus.length) {
       try {
-        await releaseCheckoutStock(claimedSkus);
+        await releaseCheckoutStock(claimedSkus, holdToken ? { holdToken } : {});
       } catch {
-        // Expired reservations self-release; preserve the original failure.
+        // Preserve the original failure.
       }
     }
     console.error("Checkout error:", err);
