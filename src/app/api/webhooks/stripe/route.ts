@@ -86,7 +86,9 @@ async function cancelPendingOrder(
 ) {
   if (order.status !== "PENDING_PAYMENT") return;
   await updateOrderStatus(order.id, "CANCELLED", actor);
-  await releaseCheckoutStock(order.items.map((item) => item.sku));
+  await releaseCheckoutStock(order.items.map((item) => item.sku), {
+    orderId: order.id,
+  });
 }
 
 async function refundExpiredPayment(
