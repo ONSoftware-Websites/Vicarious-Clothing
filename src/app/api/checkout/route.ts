@@ -41,6 +41,10 @@ function validEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function bodyHoldToken(body: Record<string, unknown>) {
+  return body.checkoutHoldToken ?? body.holdToken;
+}
+
 async function grantBrowserOrderAccess(order: Order) {
   const store = await cookies();
   store.set(orderAccessCookieName(order.id), createOrderAccessToken(order.id, order.email), {
@@ -92,7 +96,7 @@ export async function POST(request: NextRequest) {
   let claimedSkus: string[] = [];
   let holdToken = "";
   try {
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
     const { email, name, items, address, discountCode } = body;
     const cleanEmail = String(email ?? "").trim().toLowerCase();
     const cleanName = String(name ?? "").trim();
@@ -117,12 +121,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const addressRecord = address as Record<string, unknown>;
     const addressData = {
-      line1: String(address.line1 ?? "").trim(),
-      line2: address.line2 ? String(address.line2).trim() : undefined,
-      city: String(address.city ?? "").trim(),
-      postcode: String(address.postcode ?? "").trim().toUpperCase(),
-      country: String(address.country ?? "United Kingdom").trim(),
+      line1: String(addressRecord.line1 ?? "").trim(),
+      line2: addressRecord.line2 ? String(addressRecord.line2).trim() : undefined,
+      city: String(addressRecord.city ?? "").trim(),
+      postcode: String(addressRecord.postcode ?? "").trim().toUpperCase(),
+      country: String(addressRecord.country ?? "United Kingdom").trim(),
     };
     if (!addressData.line1 || !addressData.city || !addressData.postcode) {
       return Response.json({ error: "A complete delivery address is required" }, { status: 400 });
@@ -209,7 +214,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    holdToken = await getOrCreateCheckoutHoldToken();
+    holdToken = await getOrCreateCheckoutHoldToken(bodyHoldToken(body));
     await refreshCheckoutHoldToken(holdToken);
 
     const claim = await claimCheckoutStock(skus, { holdToken });
@@ -283,7 +288,7 @@ export async function POST(request: NextRequest) {
       await setOrderPayment(order.id, intent.id);
       claimedSkus = [];
       return Response.json(
-        { order, mode: "stripe", clientSecret: intent.client_secret },
+        { order, mode: "stripe", clientSecret: intent.client_secret, holdToken },
         { status: 201 }
       );
     } catch (error) {
