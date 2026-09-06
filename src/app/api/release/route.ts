@@ -7,11 +7,15 @@ function normalizeSkus(value: unknown): string[] {
   return [...new Set(value.map((sku) => String(sku).trim().toUpperCase()).filter(Boolean))];
 }
 
+function bodyHoldToken(body: Record<string, unknown>) {
+  return body.checkoutHoldToken ?? body.holdToken;
+}
+
 async function release(request: NextRequest) {
   try {
-    const body = (await request.json().catch(() => ({}))) as { skus?: unknown };
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const skus = normalizeSkus(body.skus);
-    const holdToken = await readCheckoutHoldToken();
+    const holdToken = await readCheckoutHoldToken(bodyHoldToken(body));
 
     if (!holdToken || skus.length === 0) {
       return Response.json({ ok: true, released: [] });
