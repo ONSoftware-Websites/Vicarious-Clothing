@@ -4,6 +4,7 @@ import { requireAdminApi } from "@/lib/server/admin-auth";
 import { adminDeleteOrder } from "@/lib/server/admin-delete";
 import { getOrder, setOrderTracking, updateOrderStatus } from "@/lib/server/store";
 import { getStripe } from "@/lib/server/payments";
+import { releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { sendEmail } from "@/lib/server/mailer";
 import { syncOrderSaleToSellerHq } from "@/lib/server/sellerhq-sync";
 
@@ -105,8 +106,17 @@ export async function PATCH(
         refundReference = refund.id;
       }
 
+      const wasPendingPayment = existing.status === "PENDING_PAYMENT";
       const order = await updateOrderStatus(id, status, ACTOR);
       if (!order) return Response.json({ error: "Not found" }, { status: 404 });
+
+      let released: string[] = [];
+      if (status === "CANCELLED" && wasPendingPayment) {
+        const release = await releaseCheckoutStock(order.items.map((item) => item.sku), {
+          orderId: order.id,
+        });
+        released = release.released;
+      }
 
       const emailTemplates: Partial<
         Record<
@@ -146,6 +156,7 @@ export async function PATCH(
         ok: true,
         order,
         refundReference,
+        released,
         emailSent,
         sellerHqSynced: sellerHqResult.ok || Boolean(sellerHqResult.skipped),
       });
