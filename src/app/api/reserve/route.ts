@@ -11,18 +11,22 @@ function normalizeSkus(value: unknown): string[] {
   return [...new Set(value.map((sku) => String(sku).trim().toUpperCase()).filter(Boolean))];
 }
 
+function bodyHoldToken(body: Record<string, unknown>) {
+  return body.checkoutHoldToken ?? body.holdToken;
+}
+
 // Entering checkout now creates a real checkout hold for this browser session.
-// It is not time-based: the hold is released when the customer leaves/cancels
-// checkout, or converted to sold when payment succeeds.
+// The token is returned to the client as well as stored in a cookie so the next
+// checkout call can prove it owns the same hold even if the cookie is delayed.
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { skus?: unknown };
+    const body = (await request.json()) as Record<string, unknown>;
     const skus = normalizeSkus(body.skus);
     if (skus.length === 0) {
       return Response.json({ error: "No items" }, { status: 400 });
     }
 
-    const holdToken = await getOrCreateCheckoutHoldToken();
+    const holdToken = await getOrCreateCheckoutHoldToken(bodyHoldToken(body));
     await refreshCheckoutHoldToken(holdToken);
 
     const claim = await claimCheckoutStock(skus, { holdToken });
@@ -34,6 +38,7 @@ export async function POST(request: NextRequest) {
       ok: claim.gone.length ? [] : claim.ok,
       gone: claim.gone,
       held: claim.gone.length === 0,
+      holdToken,
     });
   } catch (error) {
     console.error("Checkout hold failed:", error);
@@ -43,9 +48,9 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const body = (await request.json().catch(() => ({}))) as { skus?: unknown };
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const skus = normalizeSkus(body.skus);
-    const holdToken = await readCheckoutHoldToken();
+    const holdToken = await readCheckoutHoldToken(bodyHoldToken(body));
     if (holdToken && skus.length) {
       await releaseCheckoutStock(skus, { holdToken });
     }
