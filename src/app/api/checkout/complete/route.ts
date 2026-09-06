@@ -9,6 +9,7 @@ import {
 import { recordDiscountUsageOnce } from "@/lib/server/checkout-ledger";
 import { checkoutExpired } from "@/lib/server/checkout-expiry";
 import { releaseCheckoutStock } from "@/lib/server/checkout-stock";
+import { clearCheckoutHoldToken } from "@/lib/server/checkout-hold";
 import { sendEmail } from "@/lib/server/mailer";
 import { sendAdminOrderAlertOnce } from "@/lib/server/order-alerts";
 import { syncOrderSaleToSellerHq } from "@/lib/server/sellerhq-sync";
@@ -45,13 +46,13 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Payment amount does not match order total" }, { status: 409 });
     }
 
-    // A stale PaymentIntent can still technically succeed after its one-of-one
-    // stock reservation has expired. Never resurrect an expired/cancelled order:
-    // refund the captured payment and keep the stock available for the valid buyer.
+    // Existing cancelled orders should not be resurrected by a late payment.
     if (existing.status === "CANCELLED" || checkoutExpired(existing)) {
       if (existing.status !== "CANCELLED") {
         await updateOrderStatus(existing.id, "CANCELLED", "checkout-expiry");
-        await releaseCheckoutStock(existing.items.map((item) => item.sku));
+        await releaseCheckoutStock(existing.items.map((item) => item.sku), {
+          orderId: existing.id,
+        });
       }
       await stripe.refunds.create(
         { payment_intent: intent.id },
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       return Response.json(
         {
           error:
-            "This checkout expired before payment completed. The payment has been refunded automatically.",
+            "This checkout is no longer active. The payment has been refunded automatically.",
           refunded: true,
         },
         { status: 409 }
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest) {
     let sellerHqSynced = wasAlreadyPaid;
 
     if (order) {
+      await clearCheckoutHoldToken();
       await recordDiscountUsageOnce(order.discount?.code, order.email);
       if (!wasAlreadyPaid) {
         try {
