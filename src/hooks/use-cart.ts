@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 
 export interface CartLine {
@@ -25,22 +25,26 @@ function parse(raw: string | null): CartLine[] {
   }
 }
 
+function normalizeLines(lines: CartLine[]) {
+  return lines.map((line) => ({ sku: line.sku.trim().toUpperCase(), qty: 1 })).filter((line) => line.sku);
+}
+
 export function useCart() {
-  const [lines, setLines] = useLocalStorage<CartLine[]>(
+  const [storedLines, setLines] = useLocalStorage<CartLine[]>(
     KEY,
     EMPTY,
     parse,
     JSON.stringify
   );
 
+  const lines = useMemo(() => normalizeLines(storedLines), [storedLines]);
+
   const add = useCallback(
     (sku: string) => {
       const normalizedSku = sku.trim().toUpperCase();
       if (!normalizedSku) return;
       if (lines.some((line) => line.sku === normalizedSku)) {
-        setLines(lines.map((line) =>
-          line.sku === normalizedSku ? { ...line, qty: 1 } : { ...line, qty: 1 }
-        ));
+        setLines(lines.map((line) => ({ ...line, qty: 1 })));
         return;
       }
       setLines([...lines.map((line) => ({ ...line, qty: 1 })), { sku: normalizedSku, qty: 1 }]);
@@ -50,20 +54,21 @@ export function useCart() {
 
   const remove = useCallback(
     (sku: string) => {
-      setLines(lines.filter((l) => l.sku !== sku));
+      setLines(lines.filter((l) => l.sku !== sku.trim().toUpperCase()));
     },
     [lines, setLines]
   );
 
   const setQty = useCallback(
     (sku: string, qty: number) => {
-      // Each SKU is a one-of-one piece — quantity is always 1; 0 removes
+      const normalizedSku = sku.trim().toUpperCase();
+      // Each SKU is a one-of-one piece — quantity is always 1; 0 removes.
       const nextQty = qty <= 0 ? 0 : 1;
       if (nextQty === 0) {
-        setLines(lines.filter((l) => l.sku !== sku));
+        setLines(lines.filter((l) => l.sku !== normalizedSku));
         return;
       }
-      setLines(lines.map((l) => (l.sku === sku ? { ...l, qty: 1 } : { ...l, qty: 1 })));
+      setLines(lines.map((l) => (l.sku === normalizedSku ? { ...l, qty: 1 } : { ...l, qty: 1 })));
     },
     [lines, setLines]
   );
@@ -74,5 +79,5 @@ export function useCart() {
 
   const count = lines.length;
 
-  return { lines: lines.map((line) => ({ ...line, qty: 1 })), count, add, remove, setQty, clear };
+  return { lines, count, add, remove, setQty, clear };
 }
