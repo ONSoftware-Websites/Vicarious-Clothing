@@ -89,6 +89,11 @@ function sendCheckoutCleanup(url: string, body: Record<string, unknown>) {
   }).catch(() => {});
 }
 
+function validHoldToken(value: unknown) {
+  const token = String(value ?? "").trim();
+  return /^[a-f0-9-]{36}$/i.test(token) ? token : "";
+}
+
 function PayButton({
   orderId,
   amount,
@@ -172,19 +177,28 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<Step>("contact");
   const [placing, setPlacing] = useState(false);
   const [preparing, setPreparing] = useState(false);
+  const [holdingStock, setHoldingStock] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [payConfig, setPayConfig] = useState<PayConfig | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState("");
   const [pendingOrderId, setPendingOrderId] = useState("");
+  const [checkoutHoldToken, setCheckoutHoldToken] = useState("");
   const checkoutFinishedRef = useRef(false);
   const pendingOrderRef = useRef("");
   const paymentInProgressRef = useRef(false);
   const skusRef = useRef<string[]>([]);
+  const checkoutHoldTokenRef = useRef("");
+  const holdPromiseRef = useRef<Promise<string> | null>(null);
+
   useEffect(() => {
     pendingOrderRef.current = pendingOrderId;
   }, [pendingOrderId]);
+
+  useEffect(() => {
+    checkoutHoldTokenRef.current = checkoutHoldToken;
+  }, [checkoutHoldToken]);
 
   const [email, setEmail] = useState("");
   const [marketing, setMarketing] = useState(false);
@@ -218,18 +232,83 @@ export default function CheckoutPage() {
     skusRef.current = skus;
   }, [skus]);
 
+  const rememberCheckoutHoldToken = useCallback((value: unknown) => {
+    const token = validHoldToken(value);
+    if (!token) return "";
+    checkoutHoldTokenRef.current = token;
+    setCheckoutHoldToken(token);
+    return token;
+  }, []);
+
+  const markGoneAsReserved = useCallback((gone: string[] = []) => {
+    if (!gone.length) return;
+    setProducts((prev) => {
+      const next = { ...prev };
+      for (const sku of gone) {
+        if (next[sku]) next[sku] = { ...next[sku], status: "RESERVED" };
+      }
+      return next;
+    });
+  }, []);
+
+  const ensureCheckoutHold = useCallback(async () => {
+    if (holdPromiseRef.current) return holdPromiseRef.current;
+
+    const promise = (async () => {
+      const currentSkus = skusRef.current;
+      if (currentSkus.length === 0) return "";
+
+      setHoldingStock(true);
+      try {
+        const existingToken = checkoutHoldTokenRef.current;
+        const res = await fetch("/api/reserve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            skus: currentSkus,
+            checkoutHoldToken: existingToken || undefined,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        const gone = Array.isArray(data.gone) ? data.gone.map(String) : [];
+
+        if (!res.ok || gone.length) {
+          setError(STOCK_HELD_ERROR);
+          markGoneAsReserved(gone);
+          return "";
+        }
+
+        setError((current) => (current === STOCK_HELD_ERROR ? null : current));
+        return rememberCheckoutHoldToken(data.holdToken) || existingToken;
+      } catch {
+        setError("Could not hold this item for checkout. Please refresh and try again.");
+        return "";
+      } finally {
+        setHoldingStock(false);
+      }
+    })();
+
+    holdPromiseRef.current = promise;
+    try {
+      return await promise;
+    } finally {
+      holdPromiseRef.current = null;
+    }
+  }, [markGoneAsReserved, rememberCheckoutHoldToken]);
+
   const releaseHeldCheckout = useCallback(() => {
     if (checkoutFinishedRef.current || paymentInProgressRef.current) return;
 
+    const holdToken = checkoutHoldTokenRef.current || undefined;
     const orderId = pendingOrderRef.current;
     if (orderId) {
-      sendCheckoutCleanup("/api/checkout/cancel", { orderId });
+      sendCheckoutCleanup("/api/checkout/cancel", { orderId, checkoutHoldToken: holdToken });
       return;
     }
 
     const currentSkus = skusRef.current;
     if (currentSkus.length) {
-      sendCheckoutCleanup("/api/release", { skus: currentSkus });
+      sendCheckoutCleanup("/api/release", { skus: currentSkus, checkoutHoldToken: holdToken });
     }
   }, []);
 
@@ -237,24 +316,27 @@ export default function CheckoutPage() {
     if (checkoutFinishedRef.current) return;
     const orderId = pendingOrderRef.current;
     const currentSkus = skusRef.current;
+    const holdToken = checkoutHoldTokenRef.current || undefined;
 
     try {
       if (orderId) {
         await fetch("/api/checkout/cancel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId }),
+          body: JSON.stringify({ orderId, checkoutHoldToken: holdToken }),
         });
       } else if (currentSkus.length) {
         await fetch("/api/release", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ skus: currentSkus }),
+          body: JSON.stringify({ skus: currentSkus, checkoutHoldToken: holdToken }),
         });
       }
     } finally {
+      checkoutHoldTokenRef.current = "";
       pendingOrderRef.current = "";
       skusRef.current = [];
+      setCheckoutHoldToken("");
       setPendingOrderId("");
       setClientSecret("");
       setStep("delivery");
@@ -304,24 +386,22 @@ export default function CheckoutPage() {
     if (skus.length === 0) return;
     if (pendingOrderRef.current || checkoutFinishedRef.current) return;
     let cancelled = false;
-    fetch("/api/reserve", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ skus }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled && data.gone?.length) {
-          setError(STOCK_HELD_ERROR);
-        }
-      })
-      .catch(() => {});
+
+    ensureCheckoutHold().then((token) => {
+      if (cancelled && token && skus.length) {
+        sendCheckoutCleanup("/api/release", { skus, checkoutHoldToken: token });
+      }
+    });
+
     return () => {
       cancelled = true;
       if (checkoutFinishedRef.current || pendingOrderRef.current || paymentInProgressRef.current) return;
-      sendCheckoutCleanup("/api/release", { skus });
+      sendCheckoutCleanup("/api/release", {
+        skus,
+        checkoutHoldToken: checkoutHoldTokenRef.current || undefined,
+      });
     };
-  }, [skus]);
+  }, [skus, ensureCheckoutHold]);
 
   useEffect(() => {
     const handlePageHide = () => releaseHeldCheckout();
@@ -386,6 +466,9 @@ export default function CheckoutPage() {
     setPreparing(true);
     setError(null);
     try {
+      const activeHoldToken = await ensureCheckoutHold();
+      if (!activeHoldToken) return;
+
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -396,24 +479,20 @@ export default function CheckoutPage() {
           deliveryCost,
           address: { line1, line2, city, postcode, country },
           discountCode: discount?.code,
+          checkoutHoldToken: activeHoldToken,
         }),
       });
       const data = await res.json();
       if (res.status === 409) {
         setError(STOCK_HELD_ERROR);
-        setProducts((prev) => {
-          const next = { ...prev };
-          for (const sku of data.gone ?? []) {
-            if (next[sku]) next[sku] = { ...next[sku], status: "RESERVED" };
-          }
-          return next;
-        });
+        markGoneAsReserved(Array.isArray(data.gone) ? data.gone.map(String) : []);
         return;
       }
       if (!res.ok || !data.clientSecret) {
         setError(data.error ?? "Something went wrong. Please try again.");
         return;
       }
+      rememberCheckoutHoldToken(data.holdToken || activeHoldToken);
       setClientSecret(data.clientSecret);
       setPendingOrderId(data.order.id);
       setStep("review");
@@ -429,6 +508,9 @@ export default function CheckoutPage() {
     setPlacing(true);
     setError(null);
     try {
+      const activeHoldToken = await ensureCheckoutHold();
+      if (!activeHoldToken) return;
+
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -439,18 +521,13 @@ export default function CheckoutPage() {
           deliveryCost,
           address: { line1, line2, city, postcode, country },
           discountCode: discount?.code,
+          checkoutHoldToken: activeHoldToken,
         }),
       });
       const data = await res.json();
       if (res.status === 409) {
         setError(STOCK_HELD_ERROR);
-        setProducts((prev) => {
-          const next = { ...prev };
-          for (const sku of data.gone ?? []) {
-            if (next[sku]) next[sku] = { ...next[sku], status: "RESERVED" };
-          }
-          return next;
-        });
+        markGoneAsReserved(Array.isArray(data.gone) ? data.gone.map(String) : []);
         return;
       }
       if (!res.ok) {
@@ -474,15 +551,19 @@ export default function CheckoutPage() {
   const stepIndex = steps.indexOf(step);
 
   const canContinue =
-    (step === "contact" && email.includes("@")) ||
-    (step === "delivery" && name && line1 && city && postcode) ||
-    (step === "review" &&
-      (isStripe ? terms && !!clientSecret : card.length >= 12 && cardName && cardExpiry && cardCvc && terms));
+    !holdingStock &&
+    !error &&
+    ((step === "contact" && email.includes("@")) ||
+      (step === "delivery" && name && line1 && city && postcode) ||
+      (step === "review" &&
+        (isStripe ? terms && !!clientSecret : card.length >= 12 && cardName && cardExpiry && cardCvc && terms)));
 
   const submitStep = async (e: FormEvent) => {
     e.preventDefault();
     if (!canContinue) return;
     if (step === "contact") {
+      const activeHoldToken = await ensureCheckoutHold();
+      if (!activeHoldToken) return;
       setStep("delivery");
       window.scrollTo(0, 0);
       return;
@@ -895,16 +976,18 @@ export default function CheckoutPage() {
         ) : (
           <button
             type="submit"
-            disabled={!canContinue || placing || preparing}
+            disabled={!canContinue || placing || preparing || holdingStock}
             className="flex h-14 items-center justify-center bg-ink px-12 font-display text-xs font-semibold uppercase tracking-[0.18em] text-paper transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:bg-ink-faint"
           >
-            {preparing
-              ? "Preparing payment…"
-              : placing
-                ? "Placing order…"
-                : step === "review"
-                  ? `Pay ${formatPrice(total)}`
-                  : "Continue →"}
+            {holdingStock
+              ? "Holding stock…"
+              : preparing
+                ? "Preparing payment…"
+                : placing
+                  ? "Placing order…"
+                  : step === "review"
+                    ? `Pay ${formatPrice(total)}`
+                    : "Continue →"}
           </button>
         )}
       </div>
