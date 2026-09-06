@@ -2,8 +2,9 @@ import { cookies } from "next/headers";
 
 export const CHECKOUT_HOLD_COOKIE = "vc_checkout_hold";
 
-function validToken(value: string | undefined) {
-  return Boolean(value && /^[a-f0-9-]{36}$/i.test(value));
+export function normaliseCheckoutHoldToken(value: unknown) {
+  const token = String(value ?? "").trim();
+  return /^[a-f0-9-]{36}$/i.test(token) ? token : "";
 }
 
 function cookieOptions() {
@@ -16,16 +17,26 @@ function cookieOptions() {
   };
 }
 
-export async function readCheckoutHoldToken() {
+export async function readCheckoutHoldToken(candidate?: unknown) {
+  const supplied = normaliseCheckoutHoldToken(candidate);
+  if (supplied) return supplied;
+
   const store = await cookies();
   const token = store.get(CHECKOUT_HOLD_COOKIE)?.value;
-  return validToken(token) ? token! : "";
+  return normaliseCheckoutHoldToken(token);
 }
 
-export async function getOrCreateCheckoutHoldToken() {
+export async function getOrCreateCheckoutHoldToken(candidate?: unknown) {
   const store = await cookies();
+  const supplied = normaliseCheckoutHoldToken(candidate);
+  if (supplied) {
+    store.set(CHECKOUT_HOLD_COOKIE, supplied, cookieOptions());
+    return supplied;
+  }
+
   const existing = store.get(CHECKOUT_HOLD_COOKIE)?.value;
-  if (validToken(existing)) return existing!;
+  const validExisting = normaliseCheckoutHoldToken(existing);
+  if (validExisting) return validExisting;
 
   const token = crypto.randomUUID();
   store.set(CHECKOUT_HOLD_COOKIE, token, cookieOptions());
@@ -33,9 +44,10 @@ export async function getOrCreateCheckoutHoldToken() {
 }
 
 export async function refreshCheckoutHoldToken(token: string) {
-  if (!validToken(token)) return;
+  const clean = normaliseCheckoutHoldToken(token);
+  if (!clean) return;
   const store = await cookies();
-  store.set(CHECKOUT_HOLD_COOKIE, token, cookieOptions());
+  store.set(CHECKOUT_HOLD_COOKIE, clean, cookieOptions());
 }
 
 export async function clearCheckoutHoldToken() {
