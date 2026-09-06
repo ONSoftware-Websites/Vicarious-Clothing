@@ -1,9 +1,9 @@
 import type { Order } from "@/lib/types";
-import { RESERVATION_MINUTES } from "@/lib/site";
 
-export function checkoutExpired(order: Order, now = Date.now()) {
-  if (order.status !== "PENDING_PAYMENT") return false;
-  const created = new Date(order.createdAt).getTime();
-  if (!Number.isFinite(created)) return false;
-  return created + RESERVATION_MINUTES * 60 * 1000 < now;
+// Checkout holds are no longer time-based. Stock is released when the customer
+// leaves/cancels checkout, when payment fails, or when an admin/server process
+// cancels the pending order. Keep this helper so existing payment routes can
+// share one policy point without reintroducing a timer.
+export function checkoutExpired(_order: Order, _now = Date.now()) {
+  return false;
 }
