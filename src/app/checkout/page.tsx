@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Elements,
   PaymentElement,
@@ -41,6 +41,9 @@ type Step = "contact" | "delivery" | "review";
 const input =
   "h-12 w-full border border-line bg-paper px-4 text-sm focus:border-ink focus:outline-none";
 
+const STOCK_HELD_ERROR =
+  "SOMEONE GOT THERE FIRST. A piece in your bag is currently on hold or has sold.";
+
 const ELEMENT_APPEARANCE = {
   theme: "flat" as const,
   variables: {
@@ -71,18 +74,37 @@ const ELEMENT_APPEARANCE = {
   },
 };
 
+function sendCheckoutCleanup(url: string, body: Record<string, unknown>) {
+  const payload = JSON.stringify(body);
+  if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+    const blob = new Blob([payload], { type: "application/json" });
+    if (navigator.sendBeacon(url, blob)) return;
+  }
+
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: payload,
+    keepalive: true,
+  }).catch(() => {});
+}
+
 function PayButton({
   orderId,
   amount,
   disabled,
   onSuccess,
   onError,
+  onPaymentStart,
+  onPaymentEnd,
 }: {
   orderId: string;
   amount: number;
   disabled: boolean;
   onSuccess: () => void;
   onError: (message: string) => void;
+  onPaymentStart?: () => void;
+  onPaymentEnd?: () => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -91,6 +113,7 @@ function PayButton({
   const pay = async () => {
     if (!stripe || !elements) return;
     setBusy(true);
+    onPaymentStart?.();
     try {
       const result = await stripe.confirmPayment({
         elements,
@@ -123,6 +146,7 @@ function PayButton({
     } catch {
       onError("Payment failed. Please try again.");
     } finally {
+      onPaymentEnd?.();
       setBusy(false);
     }
   };
@@ -156,6 +180,8 @@ export default function CheckoutPage() {
   const [pendingOrderId, setPendingOrderId] = useState("");
   const checkoutFinishedRef = useRef(false);
   const pendingOrderRef = useRef("");
+  const paymentInProgressRef = useRef(false);
+  const skusRef = useRef<string[]>([]);
   useEffect(() => {
     pendingOrderRef.current = pendingOrderId;
   }, [pendingOrderId]);
@@ -187,6 +213,54 @@ export default function CheckoutPage() {
 
   const skus = useMemo(() => lines.map((l) => l.sku), [lines]);
   const isStripe = payConfig?.mode === "stripe";
+
+  useEffect(() => {
+    skusRef.current = skus;
+  }, [skus]);
+
+  const releaseHeldCheckout = useCallback(() => {
+    if (checkoutFinishedRef.current || paymentInProgressRef.current) return;
+
+    const orderId = pendingOrderRef.current;
+    if (orderId) {
+      sendCheckoutCleanup("/api/checkout/cancel", { orderId });
+      return;
+    }
+
+    const currentSkus = skusRef.current;
+    if (currentSkus.length) {
+      sendCheckoutCleanup("/api/release", { skus: currentSkus });
+    }
+  }, []);
+
+  const cancelCheckout = async () => {
+    if (checkoutFinishedRef.current) return;
+    const orderId = pendingOrderRef.current;
+    const currentSkus = skusRef.current;
+
+    try {
+      if (orderId) {
+        await fetch("/api/checkout/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId }),
+        });
+      } else if (currentSkus.length) {
+        await fetch("/api/release", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skus: currentSkus }),
+        });
+      }
+    } finally {
+      pendingOrderRef.current = "";
+      skusRef.current = [];
+      setPendingOrderId("");
+      setClientSecret("");
+      setStep("delivery");
+      router.replace("/bag");
+    }
+  };
 
   useEffect(() => {
     fetch("/api/payments/config")
@@ -238,38 +312,25 @@ export default function CheckoutPage() {
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled && data.gone?.length) {
-          setError("SOMEONE GOT THERE FIRST. A piece in your bag has just sold.");
+          setError(STOCK_HELD_ERROR);
         }
       })
       .catch(() => {});
     return () => {
       cancelled = true;
-      if (checkoutFinishedRef.current || pendingOrderRef.current) return;
-      fetch("/api/release", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ skus }),
-      }).catch(() => {});
+      if (checkoutFinishedRef.current || pendingOrderRef.current || paymentInProgressRef.current) return;
+      sendCheckoutCleanup("/api/release", { skus });
     };
   }, [skus]);
 
-  const emailRef = useRef("");
   useEffect(() => {
-    emailRef.current = email;
-  }, [email]);
-
-  useEffect(() => {
+    const handlePageHide = () => releaseHeldCheckout();
+    window.addEventListener("pagehide", handlePageHide);
     return () => {
-      if (checkoutFinishedRef.current || pendingOrderRef.current) return;
-      if (emailRef.current) {
-        fetch("/api/checkout/cancel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: emailRef.current }),
-        }).catch(() => {});
-      }
+      window.removeEventListener("pagehide", handlePageHide);
+      releaseHeldCheckout();
     };
-  }, []);
+  }, [releaseHeldCheckout]);
 
   const items = lines
     .map((line) => ({ line, product: products[line.sku] }))
@@ -339,18 +400,18 @@ export default function CheckoutPage() {
       });
       const data = await res.json();
       if (res.status === 409) {
-        setError("SOMEONE GOT THERE FIRST. A piece in your bag has just sold.");
+        setError(STOCK_HELD_ERROR);
         setProducts((prev) => {
           const next = { ...prev };
           for (const sku of data.gone ?? []) {
-            if (next[sku]) next[sku] = { ...next[sku], status: "SOLD" };
+            if (next[sku]) next[sku] = { ...next[sku], status: "RESERVED" };
           }
           return next;
         });
         return;
       }
       if (!res.ok || !data.clientSecret) {
-      setError(data.error ?? "Something went wrong. Please try again.");
+        setError(data.error ?? "Something went wrong. Please try again.");
         return;
       }
       setClientSecret(data.clientSecret);
@@ -382,11 +443,11 @@ export default function CheckoutPage() {
       });
       const data = await res.json();
       if (res.status === 409) {
-        setError("SOMEONE GOT THERE FIRST. A piece in your bag has just sold.");
+        setError(STOCK_HELD_ERROR);
         setProducts((prev) => {
           const next = { ...prev };
           for (const sku of data.gone ?? []) {
-            if (next[sku]) next[sku] = { ...next[sku], status: "SOLD" };
+            if (next[sku]) next[sku] = { ...next[sku], status: "RESERVED" };
           }
           return next;
         });
@@ -788,32 +849,49 @@ export default function CheckoutPage() {
       )}
 
       <div className="mt-10 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {stepIndex > 0 ? (
-          <button
-            type="button"
-            onClick={() => setStep(steps[stepIndex - 1])}
-            className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-soft underline underline-offset-4 hover:text-accent-deep"
-          >
-            ← Back
-          </button>
-        ) : (
-          <span />
-        )}
+        <div className="flex flex-wrap items-center gap-4">
+          {stepIndex > 0 ? (
+            <button
+              type="button"
+              onClick={() => setStep(steps[stepIndex - 1])}
+              className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-soft underline underline-offset-4 hover:text-accent-deep"
+            >
+              ← Back
+            </button>
+          ) : (
+            <span />
+          )}
+          {pendingOrderId && (
+            <button
+              type="button"
+              onClick={cancelCheckout}
+              className="font-mono text-[11px] uppercase tracking-[0.16em] text-red-700 underline underline-offset-4 hover:text-red-900"
+            >
+              Cancel checkout
+            </button>
+          )}
+        </div>
         {step === "review" && isStripe ? (
-        <PayButton
-          orderId={pendingOrderId}
-          amount={total}
-          disabled={!terms || placing}
-          onSuccess={() => {
-            if (marketing) {
-              fetch("/api/newsletter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, source: "checkout", consent: true }) }).catch(() => {});
-            }
-            checkoutFinishedRef.current = true;
-            clear();
-            router.replace(`/order/${pendingOrderId}?paid=1`);
-          }}
-          onError={(message) => setError(message)}
-        />
+          <PayButton
+            orderId={pendingOrderId}
+            amount={total}
+            disabled={!terms || placing}
+            onPaymentStart={() => {
+              paymentInProgressRef.current = true;
+            }}
+            onPaymentEnd={() => {
+              paymentInProgressRef.current = false;
+            }}
+            onSuccess={() => {
+              if (marketing) {
+                fetch("/api/newsletter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, source: "checkout", consent: true }) }).catch(() => {});
+              }
+              checkoutFinishedRef.current = true;
+              clear();
+              router.replace(`/order/${pendingOrderId}?paid=1`);
+            }}
+            onError={(message) => setError(message)}
+          />
         ) : (
           <button
             type="submit"
@@ -862,9 +940,9 @@ export default function CheckoutPage() {
           <p className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-red-800">
             {error}
           </p>
-          {error.includes("SOLD") && (
+          {(error.toLowerCase().includes("hold") || error.toLowerCase().includes("sold")) && (
             <p className="mt-1 text-sm text-ink-soft">
-              Remove the sold piece from your bag and continue.
+              Remove that piece from your bag and continue, or try again if the checkout hold is released.
             </p>
           )}
         </div>
@@ -973,8 +1051,8 @@ export default function CheckoutPage() {
               </div>
             </dl>
             <p className="mt-4 font-mono text-[9px] uppercase tracking-[0.12em] leading-relaxed text-ink-faint">
-              Items are reserved while you check out. Unique pieces hold for a
-              limited time.
+              Items are held while you check out. If you leave or cancel checkout,
+              the stock is released.
             </p>
           </div>
         </aside>
