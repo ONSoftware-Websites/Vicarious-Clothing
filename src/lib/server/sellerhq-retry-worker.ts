@@ -6,6 +6,11 @@ export async function processSellerHqRetries() {
   const key = process.env.SELLERHQ_API_KEY;
   if (!db || !url || !key) throw new Error("SellerHQ integration is not configured");
   const now = new Date().toISOString();
+  const { error: leaseError } = await db.from("sellerhq_retry_jobs")
+    .update({status:"failed",retry_after:now,last_error:"Worker lease expired"})
+    .eq("status","processing")
+    .lt("updated_at",new Date(Date.now()-3*60*1000).toISOString());
+  if (leaseError) throw leaseError;
   const { data: jobs, error } = await db.from("sellerhq_retry_jobs")
     .select("id,payload,attempts").in("status", ["pending", "failed"])
     .lte("retry_after", now).order("id").limit(20);
