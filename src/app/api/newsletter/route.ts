@@ -10,8 +10,7 @@ export async function POST(request: NextRequest) {
     if (!email || !email.includes("@")) {
       return Response.json({ error: "Enter a valid email." }, { status: 400 });
     }
-    // Homepage and checkout now send consent=true; legacy callers without consent are treated as consented for backward compat but admin should always require it
-    if (source === "homepage" && !consent) {
+    if (!consent) {
       return Response.json({ error: "Please agree to receive marketing emails." }, { status: 400 });
     }
     const subscriber = await subscribeNewsletter(email, source);
