@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const photoUrls: string[] = [];
+    const uploadedPaths: string[] = [];
     if (photos.length) {
       const supabase = getSupabase();
       if (!supabase) {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
         const objectPath = `${submissionKey}/${index + 1}.${extension}`;
         const bytes = new Uint8Array(await photo.arrayBuffer());
         const { error: uploadError } = await supabase.storage
-          .from("lead-photos")
+          .from("lead-photos-private")
           .upload(objectPath, bytes, {
             contentType: photo.type,
             upsert: false,
@@ -85,19 +86,21 @@ export async function POST(request: NextRequest) {
         if (uploadError) {
           throw new Error(`Photo upload failed: ${uploadError.message}`);
         }
-        const { data } = supabase.storage.from("lead-photos").getPublicUrl(objectPath);
-        photoUrls.push(data.publicUrl);
+        uploadedPaths.push(objectPath);
+        photoUrls.push(`PRIVATEPHOTO: ${objectPath}`);
       }
     }
 
     const storedNotes = [
       notes,
-      ...photoUrls.map((url) => `PHOTO: ${url}`),
+      ...photoUrls,
     ]
       .filter(Boolean)
       .join("\n");
 
-    const lead = await createLead({
+    let lead;
+    try {
+      lead = await createLead({
       name,
       email,
       brand,
@@ -105,7 +108,14 @@ export async function POST(request: NextRequest) {
       size,
       condition,
       notes: storedNotes || undefined,
-    });
+      });
+    } catch (error) {
+      if (uploadedPaths.length) {
+        const db = getSupabase();
+        await db?.storage.from("lead-photos-private").remove(uploadedPaths);
+      }
+      throw error;
+    }
 
     let emailSent = true;
     try {
