@@ -1,11 +1,13 @@
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { enforcePublicRateLimit } from "@/lib/server/public-rate-limit";
+import { getSupabase } from "@/lib/server/supabase";
 import type { Order } from "@/lib/types";
 import {
   createOrder,
   evaluateDiscount,
   getProductBySku,
+  getOrder,
   listDiscounts,
   setOrderPayment,
   updateOrderStatus,
@@ -220,6 +222,37 @@ export async function POST(request: NextRequest) {
     holdToken = await getOrCreateCheckoutHoldToken(bodyHoldToken(body));
     await refreshCheckoutHoldToken(holdToken);
 
+    // Recover an already-created payment attempt for this checkout hold,
+    // rather than creating another order after a network retry.
+    if (stripe) {
+      const db = getSupabase();
+      if (db) {
+        const {data: held, error: heldError} = await db.from("inventory_items")
+          .select("checkout_hold_order_id").eq("checkout_hold_token",holdToken)
+          .not("checkout_hold_order_id","is",null).limit(1);
+        if (heldError) throw heldError;
+        const existingId = held?.[0]?.checkout_hold_order_id;
+        if (existingId) {
+          const existing = await getOrder(String(existingId));
+          if (existing?.status === "PENDING_PAYMENT" && existing.email === cleanEmail &&
+              existing.items.length === skus.length &&
+              existing.items.every((item) => skus.includes(item.sku))) {
+            if (existing.paymentIntentId) {
+              const intent = await stripe.paymentIntents.retrieve(existing.paymentIntentId);
+              if (intent.status === "requires_payment_method" ||
+                  intent.status === "requires_confirmation" ||
+                  intent.status === "requires_action") {
+                await grantBrowserOrderAccess(existing);
+                return Response.json({order:existing,mode:"stripe",clientSecret:intent.client_secret,holdToken}, {status:200});
+              }
+            }
+            return Response.json({error:"Your previous checkout is being processed. Check the existing order before retrying."}, {status:409});
+          }
+          return Response.json({error:"This checkout is already linked to an existing order."}, {status:409});
+        }
+      }
+    }
+
     const claim = await claimCheckoutStock(skus, { holdToken });
     claimedSkus = claim.ok;
     if (claim.gone.length) {
@@ -286,7 +319,7 @@ export async function POST(request: NextRequest) {
             .join(", ")
             .slice(0, 450),
         },
-      });
+      }, { idempotencyKey: `vicarious-checkout-${order.id}` });
 
       await setOrderPayment(order.id, intent.id);
       claimedSkus = [];
