@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
       }
 
       const submissionKey = crypto.randomUUID();
+      try {
       for (let index = 0; index < photos.length; index += 1) {
         const photo = photos[index];
         if (!photo.type.startsWith("image/")) {
@@ -88,6 +89,12 @@ export async function POST(request: NextRequest) {
         }
         uploadedPaths.push(objectPath);
         photoUrls.push(`PRIVATEPHOTO: ${objectPath}`);
+      }
+      } catch (uploadError) {
+        if (uploadedPaths.length) {
+          await supabase.storage.from("lead-photos-private").remove(uploadedPaths);
+        }
+        throw uploadError;
       }
     }
 
