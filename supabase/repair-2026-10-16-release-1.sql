@@ -27,7 +27,7 @@ begin
       (ii.checkout_hold_order_id is null and ii.checkout_hold_started_at < now() - interval '30 minutes')
       or (ii.checkout_hold_order_id is not null and not exists (
         select 1 from public.orders o
-        where o.id = ii.checkout_hold_order_id and o.status = 'PENDING_PAYMENT'
+        where o.id = ii.checkout_hold_order_id and o.status not in ('CANCELLED')
       ) and ii.checkout_hold_started_at < now() - interval '45 minutes')
     );
   get diagnostics count_released = row_count;
