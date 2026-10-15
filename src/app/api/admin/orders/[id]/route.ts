@@ -8,6 +8,19 @@ import { releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { sendEmail } from "@/lib/server/mailer";
 import { syncOrderSaleToSellerHq } from "@/lib/server/sellerhq-sync";
 
+const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  PENDING_PAYMENT: ["CANCELLED"],
+  PAID: ["PICKING", "READY_TO_DISPATCH", "DISPATCHED", "CANCELLED", "REFUNDED"],
+  PICKING: ["READY_TO_DISPATCH", "DISPATCHED", "CANCELLED", "REFUNDED"],
+  READY_TO_DISPATCH: ["DISPATCHED", "CANCELLED", "REFUNDED"],
+  DISPATCHED: ["DELIVERED", "RETURN_REQUESTED", "REFUNDED"],
+  DELIVERED: ["RETURN_REQUESTED", "RETURNED", "REFUNDED"],
+  RETURN_REQUESTED: ["RETURNED", "REFUNDED"],
+  RETURNED: ["REFUNDED"],
+  REFUNDED: [],
+  CANCELLED: [],
+};
+
 const ACTOR = "Admin";
 const SELLERHQ_ORDER_SYNC_STATUSES: OrderStatus[] = [
   "PAID",
@@ -60,6 +73,9 @@ export async function PATCH(
       if (!existing) return Response.json({ error: "Not found" }, { status: 404 });
       if (existing.status === status) {
         return Response.json({ ok: true, order: existing, unchanged: true });
+      }
+      if (!ALLOWED_TRANSITIONS[existing.status].includes(status)) {
+        return Response.json({ error: `Invalid order transition: ${existing.status} → ${status}` }, { status: 409 });
       }
 
       // If tracking is supplied with dispatch, persist it before sending the email.
