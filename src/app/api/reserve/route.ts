@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { enforcePublicRateLimit } from "@/lib/server/public-rate-limit";
 import {
   getOrCreateCheckoutHoldToken,
   readCheckoutHoldToken,
@@ -19,6 +20,8 @@ function bodyHoldToken(body: Record<string, unknown>) {
 // The token is returned to the client as well as stored in a cookie so the next
 // checkout call can prove it owns the same hold even if the cookie is delayed.
 export async function POST(request: NextRequest) {
+  const limited = await enforcePublicRateLimit(request, "reserve");
+  if (limited) return limited;
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const skus = normalizeSkus(body.skus);
