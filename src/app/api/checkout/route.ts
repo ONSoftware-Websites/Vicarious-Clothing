@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { enforcePublicRateLimit } from "@/lib/server/public-rate-limit";
 import type { Order } from "@/lib/types";
 import {
   createOrder,
@@ -93,6 +94,8 @@ async function sendPaidOrderSideEffects(order: Order) {
 }
 
 export async function POST(request: NextRequest) {
+  const limited = await enforcePublicRateLimit(request, "checkout");
+  if (limited) return limited;
   let claimedSkus: string[] = [];
   let holdToken = "";
   try {
