@@ -64,3 +64,39 @@ grant execute on function public.claim_checkout_hold(text[], text) to service_ro
 
 -- Recommended: schedule SELECT public.expire_checkout_holds() every minute
 -- through Supabase Cron/pg_cron. Without Cron, reclamation happens on subsequent claims.
+
+-- Atomic per-origin request limits for public write endpoints.
+create table if not exists public.public_rate_limits (
+  key text primary key,
+  window_started_at timestamptz not null,
+  hits integer not null default 0
+);
+alter table public.public_rate_limits enable row level security;
+revoke all on public.public_rate_limits from public, anon, authenticated;
+grant select, insert, update, delete on public.public_rate_limits to service_role;
+
+create or replace function public.check_public_rate_limit(
+  p_key text, p_limit integer, p_window_seconds integer
+) returns boolean language plpgsql security definer set search_path = public as $$
+declare current_hits integer;
+begin
+  if p_key !~ '^[0-9a-f]{64}$' or p_limit < 1 or p_window_seconds < 1 then
+    raise exception 'Invalid rate limit parameters';
+  end if;
+  insert into public.public_rate_limits(key, window_started_at, hits)
+  values(p_key, now(), 1)
+  on conflict (key) do update
+    set hits = case
+      when public.public_rate_limits.window_started_at <
+        now() - make_interval(secs => p_window_seconds) then 1
+      else public.public_rate_limits.hits + 1 end,
+      window_started_at = case
+      when public.public_rate_limits.window_started_at <
+        now() - make_interval(secs => p_window_seconds) then now()
+      else public.public_rate_limits.window_started_at end
+  returning hits into current_hits;
+  return current_hits <= p_limit;
+end $$;
+revoke all on function public.check_public_rate_limit(text, integer, integer) from public;
+grant execute on function public.check_public_rate_limit(text, integer, integer) to service_role;
+-- Clean stale buckets via scheduled DELETE older than one day.
