@@ -6,7 +6,7 @@ const maintenanceExempt = (p: string) =>
   p === "/maintenance" || p.startsWith("/maintenance/") ||
   p === "/admin" || p.startsWith("/admin/") ||
   p.startsWith("/api/admin/") || p.startsWith("/api/webhooks/") ||
-  p.startsWith("/api/integrations/") || p === "/api/health" ||
+  p.startsWith("/api/integrations/") || p === "/api/cron/sellerhq" || p === "/api/health" ||
   p.startsWith("/_next/") || p.startsWith("/images/") ||
   p === "/robots.txt" || p === "/site.webmanifest" ||
   p === "/favicon.ico" || p.startsWith("/favicon-") ||
