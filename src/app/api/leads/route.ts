@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { enforcePublicRateLimit } from "@/lib/server/public-rate-limit";
 import { createLead } from "@/lib/server/store";
 import { getSupabase } from "@/lib/server/supabase";
 import { sendEmail } from "@/lib/server/mailer";
@@ -11,6 +12,8 @@ function text(value: FormDataEntryValue | null) {
 }
 
 export async function POST(request: NextRequest) {
+  const limited = await enforcePublicRateLimit(request, "leads");
+  if (limited) return limited;
   try {
     const contentType = request.headers.get("content-type") ?? "";
 
