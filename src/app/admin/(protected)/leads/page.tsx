@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LeadDeleteButton } from "@/components/admin/lead-delete-button";
 import { LeadStatusSelect } from "@/components/admin/lead-status-select";
 import { listLeads } from "@/lib/server/store";
+import { getSupabase } from "@/lib/server/supabase";
 import { formatDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -10,16 +11,32 @@ export const metadata: Metadata = { title: "Sell To Us" };
 function splitNotes(notes?: string) {
   const lines = String(notes ?? "").split("\n");
   return {
-    notes: lines.filter((line) => !line.startsWith("PHOTO: ")).join("\n").trim(),
+    notes: lines.filter((line) => !line.startsWith("PHOTO: ") && !line.startsWith("PRIVATEPHOTO: ")).join("\n").trim(),
     photos: lines
-      .filter((line) => line.startsWith("PHOTO: "))
-      .map((line) => line.slice("PHOTO: ".length).trim())
+      .filter((line) => line.startsWith("PHOTO: ") || line.startsWith("PRIVATEPHOTO: "))
+      .map((line) => line.startsWith("PRIVATEPHOTO: ") ? line : line.slice("PHOTO: ".length).trim())
       .filter(Boolean),
   };
 }
 
 export default async function AdminLeadsPage() {
   const leads = await listLeads();
+  const db = getSupabase();
+  const photosByLead = new Map<string, string[]>();
+  for (const lead of leads) {
+    const refs = splitNotes(lead.notes).photos;
+    const paths = refs.filter((ref) => ref.startsWith("PRIVATEPHOTO: "))
+      .map((ref) => ref.slice("PRIVATEPHOTO: ".length).trim());
+    const signed = paths.length && db
+      ? await db.storage.from("lead-photos-private").createSignedUrls(paths, 300)
+      : null;
+    let next = 0;
+    photosByLead.set(lead.id, refs.map((ref) => {
+      if (!ref.startsWith("PRIVATEPHOTO: ")) return ref;
+      return signed?.data?.[next++]?.signedUrl ?? "";
+    }).filter(Boolean));
+  }
+
 
   return (
     <div>
@@ -45,6 +62,7 @@ export default async function AdminLeadsPage() {
           <tbody>
             {leads.map((lead) => {
               const detail = splitNotes(lead.notes);
+              detail.photos = photosByLead.get(lead.id) ?? [];
               return (
                 <tr key={lead.id} className="border-b border-line align-top hover:bg-cream/50">
                   <td className="px-4 py-4 font-mono text-xs whitespace-nowrap">{formatDateTime(lead.createdAt)}</td>
