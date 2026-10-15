@@ -276,7 +276,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as SyncBody | SellerHqProduct;
     const source = "product" in body && body.product ? body.product : body as SellerHqProduct;
     const publish = "publish" in body ? Boolean(body.publish) : true;
+    const action = "action" in body ? body.action : undefined;
+    if (action && action !== "upsert") {
+      return Response.json({ error: "Unsupported integration action" }, { status: 422 });
+    }
     const product = await mapSellerHqProduct(source, publish);
+    const previous = await findExisting(source);
+    if (previous && (previous.status === "RESERVED" || previous.status === "SOLD") && product.status === "AVAILABLE") {
+      return Response.json({ error: "Cannot reopen reserved or sold stock from catalogue sync" }, { status: 409 });
+    }
 
     await upsertProduct(product, "SellerHQ", `${product.sku} synced from SellerHQ ${product.prdCode}`);
 
