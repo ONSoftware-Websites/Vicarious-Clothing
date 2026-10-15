@@ -1,3 +1,4 @@
+import { getSupabase } from "@/lib/server/supabase";
 import type { Order, Product } from "@/lib/types";
 
 const DEFAULT_TIMEOUT_MS = 12_000;
@@ -65,6 +66,25 @@ async function postToSellerHq(body: Record<string, unknown>): Promise<SellerHqSy
   }
 }
 
+// Persist order delivery before contacting SellerHQ, so outages can be retried.
+async function persistOrderEvent(order: Order, payload: Record<string, unknown>) {
+  const db = getSupabase();
+  if (!db && process.env.NODE_ENV === "production") throw new Error("SellerHQ outbox unavailable");
+  if (!db) return;
+  const eventKey = `order:${order.id}:${order.status}:${order.updatedAt}`;
+  const { error } = await db.from("sellerhq_retry_jobs").upsert(
+    { event_key: eventKey, payload, status: "pending", retry_after: new Date().toISOString() },
+    { onConflict: "event_key", ignoreDuplicates: true }
+  );
+  if (error) throw new Error(`Could not persist SellerHQ event: ${error.message}`);
+}
+async function markDelivered(order: Order) {
+  const db = getSupabase();
+  if (!db) return;
+  const eventKey = `order:${order.id}:${order.status}:${order.updatedAt}`;
+  const { error } = await db.from("sellerhq_retry_jobs").update({ status: "done", updated_at: new Date().toISOString() }).eq("event_key", eventKey);
+  if (error) console.error("SellerHQ outbox completion failed:", error.message);
+}
 function orderPayload(order: Order) {
   return {
     id: order.id,
@@ -147,10 +167,11 @@ export async function syncOrderSaleToSellerHq(order: Order): Promise<SellerHqSyn
     return { ok: false, skipped: true, error: "SellerHQ sync is not configured" };
   }
 
-  return postToSellerHq({
-    action: "record_sale",
-    order: orderPayload(order),
-  });
+  const payload = { action: "record_sale", order: orderPayload(order) };
+  await persistOrderEvent(order, payload);
+  const result = await postToSellerHq(payload);
+  if (result.ok) await markDelivered(order);
+  return result;
 }
 
 export async function syncOrderStatusToSellerHq(order: Order): Promise<SellerHqSyncResult> {
