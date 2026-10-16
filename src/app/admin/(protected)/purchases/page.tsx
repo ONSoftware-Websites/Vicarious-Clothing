@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { PurchaseActions } from "@/components/admin/purchase-actions";
 import { PurchaseDeleteButton } from "@/components/admin/purchase-delete-button";
@@ -10,6 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Stock Purchases" };
 
 export default async function PurchasesPage() {
+  if (!(await requireRole("ADMIN"))) redirect("/admin");
   const purchases = await listPurchases();
 
   return (
