@@ -9,7 +9,7 @@ import { LogoutButton } from "@/components/admin/logout-button";
 
 const groups = [
   { title:"Workspace", links:[["Overview","/admin",1],["Operations","/admin/operations",2],["Orders","/admin/orders",3],["Inventory","/admin/inventory",2],["Sell To Us","/admin/leads",2],["Purchases","/admin/purchases",3]] },
-  { title:"Business",links:[["Marketplace","/admin/marketplace",2],["Finance & analytics","/admin/analytics",3],["Marketing","/admin/marketing",2]] },
+  { title:"Business",links:[["Marketplace","/admin/marketplace",2],["Finance & analytics","/admin/analytics",3],["Finance ledger","/admin/finance",3],["Marketing","/admin/marketing",2]] },
   { title:"Administration",links:[["Journal","/admin/journal",2],["Settings & Integrations","/admin/settings",4],["Staff & Permissions","/admin/staff",5],["Maintenance","/admin/maintenance",4]] },
 ] as const;
 const roles:Record<Role,number> = {CUSTOMER:0,STAFF:1,MANAGER:2,ADMIN:3,OWNER:4,SUPER_ADMIN:5};
