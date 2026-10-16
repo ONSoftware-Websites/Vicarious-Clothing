@@ -174,6 +174,8 @@ export default function CheckoutPage() {
   const mounted = useMounted();
   const { profile } = useAccount();
   const [products, setProducts] = useState<Record<string, CheckoutProduct>>({});
+  const [loadedStock,setLoadedStock] = useState<string | null>(null);
+  const [stockLoadError,setStockLoadError] = useState(false);
   const [step, setStep] = useState<Step>("contact");
   const [placing, setPlacing] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -353,7 +355,7 @@ export default function CheckoutPage() {
           setStripePromise(loadStripe(data.publishableKey));
         }
       })
-      .catch(() => setPayConfig({ mode: "demo", publishableKey: "" }));
+      .catch(() => {setPayConfig(null);setError("Payment services are temporarily unavailable. Please refresh to retry.");});
   }, []);
 
   useEffect(() => {
@@ -368,15 +370,18 @@ export default function CheckoutPage() {
       return;
     }
     let cancelled = false;
-    fetch(`/api/products?skus=${encodeURIComponent(lines.map((l) => l.sku).join(","))}`)
-      .then((r) => r.json())
+    const requested=lines.map((l)=>l.sku).join(",");
+    setStockLoadError(false);
+    fetch(`/api/products?skus=${encodeURIComponent(requested)}`,{cache:"no-store"})
+      .then((r) => {if(!r.ok)throw new Error("Stock check failed");return r.json();})
       .then((data) => {
         if (cancelled) return;
         const map: Record<string, CheckoutProduct> = {};
-        for (const p of data.products) map[p.sku] = p;
+        for (const p of data.products??[]) map[p.sku] = p;
         setProducts(map);
+        setLoadedStock(requested);
       })
-      .catch(() => {});
+      .catch(() => {if(!cancelled)setStockLoadError(true);});
     return () => {
       cancelled = true;
     };
@@ -582,8 +587,9 @@ export default function CheckoutPage() {
     }
   };
 
-  const loading =
-    !mounted || (lines.length > 0 && lines.some((l) => !products[l.sku]));
+  const stockKey=lines.map(line=>line.sku).join(",");
+  const loading = !mounted || (lines.length>0&&loadedStock!==stockKey&&!stockLoadError);
+  const missingStock=mounted&&!loading&&!stockLoadError&&lines.some(line=>!products[line.sku]||products[line.sku].status!=="AVAILABLE");
 
   if (loading) {
     return (
@@ -593,6 +599,10 @@ export default function CheckoutPage() {
         </p>
       </Container>
     );
+  }
+
+  if (stockLoadError || missingStock) {
+    return <Container className="py-20"><div role="alert" className="mx-auto max-w-xl border border-line bg-cream p-8 text-center"><h1 className="font-display text-2xl font-bold uppercase">{stockLoadError?"Unable to verify availability":"Some pieces are unavailable"}</h1><p className="mt-3 text-sm text-ink-soft">{stockLoadError?"We could not check your bag. Please retry before paying.":"One or more pieces have sold, been reserved, or are no longer listed. Review your bag to continue."}</p><div className="mt-6 flex flex-wrap justify-center gap-3"><Link href="/bag" className="bg-ink px-6 py-3 font-mono text-xs uppercase text-paper">Review bag</Link><button type="button" onClick={()=>window.location.reload()} className="border border-ink px-6 py-3 font-mono text-xs uppercase">Retry</button></div></div></Container>;
   }
 
   const stepsContent = (
@@ -1052,7 +1062,7 @@ export default function CheckoutPage() {
               {items.map(({ line, product }) => (
                 <li key={line.sku} className="flex items-center gap-3 py-3">
                   <Image
-                    src={product.images[0]?.src ?? ""}
+                    src={product.images[0]?.src || "/icon.png"}
                     alt={product.name}
                     width={48}
                     height={60}
