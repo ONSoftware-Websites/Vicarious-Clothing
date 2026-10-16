@@ -189,6 +189,19 @@ export async function POST(request: NextRequest) {
         const paymentIntentId =
           typeof session.payment_intent === "string" ? session.payment_intent : undefined;
 
+        // Hosted checkout events must not mark unpaid or mismatched sessions as paid.
+        if (session.payment_status !== "paid" || !paymentIntentId) {
+          throw new Error(`Checkout session not paid for ${orderId}`);
+        }
+        const sessionIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        if (sessionIntent.status !== "succeeded" ||
+            sessionIntent.currency.toLowerCase() !== "gbp" ||
+            Math.round(existing.total * 100) !== sessionIntent.amount ||
+            sessionIntent.metadata?.orderId !== orderId ||
+            (existing.paymentIntentId && existing.paymentIntentId !== sessionIntent.id)) {
+          throw new Error(`Hosted checkout payment mismatch for ${orderId}`);
+        }
+
         if (existing.status === "CANCELLED") {
           if (paymentIntentId) {
             await refundExpiredPayment(stripe, existing, paymentIntentId);
