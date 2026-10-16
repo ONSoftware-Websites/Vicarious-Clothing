@@ -91,8 +91,8 @@ export async function requireRole(minRole: Role) {
   return ROLE_LEVEL[role] >= ROLE_LEVEL[minRole];
 }
 
-export async function requireAdminApi() {
-  if (!(await isAdminSession())) {
+export async function requireAdminApi(minRole: Role = "STAFF") {
+  if (!(await requireRole(minRole))) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   return null;
