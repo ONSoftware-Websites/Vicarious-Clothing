@@ -132,7 +132,7 @@ function mapCategory(value: unknown): Category {
 
   if (raw in table) return table[raw];
   if ((CATEGORIES as readonly string[]).includes(raw)) return raw as Category;
-  return "vintage";
+  throw new Error(`Unsupported SellerHQ category: ${clean(value)}`);
 }
 
 function mapCondition(value: unknown): Condition {
@@ -152,7 +152,7 @@ function mapCondition(value: unknown): Condition {
 
   if (raw in table) return table[raw];
   if ((CONDITIONS as readonly string[]).includes(raw)) return raw as Condition;
-  return "good";
+  throw new Error(`Unsupported SellerHQ condition: ${clean(value)}`);
 }
 
 function mapStatus(source: SellerHqProduct, publish: boolean): InventoryStatus {
