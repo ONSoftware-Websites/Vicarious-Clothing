@@ -55,6 +55,16 @@ export default async function FinancePage(){
    </div>
   </section>
   <section className="border border-line p-5"><StripeReconcileForm/></section>
+  <section className="grid gap-6 lg:grid-cols-2">
+   <div className="border border-line p-5"><h2 className="font-display text-sm font-bold uppercase tracking-widest">Monthly trading activity</h2>
+    <div className="mt-4 max-h-80 overflow-y-auto"><table className="w-full text-sm"><thead><tr className="text-left text-xs text-ink-soft"><th>Month</th><th>Orders</th><th>Gross orders</th><th>Adjustments</th></tr></thead><tbody>{report.monthly.map(m=><tr key={m.month} className="border-t border-line"><td className="py-3 font-mono">{m.month}</td><td>{m.orders}</td><td>{formatPrice(m.sales)}</td><td>{formatPrice(m.adjustments)}</td></tr>)}</tbody></table></div>
+    <p className="mt-3 text-xs text-ink-soft">Order creation months and adjustment transaction months are displayed separately; timing may differ from bank settlement.</p>
+   </div>
+   <div className="border border-line p-5"><h2 className="font-display text-sm font-bold uppercase tracking-widest">Promotions attribution</h2>
+    <div className="mt-4 max-h-80 overflow-y-auto"><table className="w-full text-sm"><thead><tr className="text-left text-xs text-ink-soft"><th>Code</th><th>Orders</th><th>Order totals</th><th>Discounts</th></tr></thead><tbody>{report.promotions.map(p=><tr key={p.code} className="border-t border-line"><td className="py-3 font-mono">{p.code}</td><td>{p.orders}</td><td>{formatPrice(p.orderTotals)}</td><td>{formatPrice(p.discountRecorded)}</td></tr>)}</tbody></table>{!report.promotions.length&&<p className="mt-3 text-sm text-ink-soft">No recorded discount-code orders yet.</p>}</div>
+    <p className="mt-3 text-xs text-ink-soft">Attribution is based on checkout discount codes, not proven incremental marketing impact or newsletter clicks.</p>
+   </div>
+  </section>
   <details className="border border-line"><summary className="cursor-pointer bg-cream p-5 font-display text-xs font-semibold uppercase tracking-widest">+ Record a financial adjustment</summary><div className="p-5"><FinanceAdjustmentForm/></div></details>
   <section><h2 className="mb-4 font-display text-sm font-bold uppercase tracking-widest">Financial records</h2>
    <div className="overflow-x-auto border border-line"><table className="w-full min-w-[850px] text-left text-sm">
