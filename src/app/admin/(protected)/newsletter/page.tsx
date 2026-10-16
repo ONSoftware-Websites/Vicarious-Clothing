@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { listSubscribers } from "@/lib/server/store";
 import { formatDateTime } from "@/lib/utils";
@@ -10,6 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Newsletter" };
 
 export default async function NewsletterPage() {
+  if (!(await requireRole("MANAGER"))) redirect("/admin");
   const subscribers = await listSubscribers();
 
   return (
