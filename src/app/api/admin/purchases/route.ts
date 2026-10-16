@@ -1,3 +1,5 @@
+import {getSupabase} from "@/lib/server/supabase";
+import {getSupabaseUser} from "@/lib/supabase/server";
 import type { NextRequest } from "next/server";
 import type { StockPurchase } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
@@ -5,7 +7,6 @@ import { adminDeletePurchase } from "@/lib/server/admin-delete";
 import {
   createPurchase,
   getProductBySku,
-  markPurchasePaid,
 } from "@/lib/server/store";
 
 const ACTOR = "Admin";
@@ -19,9 +20,22 @@ export async function POST(request: NextRequest) {
     const action = String(body.action ?? "save");
 
     if (action === "paid") {
-      const purchase = await markPurchasePaid(String(body.id), ACTOR);
-      if (!purchase) return Response.json({ error: "Not found" }, { status: 404 });
-      return Response.json({ ok: true, purchase });
+      const id=String(body.id??"").trim();
+      const paymentReference=String(body.paymentReference??"").trim();
+      if(!id||paymentReference.length<4||paymentReference.length>120)
+        return Response.json({error:"Enter a real external payment reference (4–120 characters)"},{status:400});
+      const user=await getSupabaseUser();
+      const db=getSupabase();
+      if(!user||!db)return Response.json({error:"Service unavailable"},{status:503});
+      const {data, error}=await db.rpc("confirm_stock_purchase_payment",{
+        p_purchase_id:id,p_reference:paymentReference,p_actor_id:user.id
+      });
+      if(error){
+        console.error("Purchase payment reconciliation failed",error);
+        return Response.json({error:"Payment cannot be recorded yet. Check seller inspection, stock intake and the linked inventory, or contact an administrator."},{status:409});
+      }
+      if(!data)return Response.json({error:"Purchase not found"},{status:404});
+      return Response.json({ok:true,paid:true});
     }
 
     if (action === "delete") {
