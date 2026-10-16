@@ -69,27 +69,8 @@ export function useWishlist() {
       try { return createSupabaseBrowser(); } catch { return null; }
     })();
     if (!supabase) return;
-    const { data: wl } = await supabase.from("wishlists").select("id").eq("profile_id", userId).maybeSingle();
-    let wishlistId = wl?.id as string | undefined;
-    if (!wishlistId) {
-      const { data: created } = await supabase.from("wishlists").insert({ profile_id: userId }).select("id").single();
-      wishlistId = (created as { id: string } | null)?.id;
-    }
-    if (!wishlistId) return;
-    const { data: existing, error: readError } = await supabase.from("wishlist_items").select("sku").eq("wishlist_id", wishlistId);
-    if (readError) throw readError;
-    const current = new Set((existing ?? []).map(item => String(item.sku)));
-    const desired = new Set(nextSkus);
-    const additions = [...desired].filter(sku => !current.has(sku));
-    const removals = [...current].filter(sku => !desired.has(sku));
-    if (additions.length) {
-      const { error } = await supabase.from("wishlist_items").upsert(additions.map(sku => ({wishlist_id:wishlistId,sku})), {onConflict:"wishlist_id,sku",ignoreDuplicates:true});
-      if (error) throw error;
-    }
-    if (removals.length) {
-      const { error } = await supabase.from("wishlist_items").delete().eq("wishlist_id",wishlistId).in("sku",removals);
-      if (error) throw error;
-    }
+    const { error } = await supabase.rpc("sync_current_wishlist", {p_skus:[...new Set(nextSkus)]});
+    if (error) throw error;
     setRemoteSkus(nextSkus);
   }, [userId]);
 
