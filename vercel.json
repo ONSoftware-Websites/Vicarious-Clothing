@@ -30,7 +30,7 @@
   "crons": [
     {
       "path": "/api/cron/sellerhq",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
