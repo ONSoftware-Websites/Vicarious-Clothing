@@ -132,10 +132,13 @@ export async function POST(request: NextRequest) {
 
         const existing = await getOrder(orderId);
         if (!existing) throw new Error(`Order ${orderId} was not found`);
-        if (Math.round(existing.total * 100) !== intent.amount) {
+        if (intent.currency.toLowerCase() !== "gbp" || Math.round(existing.total * 100) !== intent.amount) {
           throw new Error(`Stripe amount mismatch for ${orderId}`);
         }
 
+        if (existing.paymentIntentId && existing.paymentIntentId !== intent.id) {
+          throw new Error(`Unexpected Stripe payment intent for ${orderId}`);
+        }
         if (existing.status === "CANCELLED") {
           await refundExpiredPayment(stripe, existing, intent.id);
           break;
