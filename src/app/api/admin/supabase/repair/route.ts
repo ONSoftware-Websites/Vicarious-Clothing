@@ -4,7 +4,7 @@ import { getSupabase, supabaseConfigured } from "@/lib/server/supabase";
 export const dynamic = "force-dynamic";
 
 export async function POST() {
-  const authError = await requireAdminApi();
+  const authError = await requireAdminApi("OWNER");
   if (authError) return authError;
 
   if (!supabaseConfigured()) {
