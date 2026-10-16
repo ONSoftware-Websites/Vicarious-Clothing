@@ -60,13 +60,13 @@ export default async function AnalyticsPage() {
   }
 
   const itemsSold = soldSkus.size;
-  const avgOrder = orders.length ? revenue / completed.length : 0;
+  const avgOrder = completed.length ? revenue / completed.length : 0;
   const websiteOrders = completed.filter((o) => o.channel === "website").length;
   const conversion = visits.total > 0 ? (websiteOrders / visits.total) * 100 : 0;
-  const returned = completed.filter((o) =>
+  const returned = orders.filter((o) =>
     ["RETURNED", "REFUNDED", "RETURN_REQUESTED"].includes(o.status)
   ).length;
-  const returnRate = completed.length ? (returned / completed.length) * 100 : 0;
+  const returnRate = (completed.length + orders.filter(o => o.status === "REFUNDED").length) ? (returned / (completed.length + orders.filter(o => o.status === "REFUNDED").length)) * 100 : 0;
 
   const soldProducts = products.filter((p) => p.status === "SOLD" && p.soldAt);
   const avgDaysToSell = soldProducts.length
