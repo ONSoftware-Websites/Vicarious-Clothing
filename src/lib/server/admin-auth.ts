@@ -2,6 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import type { Role } from "@/lib/types";
 import { adminEnabled } from "@/lib/admin-config";
+import { createSupabaseServer } from "@/lib/supabase/server";
+import { getSupabase } from "@/lib/server/supabase";
 
 export const COOKIE = "vc_admin";
 export const ROLE_COOKIE = "vc_admin_role";
@@ -52,7 +54,23 @@ function parseRole(value: string | undefined): Role {
   return value && ROLE_LEVEL[value as Role] !== undefined ? (value as Role) : "OWNER";
 }
 
+async function adminIdentity(): Promise<Role> {
+  const auth = await createSupabaseServer();
+  if (!auth) return "CUSTOMER";
+  const {data:{user},error} = await auth.auth.getUser();
+  if (error || !user) return "CUSTOMER";
+  const {data:aal} = await auth.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal?.currentLevel !== "aal2") return "CUSTOMER";
+  const db = getSupabase();
+  if (!db) return "CUSTOMER";
+  const {data,error:membershipError} = await db.from("admin_staff")
+    .select("role,active").eq("user_id",user.id).maybeSingle();
+  if (membershipError || !data?.active) return "CUSTOMER";
+  return (data.role in ROLE_LEVEL && data.role !== "CUSTOMER") ? data.role as Role : "CUSTOMER";
+}
+
 export async function isAdminSession() {
+  if (process.env.ADMIN_AUTH_V2 === "true") return (await adminIdentity()) !== "CUSTOMER";
   const store = await cookies();
   if (store.get(COOKIE)?.value !== "1") return false;
   const role = parseRole(store.get(ROLE_COOKIE)?.value);
@@ -62,6 +80,7 @@ export async function isAdminSession() {
 }
 
 export async function getAdminRole(): Promise<Role> {
+  if (process.env.ADMIN_AUTH_V2 === "true") return adminIdentity();
   if (!(await isAdminSession())) return "CUSTOMER";
   const store = await cookies();
   return parseRole(store.get(ROLE_COOKIE)?.value);
