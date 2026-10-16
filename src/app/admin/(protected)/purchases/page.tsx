@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/server/admin-auth";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -11,14 +12,22 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Stock Purchases" };
 
-export default async function PurchasesPage() {
+export default async function PurchasesPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   if (!(await requireRole("ADMIN"))) redirect("/admin");
-  const purchases = await listPurchases();
+  const allPurchases = await listPurchases();
+  const raw = await searchParams;
+  const q = typeof raw.q==="string"?raw.q.trim().toLowerCase():"";
+  const status = raw.status==="PAID"||raw.status==="UNPAID"?raw.status:"";
+  const purchases = allPurchases.filter(p=>(!status||(status==="PAID"?p.status==="PAID":p.status!=="PAID"))&&(!q||[p.sellerName,p.sellerEmail??"",p.notes??"",...p.items.map(i=>`${i.sku} ${i.name}`)].join(" ").toLowerCase().includes(q)));
+  const paid = allPurchases.filter(p=>p.status==="PAID");
+  const outstanding = allPurchases.filter(p=>p.status!=="PAID");
+  const unlinked = allPurchases.filter(p=>p.items.length===0);
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-2xl font-semibold uppercase tracking-tight">
+        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-accent-deep">Workspace / Acquisitions</p>
+        <h1 className="font-display text-3xl font-bold uppercase tracking-tight">
           Stock purchases
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-soft">
@@ -28,7 +37,23 @@ export default async function PurchasesPage() {
         </p>
       </div>
 
-      <PurchaseForm />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[
+        ["Total acquisitions",String(allPurchases.length),"All recorded purchases"],
+        ["Paid",String(paid.length),formatPrice(paid.reduce((sum,p)=>sum+p.amount,0))+" paid"],
+        ["Outstanding",String(outstanding.length),formatPrice(outstanding.reduce((sum,p)=>sum+p.amount,0))+" to reconcile"],
+        ["Unlinked stock",String(unlinked.length),"Purchases without linked items"]
+      ].map(([label,value,detail])=><div key={label} className="border border-line bg-cream p-4"><p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">{label}</p><p className="mt-2 font-display text-2xl font-semibold">{value}</p><p className="mt-1 text-xs text-ink-soft">{detail}</p></div>)}</div>
+
+      <details className="border border-line bg-paper" id="record-purchase"><summary className="cursor-pointer bg-cream px-5 py-4 font-display text-xs font-semibold uppercase tracking-wider">+ Record a stock purchase</summary><div className="p-5"><PurchaseForm /></div></details>
+
+      <form action="/admin/purchases" className="flex flex-wrap gap-3">
+        <label className="sr-only" htmlFor="purchase-search">Search purchases</label>
+        <input id="purchase-search" name="q" defaultValue={typeof raw.q==="string"?raw.q:""} placeholder="Seller, email, item SKU or notes…" className="h-11 min-w-0 flex-1 border border-line bg-paper px-4 text-sm sm:max-w-md"/>
+        <label className="sr-only" htmlFor="purchase-status">Payment status</label>
+        <select id="purchase-status" name="status" defaultValue={status} className="h-11 border border-line bg-paper px-3 font-mono text-xs uppercase"><option value="">All payments</option><option value="UNPAID">Outstanding</option><option value="PAID">Paid</option></select>
+        <button type="submit" className="h-11 bg-ink px-5 font-display text-xs font-semibold uppercase tracking-wider text-paper">Apply</button>
+        <Link href="/admin/purchases" className="flex h-11 items-center font-mono text-xs uppercase text-ink-soft underline underline-offset-4">Clear</Link>
+      </form>
 
       <div className="overflow-x-auto border border-line">
         <table className="w-full min-w-[800px] border-collapse text-sm">
@@ -96,7 +121,7 @@ export default async function PurchasesPage() {
             {purchases.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
-                  No purchases recorded yet
+                  No purchases match these filters
                 </td>
               </tr>
             )}
