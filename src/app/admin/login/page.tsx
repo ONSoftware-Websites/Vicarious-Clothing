@@ -1,7 +1,9 @@
 import { hasAdminPassword } from "@/lib/admin-config";
 import { AdminLoginForm } from "@/components/admin/login-form";
+import { SecureAdminLogin } from "@/components/admin/secure-admin-login";
 
 export default function AdminLoginPage() {
+  if (process.env.ADMIN_AUTH_V2 === "true") return <SecureAdminLogin />;
   const configured = hasAdminPassword();
   return (
     <div>
