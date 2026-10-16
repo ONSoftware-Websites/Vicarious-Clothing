@@ -25,6 +25,7 @@ const ROLE_LEVEL: Record<Role, number> = {
   MANAGER: 2,
   ADMIN: 3,
   OWNER: 4,
+  SUPER_ADMIN: 5,
 };
 
 function adminSecret() {
