@@ -34,8 +34,18 @@ export function financeReport(orders:Order[],products:Product[],purchases:StockP
   const attributed=entries.filter(e=>e.order_id&&orderIds.has(e.order_id));
   return {channel,orders:group.length,sales:sum(group.map(o=>o.total)),recordedAdjustments:sum(attributed.map(e=>e.amount))};
  });
+ const promotions=[...new Set(chargeable.flatMap(o=>o.discount?.code?[o.discount.code]:[]))].map(code=>{
+   const affected=chargeable.filter(o=>o.discount?.code===code);
+   return {code,orders:affected.length,orderTotals:sum(affected.map(o=>o.total)),discountRecorded:sum(affected.map(o=>o.discount?.amount??0))};
+ }).sort((a,b)=>b.orderTotals-a.orderTotals);
+ const months=[...new Set([...chargeable.map(o=>o.createdAt.slice(0,7)),...entries.map(e=>e.occurred_at.slice(0,7))])].sort().reverse();
+ const monthly=months.map(month=>({month,
+  sales:sum(chargeable.filter(o=>o.createdAt.startsWith(month)).map(o=>o.total)),
+  adjustments:sum(entries.filter(e=>e.occurred_at.startsWith(month)).map(e=>e.amount)),
+  orders:chargeable.filter(o=>o.createdAt.startsWith(month)).length
+ }));
  return {sales,itemCosts,unknownCosts,expenseTotal,adjustments,contribution,orders:chargeable.length,
   refundedWithoutLedger,unattributedAdjustments:entries.filter(e=>!e.order_id).length,
-  channels,averageOrder:chargeable.length?money(sales/chargeable.length):0,
+  channels,promotions,monthly,averageOrder:chargeable.length?money(sales/chargeable.length):0,
   isComplete:unknownCosts===0&&refundedWithoutLedger===0};
 }
