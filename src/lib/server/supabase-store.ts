@@ -949,6 +949,7 @@ function toPurchase(row: Row, items: Row[]): StockPurchase {
     leadId: row.lead_id ? str(row.lead_id) : undefined,
     createdAt: str(row.created_at),
     paidAt: row.paid_at ? str(row.paid_at) : undefined,
+    paymentReference: row.payment_reference ? str(row.payment_reference) : undefined,
   };
 }
 
