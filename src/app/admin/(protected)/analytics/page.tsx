@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/server/admin-auth";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -39,6 +40,9 @@ export default async function AnalyticsPage() {
   const orders = await listOrders();
   const products = await listProducts();
   const visits = await getVisits();
+  const inventoryCost = products.filter(p=>p.status==="AVAILABLE"||p.status==="RESERVED").reduce((sum,p)=>sum+(p.cost??0),0);
+  const pendingPayment = orders.filter(o=>o.status==="PENDING_PAYMENT").length;
+  const refunds = orders.filter(o=>o.status==="REFUNDED").length;
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -121,14 +125,16 @@ export default async function AnalyticsPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="font-display text-2xl font-semibold uppercase tracking-tight">
-          Analytics
+        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-accent-deep">Business / Financial reporting</p>
+        <h1 className="font-display text-3xl font-bold uppercase tracking-tight">
+          Finance & Analytics
         </h1>
         <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
           <Now /> · completed orders only
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-2"><Link href="/admin/orders" className="border border-ink px-4 py-3 font-mono text-[10px] uppercase tracking-wider hover:bg-cream">Review orders →</Link><Link href="/admin/purchases" className="border border-line px-4 py-3 font-mono text-[10px] uppercase tracking-wider hover:bg-cream">Stock purchases →</Link><Link href="/admin/inventory" className="border border-line px-4 py-3 font-mono text-[10px] uppercase tracking-wider hover:bg-cream">Inventory →</Link></div>
       <section>
         <h2 className="mb-4 font-display text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">
           This month
@@ -161,6 +167,7 @@ export default async function AnalyticsPage() {
         </div>
       </section>
 
+      <section><h2 className="mb-4 font-display text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">Financial oversight</h2><div className="grid grid-cols-2 gap-4 lg:grid-cols-4"><Metric label="Capital in available stock" value={formatPrice(inventoryCost)} sub="Recorded acquisition cost; available and reserved"/><Metric label="Orders awaiting payment" value={String(pendingPayment)} sub="Not included in revenue"/><Metric label="Refunded orders" value={String(refunds)} sub="Excluded from reported revenue"/><Metric label="Website revenue share" value={`${revenue?((websiteRevenue/revenue)*100).toFixed(1):"0.0"}%`} sub="All completed sales channels"/></div><p className="mt-3 text-xs text-ink-soft">Profit is a product-level estimate, not an accounting statement. It does not include every overhead or tax liability. Revenue figures exclude fully refunded orders; partial refunds require separate reconciliation.</p></section>
       <section>
         <h2 className="mb-4 font-display text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">
           Sales by channel
