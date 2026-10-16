@@ -6,7 +6,8 @@ function cell(v:unknown){
 }
 export async function GET(){
  const denied=await requireAdminApi("ADMIN");if(denied)return denied;
- const data=await getFinanceEntries();
+ let data;
+ try{data=await getFinanceEntries();}catch{return Response.json({error:"The full financial ledger could not be exported"},{status:503});}
  const header=["Date","Type","GBP amount","Order ID","Reference","Description","Recorded at"];
  const csv=[header,...data.map(row=>[
   row.occurred_at,row.kind,row.amount,row.order_id,row.reference,row.description,row.created_at
