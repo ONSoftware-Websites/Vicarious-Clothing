@@ -67,7 +67,7 @@ function relistedProduct(product: Product): Product {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = await requireAdminApi();
+  const authError = await requireAdminApi("MANAGER");
   if (authError) return authError;
   const actor = "Admin";
 
