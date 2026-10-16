@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe, getWebhookSecret } from "@/lib/server/payments";
+import { getSupabase } from "@/lib/server/supabase";
 import {
   getOrder,
   listEmails,
@@ -121,6 +122,26 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Stripe webhook signature error:", error);
     return Response.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  // Durable event claim: concurrent Stripe retries must not process the same event twice.
+  const db = getSupabase();
+  if (!db) return Response.json({ error: "Event ledger unavailable" }, { status: 503 });
+  const {error:claimError} = await db.from("stripe_webhook_events").insert({
+    event_id:event.id,event_type:event.type,status:"processing"
+  });
+  if (claimError) {
+    if (claimError.code !== "23505")
+      return Response.json({ error:"Cannot record Stripe event" }, {status:503});
+    const {data:prior,error:lookupError} = await db.from("stripe_webhook_events")
+      .select("status,claimed_at").eq("event_id",event.id).maybeSingle();
+    if (lookupError || !prior) return Response.json({error:"Event state unavailable"},{status:503});
+    if (prior.status === "completed") return Response.json({received:true,duplicate:true});
+    const cutoff = new Date(Date.now()-3*60*1000).toISOString();
+    const {data:reclaimed,error:reclaimError} = await db.from("stripe_webhook_events")
+      .update({claimed_at:new Date().toISOString()}).eq("event_id",event.id)
+      .eq("status","processing").lt("claimed_at",cutoff).select("event_id").maybeSingle();
+    if (reclaimError || !reclaimed) return Response.json({error:"Event is already processing"},{status:503});
   }
 
   try {
@@ -248,9 +269,12 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error(`Stripe webhook ${event.type} failed:`, error);
+    await db.from("stripe_webhook_events").delete().eq("event_id",event.id).eq("status","processing");
     // Non-2xx causes Stripe to retry transient failures rather than silently losing them.
     return Response.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 
+  const {error:doneError} = await db.from("stripe_webhook_events").update({status:"completed",completed_at:new Date().toISOString()}).eq("event_id",event.id);
+  if (doneError) return Response.json({error:"Unable to complete Stripe event ledger"},{status:503});
   return Response.json({ received: true });
 }
