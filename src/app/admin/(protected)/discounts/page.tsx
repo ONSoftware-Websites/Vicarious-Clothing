@@ -16,7 +16,7 @@ export default async function DiscountsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-2xl font-semibold uppercase tracking-tight">
+        <h1 className="font-display text-3xl font-bold uppercase tracking-tight">
           Discounts
         </h1>
         <p className="mt-1 max-w-xl text-sm text-ink-soft">
@@ -27,7 +27,13 @@ export default async function DiscountsPage() {
         </p>
       </div>
 
-      <DiscountForm />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[
+        ["Total codes",String(discounts.length)],
+        ["Expired",String(discounts.filter(d=>d.expiresAt&&new Date(d.expiresAt).getTime()<Date.now()).length)],
+        ["Usage exhausted",String(discounts.filter(d=>d.usageLimit!==undefined&&d.usedCount>=d.usageLimit).length)],
+        ["Total redemptions",String(discounts.reduce((sum,d)=>sum+d.usedCount,0))]
+      ].map(([name,value])=><div key={name} className="border border-line bg-cream p-4"><p className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">{name}</p><p className="mt-2 font-display text-2xl font-semibold">{value}</p></div>)}</div>
+      <details className="border border-line"><summary className="cursor-pointer bg-cream p-5 font-display text-xs font-semibold uppercase tracking-widest">+ Create discount code</summary><div className="p-5"><DiscountForm /></div></details>
 
       <div className="overflow-x-auto border border-line">
         <table className="w-full min-w-[800px] border-collapse text-sm">
