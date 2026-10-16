@@ -2,7 +2,7 @@ import { requireAdminApi } from "@/lib/server/admin-auth";
 import { listSubscribers } from "@/lib/server/store";
 
 export async function GET() {
-  const authError = await requireAdminApi();
+  const authError = await requireAdminApi("ADMIN");
   if (authError) return authError;
 
   const subscribers = await listSubscribers();
