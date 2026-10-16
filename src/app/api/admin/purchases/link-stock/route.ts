@@ -15,8 +15,13 @@ export async function POST(request:Request){
  if(!purchase)return Response.json({error:"Purchase not found"},{status:404});
  if(purchase.items.some(item=>item.sku.toUpperCase()===sku))
   return Response.json({error:"That item is already linked"},{status:409});
+ const allocated=purchase.items.reduce((sum,item)=>sum+item.cost,0);
+ if(allocated+cost>purchase.amount+0.01)
+  return Response.json({error:"Allocated item costs cannot exceed the recorded purchase amount"},{status:409});
  const product=await getProductBySku(sku);
  if(!product)return Response.json({error:"Create the inventory item before linking it"},{status:404});
+ if(product.status==="SOLD"||product.status==="ARCHIVED")
+  return Response.json({error:"A sold or archived garment cannot be linked as newly acquired stock"},{status:409});
  const db=getSupabase();
  if(!db)return Response.json({error:"Stock database unavailable"},{status:503});
  const {error}=await db.from("stock_purchase_items").insert({
