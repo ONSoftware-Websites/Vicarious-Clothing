@@ -17,8 +17,9 @@ function Metric({label,count,href}:{label:string;count:number;href:string}) {
 
 export default async function OperationsPage() {
   if (!(await requireRole("MANAGER"))) redirect("/admin");
+  const canManageFinance = await requireRole("ADMIN");
   const [orders,products,leads,purchases] = await Promise.all([
-    listOrders(),listProducts(),listLeads(),listPurchases()
+    listOrders(),listProducts(),listLeads(),canManageFinance ? listPurchases() : Promise.resolve([])
   ]);
   const db = getSupabase();
   const retry = db ? await db.from("sellerhq_retry_jobs")
@@ -33,14 +34,14 @@ export default async function OperationsPage() {
       <p className="mt-2 text-sm text-ink-soft">Prioritise fulfilment, seller offers, listing quality and SellerHQ integration health.</p>
     </header>
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-      <Metric label="Orders to fulfil" count={outstanding.length} href="/admin/orders"/>
+      {canManageFinance && <Metric label="Orders to fulfil" count={outstanding.length} href="/admin/orders"/>}
       <Metric label="Open seller enquiries" count={openLeads.length} href="/admin/leads"/>
-      <Metric label="Outstanding seller payments" count={unpaid.length} href="/admin/purchases"/>
+      {canManageFinance && <Metric label="Outstanding seller payments" count={unpaid.length} href="/admin/purchases"/>}
       <Metric label="Drafts missing photographs" count={missingPhotos.length} href="/admin/inventory?status=DRAFT"/>
       <Metric label="Products needing valid pricing" count={unpriced.length} href="/admin/inventory"/>
-      <Metric label="SellerHQ deliveries outstanding" count={retry?.count??0} href="/admin/analytics"/>
+      {canManageFinance && <Metric label="SellerHQ deliveries outstanding" count={retry?.count??0} href="/admin/analytics"/>}
     </div>
-    <section className="border border-line p-6">
+    {canManageFinance && <section className="border border-line p-6">
       <h2 className="font-display text-lg font-bold uppercase">Fulfilment queue</h2>
       <div className="mt-4 space-y-3">
         {outstanding.slice(0,15).map(order=><Link key={order.id} href={`/admin/orders/${order.id}`}
@@ -49,6 +50,6 @@ export default async function OperationsPage() {
         </Link>)}
         {!outstanding.length && <p className="text-sm text-ink-soft">No outstanding fulfilment orders.</p>}
       </div>
-    </section>
+    </section>}
   </div>;
 }
