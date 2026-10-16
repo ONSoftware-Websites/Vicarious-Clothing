@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "save") {
+      if (body.purchase?.status === "PAID") return Response.json({error:"Create the purchase first, then confirm external payment with a reference."},{status:400});
       const purchase = body.purchase as Partial<StockPurchase>;
       if (!purchase.sellerName || !purchase.amount) {
         return Response.json({ error: "Missing required fields" }, { status: 400 });
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
         sellerName: String(purchase.sellerName),
         sellerEmail: String(purchase.sellerEmail ?? ""),
         amount: Number(purchase.amount),
-        status: purchase.status === "PAID" ? "PAID" : "AGREED",
+        status: "AGREED",
         items,
         notes: purchase.notes ? String(purchase.notes) : undefined,
         leadId: purchase.leadId ? String(purchase.leadId) : undefined,
@@ -89,8 +90,6 @@ export async function POST(request: NextRequest) {
         },
         ACTOR
       );
-
-      if (full.status === "PAID") await markPurchasePaid(saved.id, ACTOR);
 
       return Response.json({ ok: true, purchase: saved });
     }
