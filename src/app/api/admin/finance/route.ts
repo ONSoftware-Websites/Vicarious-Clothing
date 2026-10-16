@@ -14,7 +14,7 @@ export async function POST(req:NextRequest){
  const kind=input.kind,amount=input.amount,reference=input.reference,description=input.description,occurredAt=input.occurredAt,orderId=input.orderId;
  if(typeof kind!=="string"||!FINANCE_KINDS.includes(kind as typeof FINANCE_KINDS[number])||
     typeof amount!=="number"||!Number.isFinite(amount)||amount<=0||amount>1000000||
-    Math.round(amount*100)!==amount*100||
+    Math.abs(amount*100-Math.round(amount*100))>0.000001||
     typeof reference!=="string"||reference.trim().length<3||reference.trim().length>140||
     (description!==undefined&&(typeof description!=="string"||description.length>1000))||
     typeof occurredAt!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(occurredAt)||Number.isNaN(Date.parse(occurredAt))||
