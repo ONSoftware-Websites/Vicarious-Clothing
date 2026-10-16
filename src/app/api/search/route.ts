@@ -1,9 +1,10 @@
 import type { NextRequest } from "next/server";
+import { isPublicProduct } from "@/lib/public-catalog";
 import { listProducts } from "@/lib/server/store";
 
 export async function GET(request: NextRequest) {
   const q = (request.nextUrl.searchParams.get("q") ?? "").trim().toLowerCase();
-  const products = await (await listProducts()).filter((p) => p.status !== "DRAFT");
+  const products = (await listProducts()).filter(isPublicProduct);
 
   if (!q) {
     return Response.json({ results: [] });
