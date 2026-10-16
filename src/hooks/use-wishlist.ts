@@ -76,7 +76,7 @@ export function useWishlist() {
 
   const toggle = useCallback((sku: string) => {
     const next = skus.includes(sku) ? skus.filter((s) => s !== sku) : [...skus, sku];
-    if (isRemote) syncRemote(next);
+    if (isRemote) void syncRemote(next).catch(error => console.error("Wishlist update failed",error));
     else setLocalSkus(next);
   }, [skus, isRemote, setLocalSkus, syncRemote]);
 
@@ -92,8 +92,10 @@ export function useWishlist() {
   useEffect(() => {
     if (isRemote && localSkus.length > 0) {
       const merged = [...new Set([...remoteSkus, ...localSkus])];
-      syncRemote(merged);
-      setLocalSkus([]);
+      void syncRemote(merged).then(() => setLocalSkus([])).catch(error => {
+        // Retain offline selections when the remote merge fails.
+        console.error("Wishlist merge failed",error);
+      });
     }
   }, [isRemote]); // eslint-disable-line react-hooks/exhaustive-deps
 
