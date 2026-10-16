@@ -11,7 +11,7 @@ import {
 const ACTOR = "Admin";
 
 export async function POST(request: NextRequest) {
-  const authError = await requireAdminApi();
+  const authError = await requireAdminApi("ADMIN");
   if (authError) return authError;
 
   try {
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const authError = await requireAdminApi();
+  const authError = await requireAdminApi("ADMIN");
   if (authError) return authError;
   const id = request.nextUrl.searchParams.get("id") ?? "";
   if (!id) return Response.json({ error: "Missing id" }, { status: 400 });
