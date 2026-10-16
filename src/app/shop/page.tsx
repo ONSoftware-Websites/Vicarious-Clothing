@@ -26,6 +26,7 @@ export default async function ShopPage({
     sort: typeof raw.sort === "string" ? raw.sort : undefined,
     q: typeof raw.q === "string" ? raw.q : undefined,
     collection: typeof raw.collection === "string" ? raw.collection : undefined,
+    page: typeof raw.page === "string" ? raw.page : undefined,
   };
 
   const collection = COLLECTIONS.find((c) => c.key === params.collection);
