@@ -589,7 +589,7 @@ export default function CheckoutPage() {
 
   const stockKey=lines.map(line=>line.sku).join(",");
   const loading = !mounted || (lines.length>0&&loadedStock!==stockKey&&!stockLoadError);
-  const missingStock=mounted&&!loading&&!stockLoadError&&lines.some(line=>!products[line.sku]||products[line.sku].status!=="AVAILABLE");
+  const missingStock=mounted&&!loading&&!stockLoadError&&lines.some(line=>!products[line.sku]||!["AVAILABLE","RESERVED"].includes(products[line.sku].status));
 
   if (loading) {
     return (
