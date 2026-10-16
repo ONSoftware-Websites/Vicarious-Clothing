@@ -19,6 +19,8 @@ export function SecureAdminLogin() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
   const beginMfa = async () => {
+    const membership = await fetch("/api/admin/enrolment-check", {cache:"no-store"});
+    if (!membership.ok) throw new Error("This account is not authorised for Vicarious administration.");
     const auth = client();
     const {data:level} = await auth.auth.mfa.getAuthenticatorAssuranceLevel();
     if (level?.currentLevel === "aal2") {
