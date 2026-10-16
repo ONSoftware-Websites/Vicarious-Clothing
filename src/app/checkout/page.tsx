@@ -558,7 +558,7 @@ export default function CheckoutPage() {
   const canContinue =
     !holdingStock &&
     !error &&
-    ((step === "contact" && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.trim())) ||
+    ((step === "contact" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) ||
       (step === "delivery" && name.trim().length>1 && line1.trim() && city.trim() && postcode.trim().length>=5) ||
       (step === "review" &&
         (isStripe ? terms && !!clientSecret : card.length >= 12 && cardName && cardExpiry && cardCvc && terms)));
