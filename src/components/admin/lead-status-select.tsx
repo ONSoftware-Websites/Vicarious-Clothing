@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { LeadStatus } from "@/lib/types";
-import { LEAD_STATUSES } from "@/lib/types";
+import { LEAD_TRANSITIONS } from "@/lib/workflow-transitions";
 
 export function LeadStatusSelect({
   id,
@@ -19,17 +19,21 @@ export function LeadStatusSelect({
   const [showOffer, setShowOffer] = useState(false);
   const [offer, setOffer] = useState(currentOffer ?? "");
   const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null);
+  const [error,setError]=useState("");
 
   const doUpdate = async (nextStatus: LeadStatus, offerValue?: string) => {
-    setBusy(true);
+    setBusy(true);setError("");
     try {
-      await fetch(`/api/admin/leads/${id}`, {
+      const res=await fetch(`/api/admin/leads/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus, offer: offerValue }),
       });
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok)throw new Error(data.error??"Unable to update this submission");
+      setShowOffer(false);
       router.refresh();
-    } finally {
+    } catch(e){setError(e instanceof Error?e.message:"Unable to update submission");} finally {
       setBusy(false);
     }
   };
@@ -60,8 +64,7 @@ export function LeadStatusSelect({
             type="button"
             disabled={busy || !offer.trim()}
             onClick={() => {
-              setShowOffer(false);
-              doUpdate(pendingStatus!, offer.trim());
+              void doUpdate(pendingStatus!, offer.trim());
             }}
             className="flex-1 bg-ink px-3 py-2 font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-paper hover:bg-accent disabled:opacity-50"
           >
@@ -71,22 +74,25 @@ export function LeadStatusSelect({
             Cancel
           </button>
         </div>
+        {error&&<p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}
       </div>
     );
   }
 
   return (
-    <select
+    <div className="space-y-2"><select
       value={status}
       disabled={busy}
       onChange={(e) => handleChange(e.target.value as LeadStatus)}
       className="h-9 border border-line bg-paper px-2 font-mono text-[10px] uppercase tracking-[0.1em] focus:border-ink focus:outline-none disabled:opacity-50"
     >
-      {LEAD_STATUSES.map((s) => (
+      {[status,...LEAD_TRANSITIONS[status]].map((s) => (
         <option key={s} value={s}>
           {s.replaceAll("_", " ")}
         </option>
       ))}
     </select>
+    {error&&<p role="alert" className="max-w-56 text-xs text-red-700">{error}</p>}
+    </div>
   );
 }
