@@ -26,7 +26,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     redirect("/admin/login");
   }
   const role = await getAdminRole();
-  const level = { CUSTOMER:0, STAFF:1, MANAGER:2, ADMIN:3, OWNER:4 }[role];
+  const level = { CUSTOMER:0, STAFF:1, MANAGER:2, ADMIN:3, OWNER:4, SUPER_ADMIN:5 }[role];
 
   return (
     <div className="min-h-screen bg-paper">
