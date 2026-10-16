@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { LeadDeleteButton } from "@/components/admin/lead-delete-button";
 import { LeadStatusSelect } from "@/components/admin/lead-status-select";
@@ -20,6 +22,7 @@ function splitNotes(notes?: string) {
 }
 
 export default async function AdminLeadsPage() {
+  if (!(await requireRole("MANAGER"))) redirect("/admin");
   const leads = await listLeads();
   const db = getSupabase();
   const photosByLead = new Map<string, string[]>();
