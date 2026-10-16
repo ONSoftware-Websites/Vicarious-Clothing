@@ -1,3 +1,4 @@
+import { LEAD_TRANSITIONS } from "@/lib/workflow-transitions";
 import { completedWorkflowChecklist } from "@/lib/server/workflow-gates";
 import type { NextRequest } from "next/server";
 import { LEAD_STATUSES, type LeadStatus } from "@/lib/types";
@@ -15,7 +16,7 @@ import { getSupabase } from "@/lib/server/supabase";
 
 const OFFER_VALID_MS = 7 * 24 * 60 * 60 * 1000;
 const ACTOR = "Admin";
-const NEXT:Record<LeadStatus,LeadStatus[]>={NEW:["REVIEWING","DECLINED"],REVIEWING:["OFFER_SENT","DECLINED"],OFFER_SENT:["ACCEPTED","DECLINED"],ACCEPTED:["RECEIVED"],DECLINED:[],RECEIVED:["INSPECTED"],INSPECTED:[],PAID:[]};
+
 
 function offerAmount(value: string | undefined) {
   if (!value) return undefined;
@@ -84,7 +85,7 @@ export async function PATCH(
     if (!current) return Response.json({ error: "Not found" }, { status: 404 });
 
     if(status===current.status)return Response.json({ok:true,lead:current,unchanged:true});
-    if(!NEXT[current.status].includes(status))return Response.json({error:`Invalid seller case progression: ${current.status} → ${status}`},{status:409});
+    if(!LEAD_TRANSITIONS[current.status].includes(status))return Response.json({error:`Invalid seller case progression: ${current.status} → ${status}`},{status:409});
     if(status==="INSPECTED" && !(await completedWorkflowChecklist("lead",id,"inspection")))
       return Response.json({error:"Record all inspection checks before marking the item inspected"},{status:409});
 
