@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { isAdminSession } from "@/lib/server/admin-auth";
+import { isAdminSession, getAdminRole } from "@/lib/server/admin-auth";
 import { BrandMark } from "@/components/brand-mark";
 import { LogoutButton } from "@/components/admin/logout-button";
 
@@ -25,6 +25,8 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   if (!(await isAdminSession())) {
     redirect("/admin/login");
   }
+  const role = await getAdminRole();
+  const level = { CUSTOMER:0, STAFF:1, MANAGER:2, ADMIN:3, OWNER:4 }[role];
 
   return (
     <div className="min-h-screen bg-paper">
@@ -39,7 +41,12 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
               Vicarious Admin
             </Link>
             <nav aria-label="Admin" className="hidden items-center gap-6 md:flex">
-              {NAV.map((item) => (
+              {NAV.filter(item => {
+                const name = item.href.split("/")[2] || "";
+                const minimum = ["orders","purchases","discounts","analytics","emails"].includes(name) ? 3 :
+                  ["inventory","leads","operations","newsletter"].includes(name) ? 2 : 1;
+                return level >= minimum;
+              }).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
