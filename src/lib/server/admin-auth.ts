@@ -71,20 +71,25 @@ async function adminIdentity(): Promise<Role> {
 }
 
 export async function isAdminSession() {
-  if (process.env.ADMIN_AUTH_V2 === "true") return (await adminIdentity()) !== "CUSTOMER";
+  return (await adminIdentity()) !== "CUSTOMER";
+  /* legacy session disabled
+
   const store = await cookies();
   if (store.get(COOKIE)?.value !== "1") return false;
   const role = parseRole(store.get(ROLE_COOKIE)?.value);
   const signature = store.get(SIG_COOKIE)?.value ?? "";
   const expected = signAdminRole(role);
   return Boolean(expected) && safeEqualHex(signature, expected);
+  */
 }
 
 export async function getAdminRole(): Promise<Role> {
-  if (process.env.ADMIN_AUTH_V2 === "true") return adminIdentity();
+  return adminIdentity();
+  /* legacy session disabled
   if (!(await isAdminSession())) return "CUSTOMER";
   const store = await cookies();
   return parseRole(store.get(ROLE_COOKIE)?.value);
+  */
 }
 
 export async function requireRole(minRole: Role) {
