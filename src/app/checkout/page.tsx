@@ -1004,6 +1004,7 @@ export default function CheckoutPage() {
                 fetch("/api/newsletter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, source: "checkout", consent: true }) }).catch(() => {});
               }
               checkoutFinishedRef.current = true;
+              try{sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);}catch{}
               clear();
               router.replace(`/order/${pendingOrderId}?paid=1`);
             }}
