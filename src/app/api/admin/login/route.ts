@@ -9,6 +9,7 @@ import {
 } from "@/lib/server/admin-auth";
 
 export async function POST(request: NextRequest) {
+  if (process.env.ADMIN_AUTH_V2 === "true") return NextResponse.json({error:"Legacy admin login disabled"}, {status:410});
   try {
     const body = await request.json();
     if (!process.env.ADMIN_PASSWORD) {
