@@ -6,7 +6,8 @@ import { SORT_OPTIONS } from "@/lib/site";
 export function SortMenu() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const current = searchParams.get("sort") ?? "newest";
+  const requested=searchParams.get("sort") ?? "newest";
+  const current=SORT_OPTIONS.some(option=>option.key===requested)?requested:"newest";
 
   return (
     <label className="flex items-center gap-3">
@@ -18,6 +19,7 @@ export function SortMenu() {
         onChange={(e) => {
           const params = new URLSearchParams(searchParams.toString());
           params.set("sort", e.target.value);
+          params.delete("page");
           router.push(`?${params.toString()}`, { scroll: false });
         }}
         className="h-10 cursor-pointer border border-line bg-paper px-3 font-display text-xs font-medium uppercase tracking-[0.14em] focus:border-ink focus:outline-none"
