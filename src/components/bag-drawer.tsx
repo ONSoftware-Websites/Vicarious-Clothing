@@ -113,7 +113,7 @@ export function BagDrawer() {
                 </div>
               ))}
             </div>
-          ) : loadError ? (
+          ) : loadError && lines.length>0 ? (
             <div role="alert" className="p-6 text-sm"><p>We could not check stock availability.</p><button type="button" onClick={closeBag} className="mt-4 underline">Close and retry</button></div>
           ) : items.length === 0 && !missingSkus.length ? (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
