@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe, getWebhookSecret } from "@/lib/server/payments";
 import { getSupabase } from "@/lib/server/supabase";
+import { paymentIntentMatchesOrder } from "@/lib/server/stripe-payment-validation";
 import {
   getOrder,
   listEmails,
@@ -153,12 +154,8 @@ export async function POST(request: NextRequest) {
 
         const existing = await getOrder(orderId);
         if (!existing) throw new Error(`Order ${orderId} was not found`);
-        if (intent.currency.toLowerCase() !== "gbp" || Math.round(existing.total * 100) !== intent.amount) {
-          throw new Error(`Stripe amount mismatch for ${orderId}`);
-        }
-
-        if (existing.paymentIntentId && existing.paymentIntentId !== intent.id) {
-          throw new Error(`Unexpected Stripe payment intent for ${orderId}`);
+        if (!paymentIntentMatchesOrder(intent,existing)) {
+          throw new Error(`Stripe payment mismatch for ${orderId}`);
         }
         if (existing.status === "CANCELLED") {
           await refundExpiredPayment(stripe, existing, intent.id);
@@ -215,14 +212,9 @@ export async function POST(request: NextRequest) {
           throw new Error(`Checkout session not paid for ${orderId}`);
         }
         const sessionIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-        if (sessionIntent.status !== "succeeded" ||
-            sessionIntent.currency.toLowerCase() !== "gbp" ||
-            Math.round(existing.total * 100) !== sessionIntent.amount ||
-            sessionIntent.metadata?.orderId !== orderId ||
-            (existing.paymentIntentId && existing.paymentIntentId !== sessionIntent.id)) {
+        if (!paymentIntentMatchesOrder(sessionIntent,existing)) {
           throw new Error(`Hosted checkout payment mismatch for ${orderId}`);
         }
-
         if (existing.status === "CANCELLED") {
           if (paymentIntentId) {
             await refundExpiredPayment(stripe, existing, paymentIntentId);
