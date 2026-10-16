@@ -1,3 +1,4 @@
+import { WorkflowJournal } from "@/components/admin/workflow-journal";
 import { requireRole } from "@/lib/server/admin-auth";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -103,6 +104,7 @@ export default async function AdminOrderPage({
             </dl>
           </section>
 
+          <WorkflowJournal kind="order" referenceId={order.id} />
           <section className="border border-line">
             <h2 className="border-b border-line bg-cream px-5 py-3 font-display text-xs font-semibold uppercase tracking-[0.2em]">
               Actions
