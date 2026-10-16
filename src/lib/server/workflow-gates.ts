@@ -1,11 +1,5 @@
 import { getSupabase } from "@/lib/server/supabase";
-export type GateCategory="inspection"|"intake"|"packing"|"return";
-export const REQUIRED_CHECKS:Record<GateCategory,string[]>={
- inspection:["conditionVerified","photosChecked","discrepanciesResolved"],
- intake:["received","labelled","stockLinked"],
- packing:["itemsChecked","addressChecked","packagingChecked"],
- return:["requestReviewed","itemReceived","conditionChecked"],
-};
+import { REQUIRED_CHECKS, type GateCategory } from "@/lib/workflow-transitions";
 export async function completedWorkflowChecklist(kind:"lead"|"order",referenceId:string,category:GateCategory){
  const db=getSupabase();
  if(!db)return false;
