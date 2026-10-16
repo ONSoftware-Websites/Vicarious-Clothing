@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { DiscountForm, DiscountRow } from "@/components/admin/discount-form";
 import { listDiscounts } from "@/lib/server/store";
@@ -8,6 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Discounts" };
 
 export default async function DiscountsPage() {
+  if (!(await requireRole("ADMIN"))) redirect("/admin");
   const discounts = await listDiscounts();
 
   return (
