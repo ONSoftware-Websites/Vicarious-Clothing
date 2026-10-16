@@ -36,7 +36,7 @@ async function markOfferWindow(leadId: string) {
     })
     .eq("id", leadId);
   if (error) {
-    console.warn("Could not write offer expiry metadata:", error.message);
+    throw new Error(`Could not store offer expiry: ${error.message}`);
   }
 }
 
@@ -90,15 +90,13 @@ export async function PATCH(
     if (!lead) return Response.json({ error: "Submission was changed by another request" }, { status: 409 });
 
     if (status === "OFFER_SENT") {
+      // Never send an actionable offer without its expiry metadata recorded.
+      await markOfferWindow(lead.id);
       await sendEmail({
         to: current.email,
         template: "lead-offer",
         data: { ...current, status: "OFFER_SENT", offer, offerExpiry: "7 days" },
       });
-    }
-
-    if (status === "OFFER_SENT") {
-      await markOfferWindow(lead.id);
     }
 
     if (status === "ACCEPTED") {
