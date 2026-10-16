@@ -8,6 +8,7 @@ import {
   listPurchases,
   updateLeadStatus,
 } from "@/lib/server/store";
+import { transitionLeadStatus } from "@/lib/server/lead-transitions";
 import { sendEmail } from "@/lib/server/mailer";
 import { getSupabase } from "@/lib/server/supabase";
 
