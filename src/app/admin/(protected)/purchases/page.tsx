@@ -109,6 +109,8 @@ export default async function PurchasesPage({searchParams}:{searchParams:Promise
                 </td>
                 <td className="max-w-xs px-4 py-4 text-xs leading-relaxed text-ink-soft">
                   {p.notes ?? "—"}
+                  {p.leadId&&<Link href={`/admin/leads/${p.leadId}`} className="mt-2 block font-mono text-[10px] text-accent-deep underline">Seller case →</Link>}
+                  {p.paymentReference&&<p className="mt-2 font-mono text-[10px] text-ink-soft">Payment ref: {p.paymentReference}</p>}
                 </td>
                 <td className="px-4 py-4 font-mono text-xs whitespace-nowrap">
                   {formatDate(p.createdAt)}

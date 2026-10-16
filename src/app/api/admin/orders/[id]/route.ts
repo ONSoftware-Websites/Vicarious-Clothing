@@ -1,3 +1,5 @@
+import { completedWorkflowChecklist } from "@/lib/server/workflow-gates";
+import { ORDER_TRANSITIONS } from "@/lib/workflow-transitions";
 import type { NextRequest } from "next/server";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
@@ -8,18 +10,6 @@ import { releaseCheckoutStock } from "@/lib/server/checkout-stock";
 import { sendEmail } from "@/lib/server/mailer";
 import { syncOrderSaleToSellerHq } from "@/lib/server/sellerhq-sync";
 
-const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PENDING_PAYMENT: ["CANCELLED"],
-  PAID: ["PICKING", "READY_TO_DISPATCH", "DISPATCHED", "CANCELLED", "REFUNDED"],
-  PICKING: ["READY_TO_DISPATCH", "DISPATCHED", "CANCELLED", "REFUNDED"],
-  READY_TO_DISPATCH: ["DISPATCHED", "CANCELLED", "REFUNDED"],
-  DISPATCHED: ["DELIVERED", "RETURN_REQUESTED", "REFUNDED"],
-  DELIVERED: ["RETURN_REQUESTED", "RETURNED", "REFUNDED"],
-  RETURN_REQUESTED: ["RETURNED", "REFUNDED"],
-  RETURNED: ["REFUNDED"],
-  REFUNDED: [],
-  CANCELLED: [],
-};
 
 const ACTOR = "Admin";
 const SELLERHQ_ORDER_SYNC_STATUSES: OrderStatus[] = [
@@ -74,9 +64,14 @@ export async function PATCH(
       if (existing.status === status) {
         return Response.json({ ok: true, order: existing, unchanged: true });
       }
-      if (!ALLOWED_TRANSITIONS[existing.status].includes(status)) {
+      if (!ORDER_TRANSITIONS[existing.status].includes(status)) {
         return Response.json({ error: `Invalid order transition: ${existing.status} → ${status}` }, { status: 409 });
       }
+
+      if (status==="DISPATCHED" && !(await completedWorkflowChecklist("order",id,"packing")))
+        return Response.json({error:"Complete and save the packing checklist before dispatch"},{status:409});
+      if (status==="RETURNED" && !(await completedWorkflowChecklist("order",id,"return")))
+        return Response.json({error:"Record receipt and inspection of the returned parcel before marking it returned"},{status:409});
 
       // If tracking is supplied with dispatch, persist it before sending the email.
       if (status === "DISPATCHED" && (body.carrier || body.tracking)) {
@@ -124,7 +119,7 @@ export async function PATCH(
 
       const wasPendingPayment = existing.status === "PENDING_PAYMENT";
       const order = await updateOrderStatus(id, status, ACTOR);
-      if (!order) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!order) return Response.json({ error: "Order status changed during this operation. Refresh and try again." }, { status: 409 });
 
       let released: string[] = [];
       if (status === "CANCELLED" && wasPendingPayment) {

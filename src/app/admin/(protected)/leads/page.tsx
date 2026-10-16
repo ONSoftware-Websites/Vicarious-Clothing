@@ -113,7 +113,7 @@ export default async function AdminLeadsPage({searchParams}:{searchParams:Promis
                     <LeadStatusSelect id={lead.id} status={lead.status} currentOffer={lead.offer} />
                     {lead.offer && <p className="mt-1 font-mono text-[10px] text-accent-deep">Offer: {lead.offer}</p>}
                   </td>
-                  <td className="px-4 py-4"><LeadDeleteButton id={lead.id} /></td>
+                  <td className="px-4 py-4"><div className="flex flex-col items-start gap-3"><Link href={`/admin/leads/${lead.id}`} className="font-mono text-[10px] font-semibold uppercase text-accent-deep underline underline-offset-2">Open case →</Link><LeadDeleteButton id={lead.id} /></div></td>
                 </tr>
               );
             })}

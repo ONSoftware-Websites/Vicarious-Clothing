@@ -1,0 +1,30 @@
+import type { OrderStatus,LeadStatus } from "@/lib/types";
+export const ORDER_TRANSITIONS:Record<OrderStatus,OrderStatus[]>={
+ PENDING_PAYMENT:["CANCELLED"],
+ PAID:["PICKING","REFUNDED"],
+ PICKING:["READY_TO_DISPATCH","REFUNDED"],
+ READY_TO_DISPATCH:["DISPATCHED","REFUNDED"],
+ DISPATCHED:["DELIVERED","RETURN_REQUESTED","REFUNDED"],
+ DELIVERED:["RETURN_REQUESTED","REFUNDED"],
+ RETURN_REQUESTED:["RETURNED","REFUNDED"],
+ RETURNED:["REFUNDED"],
+ REFUNDED:[],CANCELLED:[]
+};
+export const LEAD_TRANSITIONS:Record<LeadStatus,LeadStatus[]>={
+ NEW:["REVIEWING","DECLINED"],
+ REVIEWING:["OFFER_SENT","DECLINED"],
+ OFFER_SENT:["ACCEPTED","DECLINED"],
+ ACCEPTED:["RECEIVED"],
+ DECLINED:[],
+ RECEIVED:["INSPECTED"],
+ INSPECTED:[],
+ PAID:[]
+};
+
+export type GateCategory="inspection"|"intake"|"packing"|"return";
+export const REQUIRED_CHECKS:Record<GateCategory,string[]>={
+ inspection:["conditionVerified","photosChecked","discrepanciesResolved"],
+ intake:["received","labelled","stockLinked"],
+ packing:["itemsChecked","addressChecked","packagingChecked"],
+ return:["requestReviewed","itemReceived","conditionChecked"],
+};

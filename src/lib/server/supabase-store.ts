@@ -689,11 +689,14 @@ export async function updateOrderStatus(
 ): Promise<Order | undefined> {
   const before = await getOrder(db, id);
   if (!before) return undefined;
-  const { error } = await db
+  const { data, error } = await db
     .from("orders")
     .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", id.toUpperCase());
+    .eq("id", id.toUpperCase())
+    .eq("status", before.status)
+    .select("id").maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) return undefined;
   await logAudit(db, actor, "updated order", before.id, before.status, status);
   return { ...before, status };
 }
@@ -949,6 +952,7 @@ function toPurchase(row: Row, items: Row[]): StockPurchase {
     leadId: row.lead_id ? str(row.lead_id) : undefined,
     createdAt: str(row.created_at),
     paidAt: row.paid_at ? str(row.paid_at) : undefined,
+    paymentReference: row.payment_reference ? str(row.payment_reference) : undefined,
   };
 }
 

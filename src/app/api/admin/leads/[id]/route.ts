@@ -1,3 +1,5 @@
+import { LEAD_TRANSITIONS } from "@/lib/workflow-transitions";
+import { completedWorkflowChecklist } from "@/lib/server/workflow-gates";
 import type { NextRequest } from "next/server";
 import { LEAD_STATUSES, type LeadStatus } from "@/lib/types";
 import { requireAdminApi } from "@/lib/server/admin-auth";
@@ -14,6 +16,7 @@ import { getSupabase } from "@/lib/server/supabase";
 
 const OFFER_VALID_MS = 7 * 24 * 60 * 60 * 1000;
 const ACTOR = "Admin";
+
 
 function offerAmount(value: string | undefined) {
   if (!value) return undefined;
@@ -80,6 +83,11 @@ export async function PATCH(
 
     const current = (await listLeads()).find((lead) => lead.id === id);
     if (!current) return Response.json({ error: "Not found" }, { status: 404 });
+
+    if(status===current.status)return Response.json({ok:true,lead:current,unchanged:true});
+    if(!LEAD_TRANSITIONS[current.status].includes(status))return Response.json({error:`Invalid seller case progression: ${current.status} → ${status}`},{status:409});
+    if(status==="INSPECTED" && !(await completedWorkflowChecklist("lead",id,"inspection")))
+      return Response.json({error:"Record all inspection checks before marking the item inspected"},{status:409});
 
     const offer = body.offer ? String(body.offer).trim() : current.offer;
     if (status === "OFFER_SENT" && !offer) {
