@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
   if (limited) return limited;
   let claimedSkus: string[] = [];
   let holdToken = "";
+  let provisionalOrderId = "";
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const { email, name, items, address, discountCode } = body;
@@ -288,6 +289,7 @@ export async function POST(request: NextRequest) {
     }
 
     const order = orderResult.order;
+    provisionalOrderId = order.id;
     if (stripe) {
       await attachCheckoutHoldToOrder(
         order.items.map((item) => item.sku),
@@ -323,6 +325,7 @@ export async function POST(request: NextRequest) {
 
       await setOrderPayment(order.id, intent.id);
       claimedSkus = [];
+      provisionalOrderId = "";
       return Response.json(
         { order, mode: "stripe", clientSecret: intent.client_secret, holdToken },
         { status: 201 }
@@ -337,9 +340,16 @@ export async function POST(request: NextRequest) {
       throw error;
     }
   } catch (err) {
+    if (provisionalOrderId) {
+      try {
+        await updateOrderStatus(provisionalOrderId, "CANCELLED", "checkout-setup-failure");
+      } catch (cleanupError) {
+        console.error("Unable to cancel incomplete checkout order", cleanupError);
+      }
+    }
     if (claimedSkus.length) {
       try {
-        await releaseCheckoutStock(claimedSkus, holdToken ? { holdToken } : {});
+        await releaseCheckoutStock(claimedSkus, holdToken ? { holdToken, ...(provisionalOrderId ? { orderId: provisionalOrderId } : {}) } : {});
       } catch {
         // Preserve the original failure.
       }
