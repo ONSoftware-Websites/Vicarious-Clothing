@@ -1,3 +1,4 @@
+import { RequestReturn } from "@/components/request-return";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -122,6 +123,8 @@ export default async function OrderPage({
         )}
       </div>
 
+      {["DISPATCHED","DELIVERED"].includes(order.status) && <div className="mx-auto max-w-2xl"><RequestReturn orderId={order.id}/></div>}
+      {order.status==="RETURN_REQUESTED"&&<p role="status" className="mx-auto mt-8 max-w-2xl border border-line bg-cream p-5 text-sm">Your return request has been received and is awaiting review. We will contact you with the next steps.</p>}
       <div className="mx-auto mt-14 max-w-2xl border border-line">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line bg-cream px-6 py-4">
           <div>
