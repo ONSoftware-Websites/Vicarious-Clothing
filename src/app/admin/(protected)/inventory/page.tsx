@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -16,6 +18,7 @@ export default async function InventoryPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  if (!(await requireRole("MANAGER"))) redirect("/admin");
   const raw = await searchParams;
   const q = typeof raw.q === "string" ? raw.q.toLowerCase() : "";
   const status = typeof raw.status === "string" ? raw.status : "";
