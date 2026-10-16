@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { OrderStatus } from "@/lib/types";
+import { ORDER_TRANSITIONS } from "@/lib/workflow-transitions";
 
 const STATUS_FLOW: Array<{ status: OrderStatus; label: string }> = [
   { status: "PAID", label: "Paid" },
@@ -54,13 +55,14 @@ export function OrderActions({ id, status }: { id: string; status: OrderStatus }
   return (
     <div className="space-y-5">
       <div>
+        <p className="mb-3 text-xs text-ink-soft">{status==="READY_TO_DISPATCH"?"Complete the packing checklist and save carrier tracking before dispatch.":status==="RETURN_REQUESTED"?"Review the return checklist before marking goods received.":"Only the next valid fulfilment step is available; changes are recorded against the order."}</p>
         <p className="mb-2 font-display text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">
           Move order
         </p>
         <div className="flex flex-wrap gap-2">
           {STATUS_FLOW.map((step, i) => {
             const done = i <= flowIndex;
-            const next = i === flowIndex + 1;
+            const next = flowIndex>=0 && i === flowIndex + 1 && ORDER_TRANSITIONS[status].includes(step.status);
             return (
               <button
                 key={step.status}
@@ -97,12 +99,15 @@ export function OrderActions({ id, status }: { id: string; status: OrderStatus }
           Branches
         </p>
         <div className="flex flex-wrap gap-2">
-          {BRANCHES.filter((b) => b.status !== status).map((branch) => (
+          {BRANCHES.filter((branch) => ORDER_TRANSITIONS[status].includes(branch.status)).map((branch) => (
             <button
               key={branch.status}
               type="button"
               disabled={busy}
-              onClick={() => patch({ status: branch.status })}
+              onClick={() => {
+                if(branch.status==="REFUNDED" && !window.confirm("Confirm a Stripe refund or manual refund of this order? This action can transfer money back to the customer."))return;
+                void patch({status:branch.status});
+              }}
               className="border border-line px-4 py-2 font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-soft transition-colors hover:border-ink hover:text-ink disabled:opacity-50"
             >
               {branch.label}
