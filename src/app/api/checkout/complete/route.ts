@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { getStripe } from "@/lib/server/payments";
+import { paymentIntentMatchesOrder } from "@/lib/server/stripe-payment-validation";
 import {
   getOrder,
   markOrderPaid,
@@ -39,14 +40,8 @@ export async function POST(request: NextRequest) {
     }
 
     const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    if (intent.status !== "succeeded" || intent.metadata?.orderId !== orderId) {
-      return Response.json({ error: "Payment has not been confirmed" }, { status: 409 });
-    }
-    if (intent.currency.toLowerCase() !== "gbp" || (existing.paymentIntentId && existing.paymentIntentId !== intent.id)) {
-      return Response.json({ error: "Payment does not belong to this checkout" }, { status: 409 });
-    }
-    if (Math.round(existing.total * 100) !== intent.amount) {
-      return Response.json({ error: "Payment amount does not match order total" }, { status: 409 });
+    if (!paymentIntentMatchesOrder(intent, existing)) {
+      return Response.json({ error: "Payment details do not match this order" }, { status: 409 });
     }
 
     // Existing cancelled orders should not be resurrected by a late payment.
