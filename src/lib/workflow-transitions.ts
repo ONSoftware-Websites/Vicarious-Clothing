@@ -20,3 +20,11 @@ export const LEAD_TRANSITIONS:Record<LeadStatus,LeadStatus[]>={
  INSPECTED:[],
  PAID:[]
 };
+
+export type GateCategory="inspection"|"intake"|"packing"|"return";
+export const REQUIRED_CHECKS:Record<GateCategory,string[]>={
+ inspection:["conditionVerified","photosChecked","discrepanciesResolved"],
+ intake:["received","labelled","stockLinked"],
+ packing:["itemsChecked","addressChecked","packagingChecked"],
+ return:["requestReviewed","itemReceived","conditionChecked"],
+};
