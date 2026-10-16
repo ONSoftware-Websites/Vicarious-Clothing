@@ -25,6 +25,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<{ query: string; items: SearchResult[] } | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
+  const [searchError,setSearchError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -43,15 +44,17 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const query = q.trim();
-    if (!query) return;
+    if (!query) {setResults(null);setSearchError(false);return;}
+    setSearchError(false);
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`,{cache:"no-store"});
+        if(!res.ok) throw new Error("Search unavailable");
         const data = await res.json();
-        if (!cancelled) setResults({ query, items: data.results });
+        if (!cancelled) setResults({ query, items: data.results ?? [] });
       } catch {
-        // ignored
+        if(!cancelled){setSearchError(true);setResults({query,items:[]});}
       }
     }, 180);
     return () => {
@@ -149,6 +152,8 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
             Searching…
           </p>
+        ) : searchError ? (
+          <div role="alert" className="py-8 text-center"><p className="font-display text-lg font-semibold uppercase">Search is temporarily unavailable</p><p className="mt-2 text-sm text-ink-soft">Browse the catalogue or try your search again.</p><Link href="/shop" onClick={onClose} className="mt-4 inline-block border border-ink px-5 py-3 font-mono text-xs uppercase">Browse all clothing</Link></div>
         ) : currentResults.length === 0 ? (
           <div className="py-8 text-center">
             <p className="font-display text-lg font-semibold uppercase">
@@ -176,7 +181,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
                 >
                   <span className="relative shrink-0 overflow-hidden bg-cream">
                     <Image
-                      src={r.image}
+                      src={r.image || "/icon.png"}
                       alt={r.name}
                       width={56}
                       height={70}

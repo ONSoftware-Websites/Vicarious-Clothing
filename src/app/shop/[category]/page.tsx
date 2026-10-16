@@ -52,6 +52,7 @@ export default async function CategoryPage({
     sort: typeof raw.sort === "string" ? raw.sort : undefined,
     q: typeof raw.q === "string" ? raw.q : undefined,
     collection: typeof raw.collection === "string" ? raw.collection : undefined,
+    page: typeof raw.page === "string" ? raw.page : undefined,
   };
 
   return <ShopView category={category as Category | "new-in" | "sale"} params={shopParams} />;

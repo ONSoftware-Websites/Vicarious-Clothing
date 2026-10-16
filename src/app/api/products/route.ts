@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
+import { isPublicProduct } from "@/lib/public-catalog";
 import { listProducts } from "@/lib/server/store";
-
-const PUBLIC_STATUSES = new Set(["AVAILABLE", "RESERVED", "SOLD"]);
 
 export async function GET(request: NextRequest) {
   const skus = (request.nextUrl.searchParams.get("skus") ?? "")
@@ -9,9 +8,7 @@ export async function GET(request: NextRequest) {
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
 
-  const allPublicProducts = (await listProducts()).filter((p) =>
-    PUBLIC_STATUSES.has(p.status)
-  );
+  const allPublicProducts = (await listProducts()).filter(isPublicProduct);
 
   const products = skus.length
     ? allPublicProducts.filter((p) => skus.includes(p.sku))

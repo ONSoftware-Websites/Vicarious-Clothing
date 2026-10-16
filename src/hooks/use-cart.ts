@@ -16,9 +16,7 @@ function parse(raw: string | null): CartLine[] {
   try {
     const parsed = JSON.parse(raw) as CartLine[];
     return Array.isArray(parsed)
-      ? parsed
-          .map((line) => ({ sku: String(line.sku ?? "").toUpperCase(), qty: 1 }))
-          .filter((line) => line.sku)
+      ? normalizeLines(parsed.filter((line) => line && typeof line.sku === "string"))
       : [];
   } catch {
     return [];
@@ -26,7 +24,7 @@ function parse(raw: string | null): CartLine[] {
 }
 
 function normalizeLines(lines: CartLine[]) {
-  return lines.map((line) => ({ sku: line.sku.trim().toUpperCase(), qty: 1 })).filter((line) => line.sku);
+  return [...new Set(lines.map((line) => line.sku.trim().toUpperCase()).filter(Boolean))].map(sku => ({sku,qty:1}));
 }
 
 export function useCart() {

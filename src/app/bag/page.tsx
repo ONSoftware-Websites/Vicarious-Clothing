@@ -26,26 +26,33 @@ export default function BagPage() {
   const { lines, remove, setQty } = useCart();
   const mounted = useMounted();
   const [products, setProducts] = useState<Record<string, BagProduct>>({});
+  const [loadedSkus,setLoadedSkus] = useState<string | null>(null);
+  const [loadError,setLoadError] = useState(false);
 
   useEffect(() => {
     if (!mounted || lines.length === 0) return;
     let cancelled = false;
     const skus = lines.map((l) => l.sku).join(",");
-    fetch(`/api/products?skus=${encodeURIComponent(skus)}`)
-      .then((r) => r.json())
+    setLoadError(false);
+    fetch(`/api/products?skus=${encodeURIComponent(skus)}`,{cache:"no-store"})
+      .then((r) => {if (!r.ok) throw new Error("Product availability unavailable");return r.json();})
       .then((data) => {
         if (cancelled) return;
         const map: Record<string, BagProduct> = {};
-        for (const p of data.products) map[p.sku] = p;
+        for (const p of data.products ?? []) map[p.sku] = p;
         setProducts(map);
+        setLoadedSkus(skus);
       })
-      .catch(() => {});
+      .catch(() => {if(!cancelled)setLoadError(true);});
     return () => {
       cancelled = true;
     };
   }, [lines, mounted]);
 
-  const loading = mounted && lines.length > 0 && lines.some((l) => !products[l.sku]);
+  const currentSkus=lines.map(line=>line.sku).join(",");
+  const loading = mounted && lines.length > 0 && loadedSkus!==currentSkus && !loadError;
+  const missingSkus = !loading && !loadError ? lines.filter(line=>!products[line.sku]).map(line=>line.sku) : [];
+  const unavailableSkus = !loading && !loadError ? lines.filter(line=>products[line.sku] && products[line.sku].status!=="AVAILABLE").map(line=>line.sku) : [];
 
   const items = lines
     .map((line) => ({ line, product: products[line.sku] }))
@@ -71,7 +78,9 @@ export default function BagPage() {
             Loading…
           </p>
         </div>
-      ) : items.length === 0 ? (
+      ) : loadError && lines.length>0 ? (
+        <div role="alert" className="border border-red-200 bg-red-50 p-6"><p className="font-display text-lg font-semibold uppercase">Unable to check stock</p><p className="mt-2 text-sm">Refresh the page to retry before paying.</p><button type="button" className="mt-4 border border-ink px-5 py-2 font-mono text-xs uppercase" onClick={()=>window.location.reload()}>Retry</button></div>
+      ) : items.length === 0 && !missingSkus.length ? (
         <div className="py-24 text-center">
           <p className="font-display text-2xl font-semibold uppercase tracking-tight">
             Nothing yet.
@@ -87,6 +96,7 @@ export default function BagPage() {
       ) : (
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
           <div className="lg:col-span-2">
+            {missingSkus.length>0 && <div role="alert" className="mb-6 border border-red-200 bg-red-50 p-5"><p className="font-display text-sm font-semibold uppercase">Some pieces are no longer listed</p><p className="mt-2 text-sm">Remove unavailable items to continue.</p><div className="mt-3 flex flex-wrap gap-2">{missingSkus.map(sku=><button key={sku} type="button" onClick={()=>remove(sku)} className="border border-ink px-3 py-2 font-mono text-xs">Remove {sku}</button>)}</div></div>}
             {soldItems.length > 0 && (
               <div className="mb-6 border border-red-200 bg-red-50 p-5">
                 <p className="font-display text-sm font-semibold uppercase tracking-[0.14em]">
@@ -102,7 +112,7 @@ export default function BagPage() {
                 <li key={line.sku} className="flex gap-5 py-6">
                   <Link href={`/product/${product.slug}`} className="relative shrink-0 overflow-hidden bg-cream">
                     <Image
-                      src={product.images[0]?.src ?? ""}
+                      src={product.images[0]?.src || "/icon.png"}
                       alt={product.name}
                       width={110}
                       height={137}
@@ -202,9 +212,9 @@ export default function BagPage() {
               )}
               <Link
                 href="/checkout"
-                aria-disabled={soldItems.length > 0}
+                aria-disabled={unavailableSkus.length > 0 || missingSkus.length > 0}
                 className={
-                  soldItems.length > 0
+                  unavailableSkus.length > 0 || missingSkus.length > 0
                     ? "pointer-events-none mt-6 flex h-13 w-full items-center justify-center bg-ink-faint font-display text-xs font-semibold uppercase tracking-[0.16em] text-paper"
                     : "mt-6 flex h-13 w-full items-center justify-center bg-ink font-display text-xs font-semibold uppercase tracking-[0.16em] text-paper transition-colors hover:bg-accent"
                 }

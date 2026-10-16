@@ -193,13 +193,11 @@ export function filterProducts(
     result = result.filter((p) => p.price <= filters.maxPrice!);
   }
   if (filters.q) {
-    const q = filters.q.toLowerCase();
-    result = result.filter((p) =>
-      [p.name, p.brand, p.category, p.description, p.sku, ...p.tags]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    );
+    const terms=filters.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    result = result.filter((p) => terms.every(term=>
+      [p.name,p.brand,p.category,p.description,p.sku,...p.tags]
+        .some(value=>value.toLowerCase().includes(term))
+    ));
   }
 
   switch (sort) {
@@ -241,16 +239,17 @@ export function getRecentlySold(products: Product[], limit = 6) {
 export async function getSimilar(product: Product, limit = 4) {
   const products = await listProducts();
   return products
-    .filter(
-      (p) =>
-        p.sku !== product.sku &&
-        p.status === "AVAILABLE" &&
-        (p.category === product.category || p.brand === product.brand)
-    )
-    .sort(
-      (a, b) => new Date(b.listedAt).getTime() - new Date(a.listedAt).getTime()
-    )
-    .slice(0, limit);
+    .filter(p => p.sku !== product.sku && p.status === "AVAILABLE")
+    .map(p => ({
+      p,
+      relevance: (p.category === product.category ? 8 : 0)
+        + (p.brand.toLowerCase() === product.brand.toLowerCase() ? 5 : 0)
+        + (p.size.toLowerCase() === product.size.toLowerCase() ? 3 : 0)
+        + Math.max(0, 2 - Math.abs(p.price-product.price) / 15),
+    }))
+    .sort((a,b)=>b.relevance-a.relevance || new Date(b.p.listedAt).getTime()-new Date(a.p.listedAt).getTime())
+    .slice(0,limit)
+    .map(({p})=>p);
 }
 
 export function getBrands(products: Product[]) {

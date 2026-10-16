@@ -1,9 +1,11 @@
+import Link from "next/link";
 import type { Category } from "@/lib/types";
 import { Container } from "@/components/ui";
 import { ProductGrid } from "@/components/product-grid";
 import { SortMenu } from "@/components/sort-menu";
 import { FilterSheet } from "@/components/filter-sheet";
 import { filterProducts, getFacets, type SortKey } from "@/lib/catalog";
+import { isPublicProduct, parsePriceFilter } from "@/lib/public-catalog";
 import { listProducts } from "@/lib/server/store";
 import { CATEGORY_LABELS } from "@/lib/site";
 import { isRecent } from "@/lib/utils";
@@ -18,6 +20,7 @@ export interface ShopParams {
   sort?: string;
   q?: string;
   collection?: string;
+  page?: string;
 }
 
 export async function ShopView({
@@ -27,7 +30,7 @@ export async function ShopView({
   category?: Category | "new-in" | "sale";
   params: ShopParams;
 }) {
-  const allProducts = (await listProducts()).filter((p) => p.status !== "DRAFT");
+  const allProducts = (await listProducts()).filter(isPublicProduct);
   const facets = getFacets(allProducts);
 
   const filters = {
@@ -36,8 +39,8 @@ export async function ShopView({
     sizes: params.size?.split(",").filter(Boolean),
     conditions: params.condition?.split(",").filter(Boolean),
     colours: params.colour?.split(",").filter(Boolean),
-    minPrice: params.min ? Number(params.min) : undefined,
-    maxPrice: params.max ? Number(params.max) : undefined,
+    minPrice: parsePriceFilter(params.min),
+    maxPrice: parsePriceFilter(params.max),
     q: params.q,
     onlyAvailable: true,
   };
@@ -55,6 +58,13 @@ export async function ShopView({
   } else if (params.collection === "under-25") {
     products = products.filter((p) => p.price < 25);
   }
+
+  const pageSize=24;
+  const requestedPage=Number(params.page);
+  const totalPages=Math.max(1,Math.ceil(products.length/pageSize));
+  const page=Number.isSafeInteger(requestedPage)&&requestedPage>0?Math.min(requestedPage,totalPages):1;
+  const visibleProducts=products.slice((page-1)*pageSize,page*pageSize);
+  const pageHref=(target:number)=>{const query=new URLSearchParams();for(const [key,value] of Object.entries(params)){if(value&&key!=="page")query.set(key,value);}query.set("page",String(target));return `?${query.toString()}`;};
 
   const heading = category
     ? category === "new-in"
@@ -99,7 +109,8 @@ export async function ShopView({
           <FilterSheet facets={facets} />
         </div>
         <div className="flex-1">
-          <ProductGrid products={products} />
+          {visibleProducts.length ? <ProductGrid products={visibleProducts} /> : <div className="border border-line bg-cream px-6 py-12 text-center"><p className="font-display text-xl font-bold uppercase">No matching pieces</p><p className="mt-2 text-sm text-ink-soft">Try a broader search or remove some filters.</p><Link href="/shop" className="mt-5 inline-block border border-ink px-6 py-3 font-mono text-xs uppercase">Browse all clothing</Link></div>}
+          {totalPages>1 && <nav aria-label="Catalogue pages" className="mt-10 flex flex-wrap items-center justify-center gap-3"><Link href={pageHref(Math.max(1,page-1))} aria-disabled={page===1} className={`border border-line px-4 py-2 font-mono text-xs uppercase ${page===1?"pointer-events-none opacity-40":""}`}>Previous</Link><span className="font-mono text-xs text-ink-soft">Page {page} of {totalPages}</span><Link href={pageHref(Math.min(totalPages,page+1))} aria-disabled={page===totalPages} className={`border border-line px-4 py-2 font-mono text-xs uppercase ${page===totalPages?"pointer-events-none opacity-40":""}`}>Next</Link></nav>}
         </div>
       </div>
     </Container>

@@ -202,3 +202,17 @@ describe("similar products", async () => {
     expect(similar.every((p) => p.status === "AVAILABLE")).toBe(true);
   });
 });
+
+
+describe("Release 9 catalogue search",()=>{
+  it("matches terms across different product fields rather than only an exact phrase",async()=>{
+    const example=(await ALL())[0];
+    expect(example).toBeDefined();
+    const matches=filterProducts([example],{q:`${example.brand} ${example.category}`});
+    expect(matches).toHaveLength(1);
+  });
+  it("rejects searches with an unmatched term",async()=>{
+    const example=(await ALL())[0];
+    expect(filterProducts([example],{q:"__release9_unmatchable_search_term__"})).toHaveLength(0);
+  });
+});

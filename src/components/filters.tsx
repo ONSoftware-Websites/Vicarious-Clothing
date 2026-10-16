@@ -35,6 +35,7 @@ function useToggleParam() {
       } else {
         params.set(key, [...existing, value].join(","));
       }
+      params.delete("page");
       router.push(`?${params.toString()}`, { scroll: false });
     },
     [router, searchParams]
@@ -94,9 +95,18 @@ function PriceRange({
   const router = useRouter();
   const [minPrice, setMinPrice] = useState(initialMin);
   const [maxPrice, setMaxPrice] = useState(initialMax);
+  const [priceError,setPriceError] = useState("");
 
   const applyPrice = () => {
+    const min=minPrice.trim()?Number(minPrice):undefined;
+    const max=maxPrice.trim()?Number(maxPrice):undefined;
+    if((min!==undefined&&(!Number.isFinite(min)||min<0))||(max!==undefined&&(!Number.isFinite(max)||max<0))||(min!==undefined&&max!==undefined&&min>max)) {
+      setPriceError("Enter a valid range with the minimum no higher than the maximum.");
+      return;
+    }
+    setPriceError("");
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
     if (minPrice) params.set("min", minPrice);
     else params.delete("min");
     if (maxPrice) params.set("max", maxPrice);
@@ -119,6 +129,7 @@ function PriceRange({
           type="number"
           inputMode="numeric"
           min={0}
+          step="0.01"
           placeholder={`£${facets.minPrice}`}
           value={minPrice}
           onChange={(e) => setMinPrice(e.target.value)}
@@ -139,6 +150,7 @@ function PriceRange({
           className="h-10 w-full border border-line bg-paper px-3 font-mono text-xs focus:border-ink focus:outline-none"
         />
       </div>
+      {priceError && <p role="alert" className="mt-2 text-xs text-red-700">{priceError}</p>}
       <button
         type="button"
         onClick={applyPrice}

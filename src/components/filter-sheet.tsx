@@ -1,10 +1,21 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Filters, type Facets } from "@/components/filters";
 
 export function FilterSheet({ facets }: { facets: Facets }) {
   const [open, setOpen] = useState(false);
+  const triggerRef=useRef<HTMLButtonElement>(null);
+  const closeRef=useRef<HTMLButtonElement>(null);
+  useEffect(()=>{
+    if(!open)return;
+    const previous=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    closeRef.current?.focus();
+    const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape"){setOpen(false);triggerRef.current?.focus();}};
+    window.addEventListener("keydown",onKey);
+    return()=>{document.body.style.overflow=previous;window.removeEventListener("keydown",onKey);triggerRef.current?.focus();};
+  },[open]);
 
   return (
     <>
@@ -15,7 +26,10 @@ export function FilterSheet({ facets }: { facets: Facets }) {
       </div>
 
       <button
+        ref={triggerRef}
         type="button"
+        aria-expanded={open}
+        aria-controls="shop-mobile-filters"
         onClick={() => setOpen(true)}
         className="flex h-10 items-center justify-center gap-2 border border-ink px-5 font-display text-[11px] font-medium uppercase tracking-[0.16em] lg:hidden"
       >
@@ -31,6 +45,7 @@ export function FilterSheet({ facets }: { facets: Facets }) {
           aria-label="Filters"
         >
           <div
+            id="shop-mobile-filters"
             className="absolute left-0 top-0 h-full w-full max-w-sm overflow-y-auto bg-paper p-6"
             onClick={(e) => e.stopPropagation()}
           >
@@ -39,6 +54,7 @@ export function FilterSheet({ facets }: { facets: Facets }) {
                 Filter
               </h2>
               <button
+                ref={closeRef}
                 type="button"
                 onClick={() => setOpen(false)}
                 className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-soft hover:text-accent-deep"

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Container } from "@/components/ui";
 import { ProductGrid } from "@/components/product-grid";
 import { filterProducts } from "@/lib/catalog";
+import { isPublicProduct } from "@/lib/public-catalog";
 import { listProducts } from "@/lib/server/store";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export default async function SearchPage({
   const raw = await searchParams;
   const q = typeof raw.q === "string" ? raw.q : "";
 
-  const products = (await listProducts()).filter((p) => p.status !== "DRAFT");
+  const products = (await listProducts()).filter(isPublicProduct);
   const results = q
     ? filterProducts(products, { q, onlyAvailable: false }, "newest")
     : [];

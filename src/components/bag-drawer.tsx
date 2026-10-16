@@ -25,6 +25,8 @@ export function BagDrawer() {
   const { bagOpen, closeBag } = useShopUi();
   const { lines, remove, setQty, count } = useCart();
   const [products, setProducts] = useState<Record<string, BagProduct>>({});
+  const [loadedSkus,setLoadedSkus] = useState<string | null>(null);
+  const [loadError,setLoadError] = useState(false);
 
   useEffect(() => {
     if (bagOpen) {
@@ -41,15 +43,17 @@ export function BagDrawer() {
     if (!bagOpen || lines.length === 0) return;
     let cancelled = false;
     const skus = lines.map((l) => l.sku).join(",");
-    fetch(`/api/products?skus=${encodeURIComponent(skus)}`)
-      .then((r) => r.json())
+    setLoadError(false);
+    fetch(`/api/products?skus=${encodeURIComponent(skus)}`,{cache:"no-store"})
+      .then((r) => {if (!r.ok) throw new Error("Product availability unavailable");return r.json();})
       .then((data) => {
         if (cancelled) return;
         const map: Record<string, BagProduct> = {};
-        for (const p of data.products) map[p.sku] = p;
+        for (const p of data.products ?? []) map[p.sku] = p;
         setProducts(map);
+        setLoadedSkus(skus);
       })
-      .catch(() => {});
+      .catch(() => {if(!cancelled)setLoadError(true);});
     return () => {
       cancelled = true;
     };
@@ -57,8 +61,11 @@ export function BagDrawer() {
 
   if (!bagOpen) return null;
 
-  const loading = lines.length > 0 && lines.some((l) => !products[l.sku]);
+  const currentSkus=lines.map(line=>line.sku).join(",");
+  const loading = lines.length > 0 && loadedSkus!==currentSkus && !loadError;
+  const missingSkus=!loading&&!loadError?lines.filter(line=>!products[line.sku]).map(line=>line.sku):[];
 
+  const unavailable=lines.some(line=>!products[line.sku] || products[line.sku].status!=="AVAILABLE");
   const items = lines
     .map((line) => ({ line, product: products[line.sku] }))
     .filter((x) => x.product);
@@ -106,7 +113,9 @@ export function BagDrawer() {
                 </div>
               ))}
             </div>
-          ) : items.length === 0 ? (
+          ) : loadError && lines.length>0 ? (
+            <div role="alert" className="p-6 text-sm"><p>We could not check stock availability.</p><button type="button" onClick={closeBag} className="mt-4 underline">Close and retry</button></div>
+          ) : items.length === 0 && !missingSkus.length ? (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
               <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-accent-deep">Bag</p>
               <p className="mt-3 font-display text-2xl font-semibold uppercase tracking-tight">Nothing yet.</p>
@@ -125,12 +134,13 @@ export function BagDrawer() {
               </Link>
             </div>
           ) : (
+            <div>{missingSkus.length>0 && <div role="alert" className="my-4 border border-red-200 bg-red-50 p-4 text-sm"><p>Some items are no longer available:</p>{missingSkus.map(sku=><button type="button" key={sku} onClick={()=>remove(sku)} className="mr-2 mt-2 underline">Remove {sku}</button>)}</div>}
             <ul className="divide-y divide-line">
               {items.map(({ line, product }) => (
                 <li key={line.sku} className="flex gap-4 py-5">
                   <Link href={`/product/${product.slug}`} onClick={closeBag} className="relative shrink-0 overflow-hidden bg-cream">
                     <Image
-                      src={product.images[0]?.src ?? ""}
+                      src={product.images[0]?.src || "/icon.png"}
                       alt={product.name}
                       width={80}
                       height={100}
@@ -171,10 +181,11 @@ export function BagDrawer() {
                 </li>
               ))}
             </ul>
+            </div>
           )}
         </div>
 
-        {items.length > 0 && (
+        {items.length > 0 && !loadError && (
           <div className="border-t border-line bg-cream px-6 py-5">
             <div className="mb-3">
               <div className="mb-1.5 flex justify-between font-mono text-[10px] uppercase tracking-[0.12em]">
@@ -194,11 +205,11 @@ export function BagDrawer() {
               <p className="font-mono text-base">{formatPrice(subtotal)}</p>
             </div>
             <Link
-              href="/checkout"
+              href={unavailable?"/bag":"/checkout"}
               onClick={closeBag}
               className="flex h-13 w-full items-center justify-center bg-ink font-display text-xs font-medium uppercase tracking-[0.16em] text-paper transition-colors hover:bg-accent"
             >
-              Checkout
+              {unavailable?"Review unavailable pieces":"Checkout"}
             </Link>
             <Link
               href="/bag"

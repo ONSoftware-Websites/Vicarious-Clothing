@@ -155,6 +155,8 @@ export default async function ProductPage({
             </div>
           </dl>
 
+          {product.defects.length>0 && <div className="mt-5 border border-line bg-cream p-4"><p className="font-display text-xs font-bold uppercase tracking-widest">Condition disclosure</p><p className="mt-2 text-sm text-ink-soft">{product.defects.join(" · ")}</p><a href="#product-details" className="mt-2 inline-block font-mono text-[10px] uppercase text-accent-deep underline underline-offset-2">Read full details below</a></div>}
+          <div className="mt-3 flex flex-wrap gap-4 text-xs"><Link href="/help/condition-guide" className="text-accent-deep underline underline-offset-4">Condition guide</Link><Link href="/help/delivery" className="text-accent-deep underline underline-offset-4">Delivery information</Link><Link href="/help/returns" className="text-accent-deep underline underline-offset-4">Returns policy</Link></div>
           <div className="mt-6 flex items-center gap-3">
             {sold ? (
               <p className="flex h-14 w-full items-center justify-center border border-ink font-display text-xs font-semibold uppercase tracking-[0.18em] text-ink">
@@ -176,7 +178,7 @@ export default async function ProductPage({
             </p>
           )}
 
-          <div className="mt-8">
+          <div className="mt-8" id="product-details">
             <Accordion
               defaultOpen={sold ? 1 : 0}
               items={[
@@ -242,7 +244,7 @@ export default async function ProductPage({
                       </p>
                     </dl>
                   ) : (
-                    <p>One size fits most.</p>
+                    <p>Measurements have not been recorded for this piece. Contact us if you would like the garment measured before buying.</p>
                   ),
                 },
                 {

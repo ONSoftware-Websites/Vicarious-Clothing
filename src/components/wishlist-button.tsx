@@ -12,10 +12,11 @@ export function WishlistButton({
   className?: string;
   sold?: boolean;
 }) {
-  const { has, toggle } = useWishlist();
+  const { has, toggle, syncError } = useWishlist();
   const active = has(sku);
 
   return (
+    <>
     <button
       type="button"
       onClick={() => toggle(sku)}
@@ -37,5 +38,7 @@ export function WishlistButton({
         />
       </svg>
     </button>
+    {syncError && <div role="alert" className="fixed bottom-5 left-5 right-5 z-[100] mx-auto max-w-sm border border-red-200 bg-paper p-4 text-sm text-red-700 shadow-lg">{syncError}</div>}
+    </>
   );
 }

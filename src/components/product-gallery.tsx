@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProductImage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { productImageVariant } from "@/lib/product-image";
@@ -10,6 +10,8 @@ import { ResilientImage } from "@/components/resilient-image";
 export function ProductGallery({ images }: { images: ProductImage[] }) {
   const [active, setActive] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
+  const triggerRef=useRef<HTMLButtonElement>(null);
+  const closeRef=useRef<HTMLButtonElement>(null);
 
   const step = useCallback(
     (dir: 1 | -1) => {
@@ -20,6 +22,8 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
 
   useEffect(() => {
     if (!fullscreen) return;
+    closeRef.current?.focus();
+    const previousOverflow=document.body.style.overflow;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setFullscreen(false);
       if (e.key === "ArrowRight") step(1);
@@ -29,7 +33,8 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
+      triggerRef.current?.focus();
     };
   }, [fullscreen, step]);
 
@@ -47,6 +52,7 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
     <div>
       <div className="space-y-2">
         <button
+          ref={triggerRef}
           type="button"
           className="group relative block w-full cursor-zoom-in overflow-hidden bg-cream"
           onClick={() => setFullscreen(true)}
@@ -111,10 +117,11 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
           onClick={() => setFullscreen(false)}
         >
           <div className="flex items-center justify-between p-4">
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-paper/70">
+            <p aria-live="polite" className="font-mono text-[11px] uppercase tracking-[0.2em] text-paper/70">
               {active + 1} / {images.length}
             </p>
             <button
+              ref={closeRef}
               type="button"
               onClick={() => setFullscreen(false)}
               className="font-mono text-[11px] uppercase tracking-[0.18em] text-paper hover:text-white"
