@@ -237,6 +237,7 @@ export interface StockPurchase {
   leadId?: string;
   createdAt: string;
   paidAt?: string;
+  paymentReference?: string;
 }
 
 export interface JournalPost {
