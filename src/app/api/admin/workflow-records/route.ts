@@ -37,8 +37,10 @@ export async function GET(request:NextRequest){
 export async function POST(request:NextRequest){
  const a=await authorize(request);
  if(a.error)return a.error;
- let body:Record<string,unknown>;
- try{body=await request.json();}catch{return Response.json({error:"Invalid payload"},{status:400})}
+ let parsed:unknown;
+ try{parsed=await request.json();}catch{return Response.json({error:"Invalid payload"},{status:400})}
+ if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))return Response.json({error:"Invalid workflow entry"},{status:400});
+ const body=parsed as Record<string,unknown>;
  const category=String(body.category??"") as Category;
  const note=typeof body.note==="string"?body.note.trim():"";
  if(!CATEGORIES.includes(category)||!allowedForKind[a.kind as "lead"|"order"].has(category)||note.length>4000)return Response.json({error:"Invalid workflow entry"},{status:400});
