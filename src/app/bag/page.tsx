@@ -78,7 +78,7 @@ export default function BagPage() {
             Loading…
           </p>
         </div>
-      ) : loadError ? (
+      ) : loadError && lines.length>0 ? (
         <div role="alert" className="border border-red-200 bg-red-50 p-6"><p className="font-display text-lg font-semibold uppercase">Unable to check stock</p><p className="mt-2 text-sm">Refresh the page to retry before paying.</p><button type="button" className="mt-4 border border-ink px-5 py-2 font-mono text-xs uppercase" onClick={()=>window.location.reload()}>Retry</button></div>
       ) : items.length === 0 && !missingSkus.length ? (
         <div className="py-24 text-center">
