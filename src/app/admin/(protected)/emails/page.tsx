@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { listEmails } from "@/lib/server/store";
 import { formatDateTime } from "@/lib/utils";
@@ -7,6 +9,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Emails" };
 
 export default async function EmailsPage() {
+  if (!(await requireRole("ADMIN"))) redirect("/admin");
   const emails = await listEmails(100);
 
   return (
