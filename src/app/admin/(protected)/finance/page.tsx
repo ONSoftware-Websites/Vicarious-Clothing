@@ -16,8 +16,10 @@ function Metric({name,value,note}:{name:string;value:string;note:string}){
 export default async function FinancePage(){
  if(!(await requireRole("ADMIN")))redirect("/admin");
  const [orders,products,purchases,entries]=await Promise.all([
-  listOrders(),listProducts(),listPurchases(),getFinanceEntries()
+  listOrders(),listProducts(),listPurchases(),getFinanceEntries().catch(()=>null)
  ]);
+ if(!entries)return <p role="alert" className="p-8">Financial ledger unavailable or reporting limit exceeded. Totals have been withheld.</p>;
+ entries.sort((a,b)=>b.occurred_at.localeCompare(a.occurred_at)||b.created_at.localeCompare(a.created_at));
  const report=financeReport(orders,products,purchases,entries);
  return <div className="space-y-8">
   <header className="border-b border-line pb-7">
