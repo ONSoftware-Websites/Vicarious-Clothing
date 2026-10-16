@@ -5,6 +5,7 @@ import {getSupabase} from "@/lib/server/supabase";
 import {listOrders,listProducts,listPurchases} from "@/lib/server/store";
 import {financeReport,type FinanceAdjustment} from "@/lib/finance-report";
 import {formatPrice} from "@/lib/utils";
+import {StripeReconcileForm} from "@/components/admin/stripe-reconcile-form";
 import {FinanceAdjustmentForm} from "@/components/admin/finance-adjustment-form";
 
 export const dynamic="force-dynamic";
@@ -53,6 +54,7 @@ export default async function FinancePage(){
     <p className="mt-3 text-xs text-ink-soft">Unallocated business expenses are not assigned to channels.</p>
    </div>
   </section>
+  <section className="border border-line p-5"><StripeReconcileForm/></section>
   <details className="border border-line"><summary className="cursor-pointer bg-cream p-5 font-display text-xs font-semibold uppercase tracking-widest">+ Record a financial adjustment</summary><div className="p-5"><FinanceAdjustmentForm/></div></details>
   <section><h2 className="mb-4 font-display text-sm font-bold uppercase tracking-widest">Financial records</h2>
    <div className="overflow-x-auto border border-line"><table className="w-full min-w-[850px] text-left text-sm">
