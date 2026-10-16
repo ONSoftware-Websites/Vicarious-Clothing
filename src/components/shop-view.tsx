@@ -4,6 +4,7 @@ import { ProductGrid } from "@/components/product-grid";
 import { SortMenu } from "@/components/sort-menu";
 import { FilterSheet } from "@/components/filter-sheet";
 import { filterProducts, getFacets, type SortKey } from "@/lib/catalog";
+import { isPublicProduct, parsePriceFilter } from "@/lib/public-catalog";
 import { listProducts } from "@/lib/server/store";
 import { CATEGORY_LABELS } from "@/lib/site";
 import { isRecent } from "@/lib/utils";
@@ -27,7 +28,7 @@ export async function ShopView({
   category?: Category | "new-in" | "sale";
   params: ShopParams;
 }) {
-  const allProducts = (await listProducts()).filter((p) => p.status !== "DRAFT");
+  const allProducts = (await listProducts()).filter(isPublicProduct);
   const facets = getFacets(allProducts);
 
   const filters = {
@@ -36,8 +37,8 @@ export async function ShopView({
     sizes: params.size?.split(",").filter(Boolean),
     conditions: params.condition?.split(",").filter(Boolean),
     colours: params.colour?.split(",").filter(Boolean),
-    minPrice: params.min ? Number(params.min) : undefined,
-    maxPrice: params.max ? Number(params.max) : undefined,
+    minPrice: parsePriceFilter(params.min),
+    maxPrice: parsePriceFilter(params.max),
     q: params.q,
     onlyAvailable: true,
   };
