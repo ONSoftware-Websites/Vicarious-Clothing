@@ -46,7 +46,7 @@ async function ensurePurchaseForAcceptedLead(lead: Awaited<ReturnType<typeof upd
   const existing = (await listPurchases()).find((purchase) => purchase.leadId === lead.id);
   if (existing) return;
 
-  await createPurchase(
+  try { await createPurchase(
     {
       sellerName: lead.name,
       sellerEmail: lead.email,
@@ -57,7 +57,9 @@ async function ensurePurchaseForAcceptedLead(lead: Awaited<ReturnType<typeof upd
       leadId: lead.id,
     },
     ACTOR
-  );
+  ); } catch (error) {
+    if (!(await listPurchases()).some(purchase => purchase.leadId === lead.id)) throw error;
+  }
 }
 
 export async function PATCH(
@@ -79,20 +81,20 @@ export async function PATCH(
     if (!current) return Response.json({ error: "Not found" }, { status: 404 });
 
     const offer = body.offer ? String(body.offer).trim() : current.offer;
-    if (status === "OFFER_SENT") {
-      if (!offer) {
-        return Response.json({ error: "Enter an offer before sending it." }, { status: 400 });
-      }
+    if (status === "OFFER_SENT" && !offer) {
+      return Response.json({ error: "Enter an offer before sending it." }, { status: 400 });
+    }
 
+    const lead = await transitionLeadStatus(id, current.status, status, offer);
+    if (!lead) return Response.json({ error: "Submission was changed by another request" }, { status: 409 });
+
+    if (status === "OFFER_SENT") {
       await sendEmail({
         to: current.email,
         template: "lead-offer",
         data: { ...current, status: "OFFER_SENT", offer, offerExpiry: "7 days" },
       });
     }
-
-    const lead = await updateLeadStatus(id, status, offer);
-    if (!lead) return Response.json({ error: "Not found" }, { status: 404 });
 
     if (status === "OFFER_SENT") {
       await markOfferWindow(lead.id);
