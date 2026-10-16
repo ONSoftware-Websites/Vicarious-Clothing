@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -23,6 +25,7 @@ export default async function AdminOrderPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (!(await requireRole("ADMIN"))) redirect("/admin");
   const { id } = await params;
   const order = await getOrder(id);
   if (!order) notFound();
