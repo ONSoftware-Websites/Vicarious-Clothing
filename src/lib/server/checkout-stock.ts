@@ -11,10 +11,6 @@ function uniqueSkus(skus: string[]) {
   return [...new Set(skus.map((s) => s.toUpperCase()).filter(Boolean))];
 }
 
-function rpcMissing(message: string) {
-  return /function .* does not exist|could not find .*function|schema cache|claim_checkout_hold|release_checkout_hold|attach_checkout_hold/i.test(message);
-}
-
 function claimedFromRpc(data: unknown) {
   return Array.isArray(data)
     ? data.map((row: unknown) => {
@@ -76,7 +72,7 @@ export async function attachCheckoutHoldToOrder(
   orderId: string | undefined
 ) {
   const unique = uniqueSkus(skus);
-  if (!holdToken || !orderId || unique.length === 0) return { attached: [] as string[] };
+  if (!holdToken || !orderId || unique.length === 0) throw new Error("Checkout attachment identifiers required");
 
   const db = getSupabase();
   if (!db) return { attached: unique };
@@ -92,7 +88,9 @@ export async function attachCheckoutHoldToOrder(
     throw new Error(`Could not attach checkout hold to order: ${error.message}`);
   }
 
-  return { attached: claimedFromRpc(data) };
+  const attached = claimedFromRpc(data);
+  if (attached.length !== unique.length) throw new Error("Checkout stock hold attachment incomplete");
+  return { attached };
 }
 
 export async function releaseCheckoutStock(
