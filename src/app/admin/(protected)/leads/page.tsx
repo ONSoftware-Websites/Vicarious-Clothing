@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/server/admin-auth";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -21,9 +22,14 @@ function splitNotes(notes?: string) {
   };
 }
 
-export default async function AdminLeadsPage() {
+export default async function AdminLeadsPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   if (!(await requireRole("MANAGER"))) redirect("/admin");
-  const leads = await listLeads();
+  const allLeads = await listLeads();
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q.trim().toLowerCase() : "";
+  const valid = new Set(["NEW","REVIEWING","OFFER_SENT","ACCEPTED","DECLINED","RECEIVED","INSPECTED","PAID"]);
+  const status = typeof params.status === "string" && valid.has(params.status) ? params.status : "";
+  const leads = allLeads.filter(l=>(!status||l.status===status)&&(!q||[l.name,l.email,l.brand,l.itemType,l.size,l.condition].join(" ").toLowerCase().includes(q)));
   const db = getSupabase();
   const photosByLead = new Map<string, string[]>();
   for (const lead of leads) {
@@ -44,12 +50,25 @@ export default async function AdminLeadsPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="font-display text-2xl font-semibold uppercase tracking-tight">Sell To Us</h1>
+        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-accent-deep">Workspace / Acquisitions</p>
+        <h1 className="font-display text-3xl font-bold uppercase tracking-tight">Sell To Us</h1>
         <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
-          {leads.length} {leads.length === 1 ? "lead" : "leads"} · flow: NEW → REVIEWING → OFFER_SENT → ACCEPTED / DECLINED → RECEIVED → INSPECTED → PAID
+          {leads.length} matching submissions · {allLeads.length} total
         </p>
       </div>
 
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">{([
+        ["New",["NEW"]],["Under review",["REVIEWING","OFFER_SENT"]],["Accepted / inbound",["ACCEPTED","RECEIVED","INSPECTED"]],["Completed",["PAID"]]
+      ] as const).map(([label,values])=><div key={label} className="border border-line bg-cream p-4"><p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">{label}</p><p className="mt-2 font-display text-2xl font-semibold">{allLeads.filter(l=>(values as readonly string[]).includes(l.status)).length}</p></div>)}</div>
+      <form action="/admin/leads" className="mb-6 flex flex-wrap gap-3">
+        <label className="sr-only" htmlFor="lead-search">Search submissions</label>
+        <input id="lead-search" name="q" defaultValue={typeof params.q==="string"?params.q:""} placeholder="Search seller, email, brand or item…" className="h-11 min-w-0 flex-1 border border-line bg-paper px-4 text-sm sm:max-w-md"/>
+        <label className="sr-only" htmlFor="lead-status">Submission status</label>
+        <select id="lead-status" name="status" defaultValue={status} className="h-11 border border-line bg-paper px-3 font-mono text-xs uppercase"><option value="">All stages</option>{Array.from(valid).map(v=><option value={v} key={v}>{v.replaceAll("_"," ")}</option>)}</select>
+        <button type="submit" className="h-11 bg-ink px-5 font-display text-xs font-semibold uppercase tracking-wider text-paper">Apply</button>
+        <Link href="/admin/leads" className="flex h-11 items-center font-mono text-xs uppercase text-ink-soft underline underline-offset-4">Clear</Link>
+      </form>
+      <p className="mb-3 text-xs text-ink-soft">Workflow: New → Reviewing → Offer sent → Accepted → Received → Inspected → Paid. Declined submissions close without purchase.</p>
       <div className="overflow-x-auto border border-line">
         <table className="w-full min-w-[980px] border-collapse text-sm">
           <thead>
@@ -100,7 +119,7 @@ export default async function AdminLeadsPage() {
             })}
             {leads.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">No leads yet</td>
+                <td colSpan={6} className="px-4 py-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">No submissions match these filters</td>
               </tr>
             )}
           </tbody>
