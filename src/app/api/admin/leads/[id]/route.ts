@@ -64,7 +64,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireAdminApi();
+  const authError = await requireAdminApi("MANAGER");
   if (authError) return authError;
 
   const { id } = await params;
@@ -116,7 +116,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireAdminApi();
+  const authError = await requireAdminApi("MANAGER");
   if (authError) return authError;
   const { id } = await params;
   try {
