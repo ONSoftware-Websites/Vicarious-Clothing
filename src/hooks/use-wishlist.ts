@@ -76,10 +76,19 @@ export function useWishlist() {
       wishlistId = (created as { id: string } | null)?.id;
     }
     if (!wishlistId) return;
-    // Simple sync: delete all then insert next
-    await supabase.from("wishlist_items").delete().eq("wishlist_id", wishlistId);
-    if (nextSkus.length) {
-      await supabase.from("wishlist_items").insert(nextSkus.map((sku) => ({ wishlist_id: wishlistId, sku })));
+    const { data: existing, error: readError } = await supabase.from("wishlist_items").select("sku").eq("wishlist_id", wishlistId);
+    if (readError) throw readError;
+    const current = new Set((existing ?? []).map(item => String(item.sku)));
+    const desired = new Set(nextSkus);
+    const additions = [...desired].filter(sku => !current.has(sku));
+    const removals = [...current].filter(sku => !desired.has(sku));
+    if (additions.length) {
+      const { error } = await supabase.from("wishlist_items").upsert(additions.map(sku => ({wishlist_id:wishlistId,sku})), {onConflict:"wishlist_id,sku",ignoreDuplicates:true});
+      if (error) throw error;
+    }
+    if (removals.length) {
+      const { error } = await supabase.from("wishlist_items").delete().eq("wishlist_id",wishlistId).in("sku",removals);
+      if (error) throw error;
     }
     setRemoteSkus(nextSkus);
   }, [userId]);
