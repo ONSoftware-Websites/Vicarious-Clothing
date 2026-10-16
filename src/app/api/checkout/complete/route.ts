@@ -73,6 +73,9 @@ export async function POST(request: NextRequest) {
     const wasAlreadyPaid = existing.status === "PAID";
     await setOrderPayment(orderId, intent.id);
     const order = await markOrderPaid(orderId);
+    if (!order || order.status !== "PAID") {
+      return Response.json({ error: "Payment finalisation is still pending. Please contact support if this persists." }, { status: 409 });
+    }
     let emailSent = wasAlreadyPaid;
     let adminAlertSent = false;
     let sellerHqSynced = wasAlreadyPaid;
