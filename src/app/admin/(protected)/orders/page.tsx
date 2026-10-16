@@ -31,7 +31,8 @@ export default async function AdminOrdersPage({searchParams}:{searchParams:Promi
   const status = typeof raw.status==="string"?raw.status:"";
   const statuses = new Set(["PENDING_PAYMENT","PAID","PICKING","READY_TO_DISPATCH","DISPATCHED","DELIVERED","RETURN_REQUESTED","RETURNED","REFUNDED","CANCELLED"]);
   const filterStatus = statuses.has(status)?status:"";
-  const orders = allOrders.filter(o=>(!filterStatus||o.status===filterStatus)&&(!query||[o.id,o.name,o.email,...o.items.map(i=>i.name)].join(" ").toLowerCase().includes(query)));
+  const queue = typeof raw.queue==="string"?raw.queue:"";
+  const orders = allOrders.filter(o=>(!filterStatus||o.status===filterStatus)&&(!queue||(queue==="fulfilment"&&["PAID","PICKING","READY_TO_DISPATCH"].includes(o.status))||(queue==="returns"&&["RETURN_REQUESTED","RETURNED"].includes(o.status)))&&(!query||[o.id,o.name,o.email,...o.items.map(i=>i.name)].join(" ").toLowerCase().includes(query)));
   const fulfillment = allOrders.filter(o=>["PAID","PICKING","READY_TO_DISPATCH"].includes(o.status)).length;
   const returns = allOrders.filter(o=>["RETURN_REQUESTED","RETURNED"].includes(o.status)).length;
 
@@ -47,11 +48,12 @@ export default async function AdminOrdersPage({searchParams}:{searchParams:Promi
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {([["All orders",allOrders.length,""],["To fulfil",fulfillment,"PAID"],["Returns",returns,"RETURN_REQUESTED"],["Pending payment",allOrders.filter(o=>o.status==="PENDING_PAYMENT").length,"PENDING_PAYMENT"]] as const).map(([label,count,key])=><Link key={label} href={key?`/admin/orders?status=${key}`:"/admin/orders"} className="border border-line bg-cream p-4 hover:border-accent">
+        {([["All orders",allOrders.length,""],["To fulfil",fulfillment,"queue=fulfilment"],["Returns",returns,"queue=returns"],["Pending payment",allOrders.filter(o=>o.status==="PENDING_PAYMENT").length,"PENDING_PAYMENT"]] as const).map(([label,count,key])=><Link key={label} href={key?`/admin/orders?${key.startsWith("queue=")?key:`status=${key}`}`:"/admin/orders"} className="border border-line bg-cream p-4 hover:border-accent">
           <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">{label}</span><span className="mt-2 block font-display text-2xl font-semibold">{count}</span>
         </Link>)}
       </div>
       <form className="mb-6 flex flex-wrap gap-3" action="/admin/orders">
+        {queue&&<input type="hidden" name="queue" value={queue}/>}
         <label htmlFor="orders-q" className="sr-only">Search orders</label>
         <input id="orders-q" name="q" defaultValue={typeof raw.q==="string"?raw.q:""} placeholder="Order number, customer, email, item…" className="h-11 min-w-0 flex-1 border border-line bg-paper px-4 text-sm sm:max-w-md"/>
         <label htmlFor="orders-status" className="sr-only">Filter by order status</label>
