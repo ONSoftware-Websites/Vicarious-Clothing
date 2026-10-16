@@ -11,9 +11,12 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Newsletter" };
 
-export default async function NewsletterPage() {
+export default async function NewsletterPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   if (!(await requireRole("MANAGER"))) redirect("/admin");
-  const subscribers = await listSubscribers();
+  const allSubscribers = await listSubscribers();
+  const params=await searchParams;
+  const q=typeof params.q==="string"?params.q.trim().toLowerCase():"";
+  const subscribers=allSubscribers.filter(s=>!q||[s.email,s.source].join(" ").toLowerCase().includes(q));
 
   return (
     <div>
@@ -23,7 +26,7 @@ export default async function NewsletterPage() {
             Newsletter
           </h1>
           <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
-            {subscribers.length} {subscribers.length === 1 ? "subscriber" : "subscribers"} ·
+            {allSubscribers.length} {allSubscribers.length === 1 ? "subscriber" : "subscribers"} ·
             marketing consent recorded separately from orders
           </p>
         </div>
@@ -35,16 +38,18 @@ export default async function NewsletterPage() {
         </a>
       </div>
 
-      <div className="mb-8 border border-line p-5">
+      <div className="mb-6 grid grid-cols-2 gap-3"><div className="border border-line bg-cream p-5"><p className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">Consented subscribers</p><p className="mt-2 font-display text-3xl font-semibold">{allSubscribers.length}</p></div><div className="border border-line bg-cream p-5"><p className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">Matching records</p><p className="mt-2 font-display text-3xl font-semibold">{subscribers.length}</p></div></div>
+      <details className="mb-8 border border-line"><summary className="cursor-pointer bg-cream p-5 font-display text-xs font-semibold uppercase tracking-widest">+ Add consented subscriber</summary><div className="p-5">
         <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.18em]">Add subscriber manually</h2>
         <p className="mb-4 text-xs leading-relaxed text-ink-faint">Add someone who gave consent offline or via another channel. Consent is recorded with source and timestamp for GDPR.</p>
         <NewsletterAddForm />
-      </div>
+      </div></details>
 
       <div className="mb-8">
-        <NewsletterSendForm count={subscribers.length} />
+        <NewsletterSendForm count={allSubscribers.length} />
       </div>
 
+      <form action="/admin/newsletter" className="mb-4 flex flex-wrap gap-3"><label className="sr-only" htmlFor="subscriber-search">Search subscribers</label><input id="subscriber-search" name="q" defaultValue={typeof params.q==="string"?params.q:""} placeholder="Search email or consent source…" className="h-11 flex-1 border border-line bg-paper px-4 text-sm"/><button type="submit" className="bg-ink px-5 font-display text-xs font-semibold uppercase text-paper">Search</button><a href="/admin/newsletter" className="self-center font-mono text-xs uppercase underline">Clear</a></form>
       <div className="overflow-x-auto border border-line">
         <table className="w-full min-w-[600px] border-collapse text-sm">
           <thead>
