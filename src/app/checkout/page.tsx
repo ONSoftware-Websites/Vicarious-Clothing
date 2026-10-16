@@ -558,8 +558,8 @@ export default function CheckoutPage() {
   const canContinue =
     !holdingStock &&
     !error &&
-    ((step === "contact" && email.includes("@")) ||
-      (step === "delivery" && name && line1 && city && postcode) ||
+    ((step === "contact" && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.trim())) ||
+      (step === "delivery" && name.trim().length>1 && line1.trim() && city.trim() && postcode.trim().length>=5) ||
       (step === "review" &&
         (isStripe ? terms && !!clientSecret : card.length >= 12 && cardName && cardExpiry && cardCvc && terms)));
 
@@ -1010,6 +1010,7 @@ export default function CheckoutPage() {
         Checkout
       </h1>
 
+      <p className="sr-only" aria-live="polite">Checkout step {stepIndex+1} of {steps.length}: {step}</p>
       <ol className="mb-10 flex flex-wrap gap-x-8 gap-y-2 font-mono text-[11px] uppercase tracking-[0.18em]">
         {steps.map((s, i) => (
           <li
@@ -1029,7 +1030,7 @@ export default function CheckoutPage() {
       </ol>
 
       {error && (
-        <div className="mb-8 border border-red-200 bg-red-50 p-5">
+        <div role="alert" className="mb-8 border border-red-200 bg-red-50 p-5">
           <p className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-red-800">
             {error}
           </p>
@@ -1129,7 +1130,7 @@ export default function CheckoutPage() {
                   <dd>
                     −
                     {discount.type === "free_delivery"
-                      ? formatPrice(deliveryCost === 0 ? 0 : baseDeliveryCost)
+                      ? formatPrice(baseDeliveryCost)
                       : formatPrice(discount.amount)}
                   </dd>
                 </div>
