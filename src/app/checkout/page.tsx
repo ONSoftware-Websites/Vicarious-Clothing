@@ -41,6 +41,7 @@ type Step = "contact" | "delivery" | "review";
 const input =
   "h-12 w-full border border-line bg-paper px-4 text-sm focus:border-ink focus:outline-none";
 
+const CHECKOUT_DRAFT_KEY="vc_checkout_draft_v1";
 const STOCK_HELD_ERROR =
   "SOMEONE GOT THERE FIRST. A piece in your bag is currently on hold or has sold.";
 
@@ -216,6 +217,30 @@ export default function CheckoutPage() {
   const [cardName, setCardName] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvc, setCardCvc] = useState("");
+
+  // Session-scoped progress recovery: no card information or Stripe secrets are stored.
+  const [draftRestored,setDraftRestored] = useState(false);
+  useEffect(()=>{
+    try{
+      const raw=sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
+      if(raw){
+        const draft=JSON.parse(raw) as Record<string,unknown>;
+        if(typeof draft.savedAt==="number"&&Date.now()-draft.savedAt<2*60*60*1000){
+          const value=(key:string)=>typeof draft[key]==="string"?String(draft[key]).slice(0,200):"";
+          setEmail(value("email"));setName(value("name"));
+          setLine1(value("line1"));setLine2(value("line2"));setCity(value("city"));
+          setPostcode(value("postcode"));setDelivery(draft.delivery==="express"?"express":"standard");
+        }
+      }
+    }catch{/* Ignore stale or blocked session storage. */}
+    setDraftRestored(true);
+  },[]);
+  useEffect(()=>{
+    if(!draftRestored||checkoutFinishedRef.current)return;
+    try{sessionStorage.setItem(CHECKOUT_DRAFT_KEY,JSON.stringify({
+      savedAt:Date.now(),email,name,line1,line2,city,postcode,delivery
+    }));}catch{/* Storage is optional. */}
+  },[draftRestored,email,name,line1,line2,city,postcode,delivery]);
 
   const [discountCode, setDiscountCode] = useState("");
   const [discount, setDiscount] = useState<{
@@ -543,6 +568,7 @@ export default function CheckoutPage() {
         fetch("/api/newsletter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, source: "checkout", consent: true }) }).catch(() => {});
       }
       checkoutFinishedRef.current = true;
+      try{sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);}catch{}
       clear();
       router.replace(`/order/${data.order.id}?paid=1`);
     } catch {
