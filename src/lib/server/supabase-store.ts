@@ -689,11 +689,14 @@ export async function updateOrderStatus(
 ): Promise<Order | undefined> {
   const before = await getOrder(db, id);
   if (!before) return undefined;
-  const { error } = await db
+  const { data, error } = await db
     .from("orders")
     .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", id.toUpperCase());
+    .eq("id", id.toUpperCase())
+    .eq("status", before.status)
+    .select("id").maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) return undefined;
   await logAudit(db, actor, "updated order", before.id, before.status, status);
   return { ...before, status };
 }
