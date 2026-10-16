@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
 
         await setOrderPayment(orderId, intent.id);
         const order = await markOrderPaid(orderId);
+        if (!order || order.status !== "PAID") throw new Error(`Order ${orderId} payment transition was not completed`);
         if (order) {
           await recordDiscountUsageOnce(order.discount?.code, order.email);
           await sendConfirmationOnceSafely(order);
@@ -238,6 +239,7 @@ export async function POST(request: NextRequest) {
 
         if (paymentIntentId) await setOrderPayment(orderId, paymentIntentId);
         const order = await markOrderPaid(orderId);
+        if (!order || order.status !== "PAID") throw new Error(`Order ${orderId} payment transition was not completed`);
         if (order) {
           await recordDiscountUsageOnce(order.discount?.code, order.email);
           await sendConfirmationOnceSafely(order);
