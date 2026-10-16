@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ImageMigrationPanel } from "@/components/admin/image-migration-panel";
 
@@ -5,7 +7,8 @@ export const metadata: Metadata = {
   title: "Maintenance | Vicarious Admin",
 };
 
-export default function MaintenancePage() {
+export default async function MaintenancePage() {
+  if (!(await requireRole("OWNER"))) redirect("/admin");
   return (
     <div className="space-y-8">
       <div>
