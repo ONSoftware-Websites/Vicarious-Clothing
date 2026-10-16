@@ -1,3 +1,4 @@
+import { LinkPurchasedStock } from "@/components/admin/link-purchased-stock";
 import Link from "next/link";
 import { notFound,redirect } from "next/navigation";
 import { requireRole } from "@/lib/server/admin-auth";
@@ -15,6 +16,7 @@ export async function generateMetadata({params}:{params:Promise<{id:string}>}){
 export default async function SellerCase({params}:{params:Promise<{id:string}>}){
  if(!(await requireRole("MANAGER")))redirect("/admin");
  const {id}=await params;
+ const canManagePurchases=await requireRole("ADMIN");
  const [leads,purchases]=await Promise.all([listLeads(),listPurchases()]);
  const lead=leads.find(l=>l.id===id);
  if(!lead)notFound();
@@ -56,7 +58,7 @@ export default async function SellerCase({params}:{params:Promise<{id:string}>})
      <h2 className="font-display text-sm font-semibold uppercase">Stock acquisition</h2>
      {linked?<><p className="text-sm font-medium">{formatPrice(linked.amount)} · {linked.status}</p><p className="font-mono text-xs text-ink-soft">Purchase {linked.id}</p><p className="text-xs">{linked.items.length} linked inventory items</p><Link href="/admin/purchases" className="inline-block font-mono text-xs uppercase text-accent-deep underline">Open purchase ledger →</Link></>:
       <p className="text-sm text-ink-soft">No linked purchase yet. A validated accepted offer creates an acquisition record.</p>}
-     <div className="border-t border-line pt-3"><Link href="/admin/inventory/new" className="font-mono text-xs uppercase text-accent-deep underline">Create inventory item →</Link></div>
+     {canManagePurchases&&<><div className="border-t border-line pt-3"><Link href="/admin/inventory/new" className="font-mono text-xs uppercase text-accent-deep underline">Create inventory item →</Link></div>{linked&&<LinkPurchasedStock purchaseId={linked.id} alreadyLinked={linked.items.map(i=>i.sku)} totalAmount={linked.amount}/>}</>}
     </section>
    </aside>
   </div>
