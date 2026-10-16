@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireRole } from "@/lib/server/admin-auth";
+import { getAdminRole, requireRole } from "@/lib/server/admin-auth";
 import { getSupabase } from "@/lib/server/supabase";
 export const dynamic="force-dynamic";
 export const metadata={title:"Settings & Integrations | Vicarious"};
 function Tile({label,value,detail}:{label:string;value:string;detail?:string}){return <div className="border border-line bg-cream p-5"><p className="font-mono text-[10px] uppercase tracking-widest text-ink-soft">{label}</p><p className="mt-2 font-display text-xl font-semibold">{value}</p>{detail&&<p className="mt-2 text-xs text-ink-soft">{detail}</p>}</div>;}
 export default async function SettingsPage(){
  if(!(await requireRole("OWNER")))redirect("/admin");
+ const role=await getAdminRole();
  const db=getSupabase();
  const jobs=db?await db.from("sellerhq_retry_jobs").select("status"):null;
  const counts={pending:0,failed:0,processing:0,done:0};
@@ -28,6 +29,6 @@ export default async function SettingsPage(){
      {jobs?.error&&<p className="text-sm text-ink-soft">Queue health could not be retrieved.</p>}
      <p className="text-xs text-ink-soft">Queue totals are stored job counts, not proof that SellerHQ accepted every event. This page does not initiate retries.</p>
    </section>
-   <section className="grid gap-3 sm:grid-cols-2"><Link href="/admin/maintenance" className="border border-line p-5 hover:border-accent"><h3 className="font-display text-sm font-bold uppercase">Maintenance tools →</h3><p className="mt-2 text-xs text-ink-soft">Restricted operational tools and one-off migrations</p></Link><Link href="/admin/staff" className="border border-line p-5 hover:border-accent"><h3 className="font-display text-sm font-bold uppercase">Staff & Permissions →</h3><p className="mt-2 text-xs text-ink-soft">Super-admin membership management</p></Link></section>
+   <section className="grid gap-3 sm:grid-cols-2"><Link href="/admin/maintenance" className="border border-line p-5 hover:border-accent"><h3 className="font-display text-sm font-bold uppercase">Maintenance tools →</h3><p className="mt-2 text-xs text-ink-soft">Restricted operational tools and one-off migrations</p></Link>{role==="SUPER_ADMIN"&&<Link href="/admin/staff" className="border border-line p-5 hover:border-accent"><h3 className="font-display text-sm font-bold uppercase">Staff & Permissions →</h3><p className="mt-2 text-xs text-ink-soft">Super-admin membership management</p></Link>}</section>
  </div>;
 }
