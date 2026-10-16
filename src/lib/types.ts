@@ -53,7 +53,7 @@ export const ORDER_STATUSES = [
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
-export const ROLES = ["CUSTOMER", "STAFF", "MANAGER", "ADMIN", "OWNER"] as const;
+export const ROLES = ["CUSTOMER", "STAFF", "MANAGER", "ADMIN", "OWNER", "SUPER_ADMIN"] as const;
 
 export type Role = (typeof ROLES)[number];
 
