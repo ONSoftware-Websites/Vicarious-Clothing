@@ -35,6 +35,7 @@ function useToggleParam() {
       } else {
         params.set(key, [...existing, value].join(","));
       }
+      params.delete("page");
       router.push(`?${params.toString()}`, { scroll: false });
     },
     [router, searchParams]
@@ -96,7 +97,11 @@ function PriceRange({
   const [maxPrice, setMaxPrice] = useState(initialMax);
 
   const applyPrice = () => {
+    const min=minPrice.trim()?Number(minPrice):undefined;
+    const max=maxPrice.trim()?Number(maxPrice):undefined;
+    if((min!==undefined&&(!Number.isFinite(min)||min<0))||(max!==undefined&&(!Number.isFinite(max)||max<0))||(min!==undefined&&max!==undefined&&min>max)) return;
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
     if (minPrice) params.set("min", minPrice);
     else params.delete("min");
     if (maxPrice) params.set("max", maxPrice);
@@ -119,6 +124,7 @@ function PriceRange({
           type="number"
           inputMode="numeric"
           min={0}
+          step="0.01"
           placeholder={`£${facets.minPrice}`}
           value={minPrice}
           onChange={(e) => setMinPrice(e.target.value)}
