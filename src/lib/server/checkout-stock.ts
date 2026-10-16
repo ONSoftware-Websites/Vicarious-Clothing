@@ -53,11 +53,7 @@ export async function claimCheckoutStock(
       };
     }
 
-    // Deployment safety: if the SQL repair has not been run yet, keep checkout
-    // working with the older timed RPC until the new hold functions exist.
-    if (!rpcMissing(error.message)) {
-      throw new Error(`Could not hold stock: ${error.message}`);
-    }
+    throw new Error(`Could not hold stock: ${error.message}`);
   }
 
   const { data, error } = await db.rpc("claim_inventory", {
@@ -92,10 +88,7 @@ export async function attachCheckoutHoldToOrder(
   });
 
   if (error) {
-    if (rpcMissing(error.message)) {
-      console.warn("Checkout hold order attachment skipped; SQL repair has not been applied yet.");
-      return { attached: [] as string[] };
-    }
+
     throw new Error(`Could not attach checkout hold to order: ${error.message}`);
   }
 
@@ -124,9 +117,7 @@ export async function releaseCheckoutStock(
 
     if (!error) return { released: claimedFromRpc(data) };
 
-    if (!rpcMissing(error.message)) {
-      throw new Error(`Could not release checkout hold: ${error.message}`);
-    }
+    throw new Error(`Could not release checkout hold: ${error.message}`);
   }
 
   // Legacy fallback for pre-hold SQL deployments and local compatibility.
