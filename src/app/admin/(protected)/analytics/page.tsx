@@ -134,7 +134,7 @@ export default async function AnalyticsPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2"><Link href="/admin/orders" className="border border-ink px-4 py-3 font-mono text-[10px] uppercase tracking-wider hover:bg-cream">Review orders →</Link><Link href="/admin/purchases" className="border border-line px-4 py-3 font-mono text-[10px] uppercase tracking-wider hover:bg-cream">Stock purchases →</Link><Link href="/admin/inventory" className="border border-line px-4 py-3 font-mono text-[10px] uppercase tracking-wider hover:bg-cream">Inventory →</Link></div>
+      <div className="flex flex-wrap gap-2"><Link href="/admin/orders" className="border border-ink px-4 py-3 font-mono text-[10px] uppercase tracking-wider hover:bg-cream">Review orders →</Link><Link href="/admin/finance" className="border border-ink px-4 py-3 font-mono text-[10px] uppercase tracking-wider hover:bg-cream">Reconcile finance →</Link><Link href="/admin/purchases" className="border border-line px-4 py-3 font-mono text-[10px] uppercase tracking-wider hover:bg-cream">Stock purchases →</Link><Link href="/admin/inventory" className="border border-line px-4 py-3 font-mono text-[10px] uppercase tracking-wider hover:bg-cream">Inventory →</Link></div>
       <section>
         <h2 className="mb-4 font-display text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">
           This month
@@ -157,7 +157,7 @@ export default async function AnalyticsPage() {
         </h2>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Metric label="Revenue" value={formatPrice(revenue)} />
-          <Metric label="Net profit" value={formatPrice(netProfit)} sub="after cost, fees, packaging" />
+          <Metric label="Estimated product profit" value={formatPrice(netProfit)} sub="product-level estimate, not reconciled" />
           <Metric label="Items sold" value={String(itemsSold)} />
           <Metric label="Average order" value={formatPrice(avgOrder)} />
           <Metric label="Website conversion" value={`${conversion.toFixed(2)}%`} sub="website orders ÷ visits" />
