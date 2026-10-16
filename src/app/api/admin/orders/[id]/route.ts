@@ -119,7 +119,7 @@ export async function PATCH(
 
       const wasPendingPayment = existing.status === "PENDING_PAYMENT";
       const order = await updateOrderStatus(id, status, ACTOR);
-      if (!order) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!order) return Response.json({ error: "Order status changed during this operation. Refresh and try again." }, { status: 409 });
 
       let released: string[] = [];
       if (status === "CANCELLED" && wasPendingPayment) {
