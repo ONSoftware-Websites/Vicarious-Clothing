@@ -65,6 +65,7 @@ export function BagDrawer() {
   const loading = lines.length > 0 && loadedSkus!==currentSkus && !loadError;
   const missingSkus=!loading&&!loadError?lines.filter(line=>!products[line.sku]).map(line=>line.sku):[];
 
+  const unavailable=lines.some(line=>!products[line.sku] || products[line.sku].status!=="AVAILABLE");
   const items = lines
     .map((line) => ({ line, product: products[line.sku] }))
     .filter((x) => x.product);
@@ -133,6 +134,7 @@ export function BagDrawer() {
               </Link>
             </div>
           ) : (
+            <div>{missingSkus.length>0 && <div role="alert" className="my-4 border border-red-200 bg-red-50 p-4 text-sm"><p>Some items are no longer available:</p>{missingSkus.map(sku=><button type="button" key={sku} onClick={()=>remove(sku)} className="mr-2 mt-2 underline">Remove {sku}</button>)}</div>}
             <ul className="divide-y divide-line">
               {items.map(({ line, product }) => (
                 <li key={line.sku} className="flex gap-4 py-5">
@@ -179,10 +181,11 @@ export function BagDrawer() {
                 </li>
               ))}
             </ul>
+            </div>
           )}
         </div>
 
-        {items.length > 0 && (
+        {items.length > 0 && !loadError && (
           <div className="border-t border-line bg-cream px-6 py-5">
             <div className="mb-3">
               <div className="mb-1.5 flex justify-between font-mono text-[10px] uppercase tracking-[0.12em]">
@@ -202,11 +205,11 @@ export function BagDrawer() {
               <p className="font-mono text-base">{formatPrice(subtotal)}</p>
             </div>
             <Link
-              href="/checkout"
+              href={unavailable?"/bag":"/checkout"}
               onClick={closeBag}
               className="flex h-13 w-full items-center justify-center bg-ink font-display text-xs font-medium uppercase tracking-[0.16em] text-paper transition-colors hover:bg-accent"
             >
-              Checkout
+              {unavailable?"Review unavailable pieces":"Checkout"}
             </Link>
             <Link
               href="/bag"
