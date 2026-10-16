@@ -634,17 +634,20 @@ export async function listOrders(db: SupabaseClient, email?: string): Promise<Or
 }
 
 export async function markOrderPaid(db: SupabaseClient, id: string): Promise<Order | undefined> {
-  const order = await getOrder(db, id);
-  if (!order) return undefined;
-  if (order.status === "PAID") return order;
-  const { error } = await db
-    .from("orders")
-    .update({ status: "PAID", updated_at: new Date().toISOString() })
-    .eq("id", id.toUpperCase());
-  if (error) throw new Error(error.message);
-  await markSoldByOrder(db, order.items.map((i) => i.sku));
-  await logAudit(db, order.name, "payment captured", order.id, undefined, `£${order.total.toFixed(2)}`);
-  return { ...order, status: "PAID" };
+  const before = await getOrder(db, id);
+  if (!before) return undefined;
+  if (before.status === "PAID") return before;
+  if (before.status !== "PENDING_PAYMENT") return undefined;
+  const { data: transitioned, error } = await db.rpc("finalize_paid_order", {
+    p_order_id: id,
+  });
+  if (error) throw new Error(`Could not finalize payment: ${error.message}`);
+  const paid = await getOrder(db, id);
+  if (!paid || paid.status !== "PAID") return undefined;
+  if (transitioned) {
+    await logAudit(db, paid.name, "payment captured", paid.id, undefined, `£${paid.total.toFixed(2)}`);
+  }
+  return paid;
 }
 
 export async function setOrderPayment(
