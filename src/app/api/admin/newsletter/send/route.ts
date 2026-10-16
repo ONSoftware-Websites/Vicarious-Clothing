@@ -45,7 +45,7 @@ ${bodyHtml}
 }
 
 export async function POST(request: NextRequest) {
-  const authErr = await requireAdminApi();
+  const authErr = await requireAdminApi("MANAGER");
   if (authErr) return authErr;
 
   try {
