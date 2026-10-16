@@ -2,13 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ShopUiProvider } from "@/hooks/use-shop-ui";
-import { AnnouncementBar } from "@/components/announcement-bar";
-import { Header } from "@/components/header";
-import { Footer } from "@/components/footer";
-import { SearchOverlay } from "@/components/search-overlay";
-import { BagDrawer } from "@/components/bag-drawer";
-import { CookieBanner } from "@/components/cookie-banner";
-import { TrackVisits } from "@/components/track-visits";
+import { SiteChrome } from "@/components/site-chrome";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 const inter = Inter({
@@ -71,14 +65,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col">
         <ShopUiProvider>
-          <AnnouncementBar />
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
-          <SearchOverlay />
-          <BagDrawer />
-          <CookieBanner />
-          <TrackVisits />
+          <SiteChrome>{children}</SiteChrome>
         </ShopUiProvider>
       </body>
     </html>
