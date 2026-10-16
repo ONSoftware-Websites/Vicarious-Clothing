@@ -49,6 +49,7 @@ export async function POST(request:NextRequest){
    return Response.json({error:"Invalid checklist fields"},{status:400});
  if(!note&&!Object.keys(fields).length)return Response.json({error:"A note or checklist is required"},{status:400});
  const auth=await createSupabaseServer();
+ if(!auth)return Response.json({error:"Authentication unavailable"},{status:503});
  const user=(await auth.auth.getUser()).data.user;
  if(!user)return Response.json({error:"Unauthenticated"},{status:401});
  const db=getSupabase();
