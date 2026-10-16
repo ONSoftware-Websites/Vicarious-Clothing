@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { listOrders, listProducts, getVisits, productEconomics } from "@/lib/server/store";
 import { formatPrice } from "@/lib/utils";
@@ -33,6 +35,7 @@ function Metric({
 }
 
 export default async function AnalyticsPage() {
+  if (!(await requireRole("ADMIN"))) redirect("/admin");
   const orders = await listOrders();
   const products = await listProducts();
   const visits = await getVisits();
