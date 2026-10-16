@@ -1,9 +1,9 @@
 import {redirect} from "next/navigation";
 import Link from "next/link";
 import {requireRole} from "@/lib/server/admin-auth";
-import {getSupabase} from "@/lib/server/supabase";
+import {getFinanceEntries} from "@/lib/server/finance-data";
 import {listOrders,listProducts,listPurchases} from "@/lib/server/store";
-import {financeReport,type FinanceAdjustment} from "@/lib/finance-report";
+import {financeReport} from "@/lib/finance-report";
 import {formatPrice} from "@/lib/utils";
 import {StripeReconcileForm} from "@/components/admin/stripe-reconcile-form";
 import {FinanceAdjustmentForm} from "@/components/admin/finance-adjustment-form";
@@ -15,15 +15,9 @@ function Metric({name,value,note}:{name:string;value:string;note:string}){
 }
 export default async function FinancePage(){
  if(!(await requireRole("ADMIN")))redirect("/admin");
- const db=getSupabase();
- if(!db)return <p className="p-8">Financial database unavailable.</p>;
- const [orders,products,purchases,rows]=await Promise.all([
-  listOrders(),listProducts(),listPurchases(),
-  db.from("finance_adjustments").select("id,kind,amount,order_id,reference,description,occurred_at,created_at")
-   .order("occurred_at",{ascending:false}).limit(2000)
+ const [orders,products,purchases,entries]=await Promise.all([
+  listOrders(),listProducts(),listPurchases(),getFinanceEntries()
  ]);
- if(rows.error)return <p role="alert" className="p-8">Financial ledger unavailable. Reporting has been withheld rather than showing incomplete figures.</p>;
- const entries=(rows.data??[]).map(row=>({...row,amount:Number(row.amount)})) as FinanceAdjustment[];
  const report=financeReport(orders,products,purchases,entries);
  return <div className="space-y-8">
   <header className="border-b border-line pb-7">
@@ -35,7 +29,6 @@ export default async function FinancePage(){
   {!report.isComplete&&<div role="status" className="border border-amber-300 bg-amber-50 p-5 text-sm text-amber-900">
    <strong>Reconciliation incomplete.</strong> {report.unknownCosts} sold line items lack recorded cost; {report.refundedWithoutLedger} fully refunded orders lack a matching refund adjustment. Do not treat contribution as accounting profit.
   </div>}
-  {rows.data?.length===2000&&<p role="status" className="border border-line p-4 text-sm">Only the most recent 2,000 adjustments are displayed and used here. Export or archive records before relying on lifetime totals.</p>}
   <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
    <Metric name="Recorded order totals" value={formatPrice(report.sales)} note={`${report.orders} non-cancelled, non-pending orders`}/>
    <Metric name="Known acquisition costs" value={formatPrice(report.itemCosts)} note={`${report.unknownCosts} item costs missing`}/>
