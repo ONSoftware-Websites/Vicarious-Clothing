@@ -8,15 +8,20 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Emails" };
 
-export default async function EmailsPage() {
+export default async function EmailsPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   if (!(await requireRole("ADMIN"))) redirect("/admin");
-  const emails = await listEmails(100);
+  const allEmails = await listEmails(100);
+  const raw=await searchParams;
+  const q=typeof raw.q==="string"?raw.q.trim().toLowerCase():"";
+  const status=raw.status==="sent"||raw.status==="logged"?raw.status:"";
+  const emails=allEmails.filter(e=>(!status||(status==="sent"?e.status==="sent":e.status!=="sent"))&&(!q||[e.to,e.template,e.subject].join(" ").toLowerCase().includes(q)));
+  const delivered=allEmails.filter(e=>e.status==="sent").length;
 
   return (
     <div>
       <div className="mb-8">
-        <h1 className="font-display text-2xl font-semibold uppercase tracking-tight">
-          Transactional email
+        <h1 className="font-display text-3xl font-bold uppercase tracking-tight">
+          Email activity
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-soft">
           Every email the store sends, in one place. Without a provider key
@@ -26,6 +31,8 @@ export default async function EmailsPage() {
         </p>
       </div>
 
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">{[["Recent records",allEmails.length],["Sent via provider",delivered],["Logged locally",allEmails.length-delivered]].map(([title,value])=><div key={title} className="border border-line bg-cream p-5"><p className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">{title}</p><p className="mt-2 font-display text-2xl font-semibold">{value}</p></div>)}</div>
+      <form action="/admin/emails" className="mb-5 flex flex-wrap gap-3"><label className="sr-only" htmlFor="email-search">Search emails</label><input id="email-search" name="q" defaultValue={typeof raw.q==="string"?raw.q:""} placeholder="Search recipient, subject or template…" className="h-11 min-w-0 flex-1 border border-line bg-paper px-4 text-sm"/><label className="sr-only" htmlFor="email-status">Delivery record status</label><select name="status" id="email-status" defaultValue={status} className="h-11 border border-line bg-paper px-3 font-mono text-xs uppercase"><option value="">All records</option><option value="sent">Sent via provider</option><option value="logged">Logged locally</option></select><button type="submit" className="bg-ink px-5 font-display text-xs font-semibold uppercase text-paper">Apply</button><a href="/admin/emails" className="self-center font-mono text-xs uppercase underline">Clear</a></form>
       <div className="overflow-x-auto border border-line">
         <table className="w-full min-w-[800px] border-collapse text-sm">
           <thead>
