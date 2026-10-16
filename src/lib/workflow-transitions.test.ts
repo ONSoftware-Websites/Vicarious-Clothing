@@ -1,6 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {ORDER_TRANSITIONS,LEAD_TRANSITIONS} from "./workflow-transitions";
-import {REQUIRED_CHECKS} from "./server/workflow-gates";
+import {ORDER_TRANSITIONS,LEAD_TRANSITIONS,REQUIRED_CHECKS} from "./workflow-transitions";
 
 describe("Release 10 order fulfilment rules",()=>{
  it("requires sequential paid-picking-packed-dispatched progression",()=>{
