@@ -25,10 +25,13 @@ export default async function OperationsPage() {
   const retry = db ? await db.from("sellerhq_retry_jobs")
     .select("id", {head:true,count:"exact"}).in("status",["pending","failed","processing"]) : null;
   const outstanding = orders.filter(o=>["PAID","PICKING","READY_TO_DISPATCH"].includes(o.status));
-  const openLeads = leads.filter(l=>["NEW","REVIEWING","OFFER_SENT","ACCEPTED"].includes(l.status));
+  const openLeads = leads.filter(l=>["NEW","REVIEWING","OFFER_SENT","ACCEPTED","RECEIVED","INSPECTED"].includes(l.status));
   const missingPhotos = products.filter(p=>p.status==="DRAFT" && !p.images.length);
   const unpriced = products.filter(p=>!Number.isFinite(p.price) || p.price<=0);
   const unpaid = purchases.filter(p=>p.status!=="PAID");
+  const returns = orders.filter(o=>o.status==="RETURN_REQUESTED");
+  const awaitingInspection = leads.filter(l=>l.status==="RECEIVED");
+  const unlinkedPurchases = purchases.filter(p=>p.items.length===0);
   return <div className="space-y-8">
     <header><h1 className="font-display text-3xl font-bold uppercase">Operations centre</h1>
       <p className="mt-2 text-sm text-ink-soft">Prioritise fulfilment, seller offers, listing quality and SellerHQ integration health.</p>
@@ -37,10 +40,14 @@ export default async function OperationsPage() {
       {canManageFinance && <Metric label="Orders to fulfil" count={outstanding.length} href="/admin/orders"/>}
       <Metric label="Open seller enquiries" count={openLeads.length} href="/admin/leads"/>
       {canManageFinance && <Metric label="Outstanding seller payments" count={unpaid.length} href="/admin/purchases"/>}
+      {canManageFinance && <Metric label="Customer returns to review" count={returns.length} href="/admin/orders?queue=returns"/>}
+      <Metric label="Seller items awaiting inspection" count={awaitingInspection.length} href="/admin/leads?status=RECEIVED"/>
+      {canManageFinance && <Metric label="Purchases without stock links" count={unlinkedPurchases.length} href="/admin/purchases"/>}
       <Metric label="Drafts missing photographs" count={missingPhotos.length} href="/admin/inventory?status=DRAFT"/>
       <Metric label="Products needing valid pricing" count={unpriced.length} href="/admin/inventory"/>
       {canManageFinance && <Metric label="SellerHQ deliveries outstanding" count={retry?.count??0} href="/admin/analytics"/>}
     </div>
+    {canManageFinance && returns.length>0 && <section className="border border-line p-6"><h2 className="font-display text-lg font-bold uppercase">Customer returns awaiting action</h2><div className="mt-4 space-y-3">{returns.slice(0,10).map(order=><Link key={order.id} href={`/admin/orders/${order.id}`} className="flex justify-between border-b border-line py-3 text-sm hover:text-accent-deep"><span>{order.id} · {order.name}</span><span className="font-mono text-xs">Review →</span></Link>)}</div></section>}
     {canManageFinance && <section className="border border-line p-6">
       <h2 className="font-display text-lg font-bold uppercase">Fulfilment queue</h2>
       <div className="mt-4 space-y-3">
