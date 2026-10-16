@@ -21,6 +21,7 @@ export function useWishlist() {
   const [localSkus, setLocalSkus] = useLocalStorage<string[]>(KEY, EMPTY, parse, JSON.stringify);
   const [remoteSkus, setRemoteSkus] = useState<string[] | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [syncError,setSyncError] = useState("");
 
   // Check auth
   useEffect(() => {
@@ -65,6 +66,7 @@ export function useWishlist() {
 
   const syncRemote = useCallback(async (nextSkus: string[]) => {
     if (!userId) return;
+    setSyncError("");
     const supabase = (() => {
       try { return createSupabaseBrowser(); } catch { return null; }
     })();
@@ -76,7 +78,7 @@ export function useWishlist() {
 
   const toggle = useCallback((sku: string) => {
     const next = skus.includes(sku) ? skus.filter((s) => s !== sku) : [...skus, sku];
-    if (isRemote) void syncRemote(next).catch(error => console.error("Wishlist update failed",error));
+    if (isRemote) void syncRemote(next).catch(error => {console.error("Wishlist update failed",error);setSyncError("Unable to save. Please try again.");});
     else setLocalSkus(next);
   }, [skus, isRemote, setLocalSkus, syncRemote]);
 
@@ -84,7 +86,7 @@ export function useWishlist() {
 
   const remove = useCallback((sku: string) => {
     const next = skus.filter((s) => s !== sku);
-    if (isRemote) syncRemote(next);
+    if (isRemote) void syncRemote(next).catch(error => {console.error("Wishlist removal failed",error);setSyncError("Unable to save. Please try again.");});
     else setLocalSkus(next);
   }, [skus, isRemote, setLocalSkus, syncRemote]);
 
@@ -99,5 +101,5 @@ export function useWishlist() {
     }
   }, [isRemote]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { skus, has, toggle, remove, count: skus.length };
+  return { skus, has, toggle, remove, count: skus.length, syncError };
 }
