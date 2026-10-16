@@ -42,6 +42,9 @@ export async function POST(request: NextRequest) {
     if (intent.status !== "succeeded" || intent.metadata?.orderId !== orderId) {
       return Response.json({ error: "Payment has not been confirmed" }, { status: 409 });
     }
+    if (intent.currency.toLowerCase() !== "gbp" || (existing.paymentIntentId && existing.paymentIntentId !== intent.id)) {
+      return Response.json({ error: "Payment does not belong to this checkout" }, { status: 409 });
+    }
     if (Math.round(existing.total * 100) !== intent.amount) {
       return Response.json({ error: "Payment amount does not match order total" }, { status: 409 });
     }
