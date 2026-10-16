@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listOrders, listProducts, listLeads, listPurchases } from "@/lib/server/store";
@@ -14,6 +16,7 @@ function Metric({label,count,href}:{label:string;count:number;href:string}) {
 }
 
 export default async function OperationsPage() {
+  if (!(await requireRole("MANAGER"))) redirect("/admin");
   const [orders,products,leads,purchases] = await Promise.all([
     listOrders(),listProducts(),listLeads(),listPurchases()
   ]);
