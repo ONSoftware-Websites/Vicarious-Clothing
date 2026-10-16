@@ -4,8 +4,8 @@ import {
   listEmails,
   listLeads,
   listPurchases,
-  updateLeadStatus,
 } from "@/lib/server/store";
+import { transitionLeadStatus } from "@/lib/server/lead-transitions";
 import { verifyLeadAccessToken } from "@/lib/server/lead-access";
 import { getSupabase } from "@/lib/server/supabase";
 
@@ -87,11 +87,10 @@ export async function POST(
       return Response.json({ error: "This offer has expired." }, { status: 410 });
     }
 
-    const updated = await updateLeadStatus(
-      lead.id,
-      decision === "accept" ? "ACCEPTED" : "DECLINED"
+    const updated = await transitionLeadStatus(
+      lead.id, "OFFER_SENT", decision === "accept" ? "ACCEPTED" : "DECLINED"
     );
-    if (!updated) return Response.json({ error: "Submission not found" }, { status: 404 });
+    if (!updated) return Response.json({ error: "Offer has already been decided or changed" }, { status: 409 });
 
     if (updated.status === "ACCEPTED") {
       const amount = offerAmount(updated.offer);
@@ -99,7 +98,7 @@ export async function POST(
         (purchase) => purchase.leadId === updated.id
       );
       if (amount && !purchaseExists) {
-        await createPurchase(
+        try { await createPurchase(
           {
             sellerName: updated.name,
             sellerEmail: updated.email,
@@ -110,7 +109,10 @@ export async function POST(
             leadId: updated.id,
           },
           "customer"
-        );
+        ); } catch (error) {
+          // A concurrent admin acceptance may have committed the same linked purchase.
+          if (!(await listPurchases()).some(p => p.leadId === updated.id)) throw error;
+        }
       }
     }
 
