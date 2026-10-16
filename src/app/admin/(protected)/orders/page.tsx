@@ -1,3 +1,5 @@
+import { requireRole } from "@/lib/server/admin-auth";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { OrderDeleteButton } from "@/components/admin/order-delete-button";
@@ -22,6 +24,7 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export default async function AdminOrdersPage() {
+  if (!(await requireRole("ADMIN"))) redirect("/admin");
   const orders = await listOrders();
 
   return (
