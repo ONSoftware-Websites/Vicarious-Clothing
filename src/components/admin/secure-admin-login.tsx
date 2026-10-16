@@ -4,7 +4,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
-export function SecureAdminLogin() {
+export function SecureAdminLogin({ enrollmentOnly = false }: { enrollmentOnly?: boolean }) {
   const router = useRouter();
   const [email,setEmail] = useState("");
   const [password,setPassword] = useState("");
@@ -12,7 +12,7 @@ export function SecureAdminLogin() {
   const [factorId,setFactorId] = useState("");
   const [qr,setQr] = useState("");
   const [secret,setSecret] = useState("");
-  const [stage,setStage] = useState<"login"|"enrol"|"verify">("login");
+  const [stage,setStage] = useState<"login"|"enrol"|"verify"|"complete">("login");
   const [error,setError] = useState("");
   const client = () => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +24,7 @@ export function SecureAdminLogin() {
     const auth = client();
     const {data:level} = await auth.auth.mfa.getAuthenticatorAssuranceLevel();
     if (level?.currentLevel === "aal2") {
+      if (enrollmentOnly) { setStage("complete"); return; }
       const res = await fetch("/api/admin/whoami");
       if (!res.ok) { setError("This account is not authorised for administration."); return; }
       router.replace("/admin"); router.refresh(); return;
@@ -52,6 +53,7 @@ export function SecureAdminLogin() {
       if (challengeError) throw challengeError;
       const {error:verifyError} = await auth.auth.mfa.verify({factorId,challengeId:challenge.id,code});
       if (verifyError) throw verifyError;
+      if (enrollmentOnly) { setSecret(""); setQr(""); setStage("complete"); return; }
       const response = await fetch("/api/admin/whoami");
       if (!response.ok) {setError("Your account is not an authorised administrator.");return;}
       router.replace("/admin");router.refresh();
@@ -59,15 +61,15 @@ export function SecureAdminLogin() {
   };
   return <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-6 py-16">
     <p className="mb-3 font-mono text-xs uppercase tracking-widest text-accent-deep">Vicarious Clothing / Staff access</p>
-    <h1 className="mb-8 font-display text-4xl font-bold uppercase">Secure admin login</h1>
-    {stage === "login" ? <form onSubmit={login} className="space-y-4">
+    <h1 className="mb-8 font-display text-4xl font-bold uppercase">{enrollmentOnly ? "Set up administrator MFA" : "Secure admin login"}</h1>
+    {stage === "complete" ? <p role="status" className="border border-green-400 p-4">Authenticator verified. MFA enrolment is complete. The new administrator login can be activated later after testing.</p> : stage === "login" ? <form onSubmit={login} className="space-y-4">
       <label className="block text-sm">Email<input className="mt-2 w-full border border-line p-3" type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="username"/></label>
       <label className="block text-sm">Password<input className="mt-2 w-full border border-line p-3" type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password"/></label>
       <button className="w-full bg-ink p-4 font-bold uppercase text-paper" type="submit">Continue</button>
     </form> : <form onSubmit={verify} className="space-y-4">
       {stage === "enrol" && <><p>Scan this authenticator QR code, then enter the six-digit code.</p>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={qr} alt="Authenticator enrolment QR code" className="h-48 w-48" />
+        <img src={qr.startsWith("data:") ? qr : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qr)}`} alt="Authenticator enrolment QR code" className="h-48 w-48" />
         <p className="break-all font-mono text-xs">Manual setup key: {secret}</p>
       </>}
       <label className="block text-sm">Authenticator code<input className="mt-2 w-full border border-line p-3" inputMode="numeric" pattern="[0-9]{6}" value={code} onChange={e=>setCode(e.target.value)} required /></label>
