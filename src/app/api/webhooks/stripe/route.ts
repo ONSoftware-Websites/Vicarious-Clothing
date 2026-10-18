@@ -1,3 +1,4 @@
+import { queueOrderNotificationRetry } from "@/lib/server/order-notification-outbox";
 import { recordOperationalEvent } from "@/lib/server/operational-events";
 import type { NextRequest } from "next/server";
 import type Stripe from "stripe";
@@ -43,6 +44,7 @@ async function sendConfirmationOnceSafely(
     // Henry's internal order alert and inventory sync must still run even if the
     // customer confirmation email provider has a transient problem.
     console.error("Order confirmation email failed:", error);
+    await queueOrderNotificationRetry(order.id,"order-confirmed",error);
   }
 }
 
