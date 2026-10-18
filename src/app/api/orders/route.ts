@@ -68,5 +68,5 @@ export async function GET() {
   }
 
   const orders = await listOrders(user.email);
-  return Response.json({ orders });
+  return Response.json({ orders: orders.filter(order => order.status !== "PENDING_PAYMENT") });
 }
