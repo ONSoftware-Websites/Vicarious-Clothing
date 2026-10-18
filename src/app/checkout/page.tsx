@@ -197,6 +197,8 @@ export default function CheckoutPage() {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState("");
   const [pendingOrderId, setPendingOrderId] = useState("");
+  const [resumeChecked, setResumeChecked] = useState(false);
+  const [resumedPayment, setResumedPayment] = useState(false);
   const [checkoutHoldToken, setCheckoutHoldToken] = useState("");
   const checkoutFinishedRef = useRef(false);
   const pendingOrderRef = useRef("");
@@ -251,6 +253,38 @@ export default function CheckoutPage() {
       savedAt:Date.now(),email,name,line1,line2,city,postcode,delivery
     }));}catch{/* Storage is optional. */}
   },[draftRestored,email,name,line1,line2,city,postcode,delivery]);
+
+  useEffect(() => {
+    let cancelled=false;
+    fetch("/api/checkout/resume",{cache:"no-store"})
+      .then(async response => {
+        if(!response.ok)throw new Error("Checkout resume unavailable");
+        return response.json();
+      })
+      .then(data => {
+        if(cancelled||!data.resumable||!data.order||!data.clientSecret)return;
+        // Never restore payment for a different collection of one-of-one items.
+        const current=skusRef.current;
+        const orderSkus=(data.order.items??[]).map((item:{sku:string})=>item.sku);
+        if(!current.length||current.length!==orderSkus.length||!orderSkus.every((sku:string)=>current.includes(sku)))return;
+        setEmail(data.order.email??"");
+        setName(data.order.name??"");
+        setLine1(data.order.address?.line1??"");
+        setLine2(data.order.address?.line2??"");
+        setCity(data.order.address?.city??"");
+        setPostcode(data.order.address?.postcode??"");
+        setClientSecret(data.clientSecret);
+        setPendingOrderId(data.order.id);
+        pendingOrderRef.current=data.order.id;
+        rememberCheckoutHoldToken(data.holdToken);
+        setReservationExpiresAt(data.expiresAt);
+        setStep("review");
+        setResumedPayment(true);
+      })
+      .catch(() => {})
+      .finally(() => {if(!cancelled)setResumeChecked(true);});
+    return () => {cancelled=true;};
+  }, [rememberCheckoutHoldToken]);
 
   const [discountCode, setDiscountCode] = useState("");
   const [discount, setDiscount] = useState<{
@@ -431,7 +465,7 @@ export default function CheckoutPage() {
   }, [lines, mounted, router]);
 
   useEffect(() => {
-    if (skus.length === 0) return;
+    if (skus.length === 0 || !resumeChecked) return;
     if (pendingOrderRef.current || checkoutFinishedRef.current) return;
     // A late reservation response must not release stock merely because the
     // shopper refreshed or temporarily left the page.
@@ -441,7 +475,7 @@ export default function CheckoutPage() {
       // Refresh or a temporary browser disconnect is not a checkout cancellation.
       // The server's bounded hold expiry handles abandoned unlinked reservations.
     };
-  }, [skus, ensureCheckoutHold]);
+  }, [skus, ensureCheckoutHold, resumeChecked]);
 
 
   const items = lines
@@ -1046,6 +1080,7 @@ export default function CheckoutPage() {
           ? "Your checkout reservation window has ended. Do not submit payment. Return to your bag to check current availability."
           : <>Your one-of-one pieces are reserved for this checkout. Time remaining: <strong className="font-mono text-ink">{String(Math.floor(reservationSeconds/60)).padStart(2,"0")}:{String(reservationSeconds%60).padStart(2,"0")}</strong>. Payment processing may continue beyond this timer.</>}
       </div>}
+      {resumedPayment && <p className="mb-6 border border-line bg-cream p-4 text-sm text-ink-soft">Your pending payment session has been restored. Please review the details and complete payment, or cancel checkout to release your reserved pieces.</p>}
       {draftRestored && email && !pendingOrderId && <p className="mb-6 border border-line p-4 text-sm text-ink-soft">We restored your contact and delivery details from this tab. Your payment details are never stored here; reservation availability is checked again before continuing.</p>}
       <p className="sr-only" aria-live="polite">Checkout step {stepIndex+1} of {steps.length}: {step}</p>
       <ol className="mb-10 grid grid-cols-3 gap-2 font-mono text-[11px] uppercase tracking-[0.12em]" aria-label="Checkout progress">
