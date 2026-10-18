@@ -331,21 +331,20 @@ export async function POST(request: NextRequest) {
         { status: 201 }
       );
     } catch (error) {
-      await updateOrderStatus(order.id, "CANCELLED", "checkout-system");
-      await releaseCheckoutStock(order.items.map((item) => item.sku), {
-        holdToken,
-        orderId: order.id,
-      });
+      // Do not mark a failed payment setup as a customer cancellation.
+      // Leave the temporary attempt for Stripe-aware reconciliation: Stripe
+      // may have created an intent even if recording it locally failed.
       claimedSkus = [];
+      provisionalOrderId = "";
       throw error;
     }
+
   } catch (err) {
     if (provisionalOrderId) {
-      try {
-        await updateOrderStatus(provisionalOrderId, "CANCELLED", "checkout-setup-failure");
-      } catch (cleanupError) {
-        console.error("Unable to cancel incomplete checkout order", cleanupError);
-      }
+      // A temporary row is NOT a cancelled customer order.
+      // Keep the hold linked until reconciliation verifies Stripe's state.
+      console.error("Checkout setup did not complete", { provisionalOrderId });
+      claimedSkus = [];
     }
     if (claimedSkus.length) {
       try {
