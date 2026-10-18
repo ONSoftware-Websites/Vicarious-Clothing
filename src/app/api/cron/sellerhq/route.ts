@@ -1,3 +1,4 @@
+import {recordOperationalEvent} from "@/lib/server/operational-events";
 import type { NextRequest } from "next/server";
 import { processSellerHqRetries } from "@/lib/server/sellerhq-retry-worker";
 import { getSupabase } from "@/lib/server/supabase";
@@ -11,16 +12,20 @@ export async function GET(request: NextRequest) {
   // A single existing once-daily cron performs checkout recovery and SellerHQ retries.
   const db = getSupabase();
   if (!db) return Response.json({error:"Database unavailable"}, {status:503});
+  await recordOperationalEvent("cron","info","daily_job_started");
   const {data:expired,error:expiryError} = await db.rpc("expire_checkout_holds");
   if (expiryError) {
     console.error("Expired checkout cleanup failed",expiryError);
+    await recordOperationalEvent("cron","error","checkout_expiry_failed");
     return Response.json({error:"Checkout cleanup unavailable"}, {status:503});
   }
   try {
     const sellerHq = await processSellerHqRetries();
+    await recordOperationalEvent("cron",sellerHq.failed?"warning":"info","daily_job_completed",{expiredCheckoutHolds:Number(expired??0),processed:sellerHq.processed,delivered:sellerHq.delivered,failed:sellerHq.failed});
     return Response.json({expiredCheckoutHolds:expired,sellerHq},{headers:{"Cache-Control":"no-store"}});
   } catch(error) {
     console.error("SellerHQ retry failed",error);
+    await recordOperationalEvent("cron","error","daily_job_failed");
     return Response.json({error:"SellerHQ retry unavailable",expiredCheckoutHolds:expired},{status:503});
   }
 }

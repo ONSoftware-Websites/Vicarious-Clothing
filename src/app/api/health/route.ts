@@ -7,7 +7,7 @@ function detailedHealthAllowed(request: NextRequest) {
   if (process.env.NODE_ENV !== "production") return true;
   const secret = process.env.HEALTHCHECK_SECRET;
   if (!secret) return false;
-  return request.nextUrl.searchParams.get("token") === secret;
+  return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 export async function GET(request: NextRequest) {
@@ -51,8 +51,7 @@ export async function GET(request: NextRequest) {
       {
         ok: false,
         checks,
-        seedDemo: process.env.SEED_DEMO ?? "(unset)",
-        vercel: process.env.VERCEL ?? null,
+
       },
       { status: 503 }
     );
@@ -87,41 +86,28 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  try {
-    const { error } = await supabase.rpc("claim_inventory", {
-      p_skus: ["__HEALTHCHECK_DO_NOT_CREATE__"],
-      p_minutes: 1,
-    });
-    if (error) {
-      ok = false;
-      checks.claimInventoryRpc = { ok: false, error: error.message };
-    } else {
-      checks.claimInventoryRpc = { ok: true };
-    }
-  } catch (error) {
-    ok = false;
-    checks.claimInventoryRpc = { ok: false, error: String(error) };
+  for(const [label,table] of [
+    ["sellerhqQueue","sellerhq_retry_jobs"],
+    ["operationalEvents","operational_events"],
+    ["financeLedger","finance_adjustments"]
+  ] as const){
+    const {error}=await supabase.from(table).select("*",{head:true,count:"exact"});
+    checks[label]=error?{ok:false,error:error.message}:{ok:true};
+    if(error)ok=false;
   }
-
   try {
-    const { data, error } = await supabase.storage.getBucket("lead-photos");
-    if (error || !data) {
-      ok = false;
-      checks.leadPhotoBucket = { ok: false, error: error?.message ?? "Bucket missing" };
-    } else {
-      checks.leadPhotoBucket = { ok: true, public: data.public };
-    }
-  } catch (error) {
-    ok = false;
-    checks.leadPhotoBucket = { ok: false, error: String(error) };
+    const { data, error } = await supabase.storage.getBucket("lead-photos-private");
+    checks.privateLeadPhotoBucket=error||!data?{ok:false}:{ok:true,private:!data.public};
+    if(error||!data||data.public)ok=false;
+  }catch{
+    checks.privateLeadPhotoBucket={ok:false};ok=false;
   }
 
   return Response.json(
     {
       ok,
       checks,
-      seedDemo: process.env.SEED_DEMO ?? "(unset)",
-      vercel: process.env.VERCEL ?? null,
+
     },
     { status: ok ? 200 : 500 }
   );

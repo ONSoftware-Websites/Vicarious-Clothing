@@ -24,14 +24,12 @@ export default async function EmailsPage({searchParams}:{searchParams:Promise<Re
           Email activity
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-soft">
-          Every email the store sends, in one place. Without a provider key
-          configured, emails are written as HTML files in{" "}
-          <code className="font-mono text-xs">.data/emails/</code> instead of
-          being delivered.
+          Provider-accepted and locally logged email requests. A provider-accepted message is not proof of final mailbox delivery. Recent provider rejections are available in Operations Monitoring.
         </p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">{[["Recent records",allEmails.length],["Sent via provider",delivered],["Logged locally",allEmails.length-delivered]].map(([title,value])=><div key={title} className="border border-line bg-cream p-5"><p className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">{title}</p><p className="mt-2 font-display text-2xl font-semibold">{value}</p></div>)}</div>
+      <p className="mb-4 text-xs text-ink-soft">Delivery failures that prevent logging are recorded as operational exceptions. See <a className="underline" href="/admin/monitoring">Operations Monitoring</a> if you have Owner access.</p>
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">{[["Recent records",allEmails.length],["Accepted by provider",delivered],["Logged locally",allEmails.length-delivered]].map(([title,value])=><div key={title} className="border border-line bg-cream p-5"><p className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">{title}</p><p className="mt-2 font-display text-2xl font-semibold">{value}</p></div>)}</div>
       <form action="/admin/emails" className="mb-5 flex flex-wrap gap-3"><label className="sr-only" htmlFor="email-search">Search emails</label><input id="email-search" name="q" defaultValue={typeof raw.q==="string"?raw.q:""} placeholder="Search recipient, subject or template…" className="h-11 min-w-0 flex-1 border border-line bg-paper px-4 text-sm"/><label className="sr-only" htmlFor="email-status">Delivery record status</label><select name="status" id="email-status" defaultValue={status} className="h-11 border border-line bg-paper px-3 font-mono text-xs uppercase"><option value="">All records</option><option value="sent">Sent via provider</option><option value="logged">Logged locally</option></select><button type="submit" className="bg-ink px-5 font-display text-xs font-semibold uppercase text-paper">Apply</button><a href="/admin/emails" className="self-center font-mono text-xs uppercase underline">Clear</a></form>
       <div className="overflow-x-auto border border-line">
         <table className="w-full min-w-[800px] border-collapse text-sm">
