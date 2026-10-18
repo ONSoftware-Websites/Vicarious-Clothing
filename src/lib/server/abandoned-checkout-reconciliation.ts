@@ -1,6 +1,7 @@
 import { getSupabase } from "@/lib/server/supabase";
 import { getStripe } from "@/lib/server/payments";
 import { getOrder, markOrderPaid, setOrderPayment } from "@/lib/server/store";
+import { recordOperationalEvent } from "@/lib/server/operational-events";
 import { paymentIntentMatchesOrder } from "@/lib/server/stripe-payment-validation";
 
 const CHECKOUT_WINDOW_MS = 45 * 60 * 1000;
@@ -16,7 +17,7 @@ export async function reconcileAbandonedCheckouts() {
    .eq("status","PENDING_PAYMENT").lt("created_at",deadline)
    .order("created_at",{ascending:true}).limit(100);
  if(error)throw error;
- let discarded=0,unresolved=0;
+ let discarded=0,unresolved=0,paidRecovered=0;
  for(const attempt of (attempts??[]) as Row[]){
    try{
      const {data:held,error:holdError}=await db.from("inventory_items")
@@ -32,6 +33,7 @@ export async function reconcileAbandonedCheckouts() {
          await setOrderPayment(order.id,intent.id);
          const paid=await markOrderPaid(order.id);
          if(!paid || paid.status!=="PAID"){unresolved++;continue;}
+         paidRecovered++;
          // Signed Stripe webhook independently retries confirmations and sync.
          continue;
        }
@@ -48,7 +50,9 @@ export async function reconcileAbandonedCheckouts() {
      });
      if(discardError)throw discardError;
      if(done)discarded++;else unresolved++;
-   }catch(error){console.error("Abandoned checkout reconciliation failed",{orderId:attempt.id,error});unresolved++;}
+   }catch(error){console.error("Abandoned checkout reconciliation failed",{orderId:attempt.id,error});unresolved++;await recordOperationalEvent("cron","error","checkout_reconciliation_failed",{orderId:attempt.id,reason:error instanceof Error?error.message.slice(0,300):"Unknown error"});}
  }
+ if(unresolved>0)await recordOperationalEvent("cron","warning","checkout_reconciliation_attention",{unresolved,processed:(attempts??[]).length});
+ if(paidRecovered>0)await recordOperationalEvent("cron","info","checkout_payment_recovered",{count:paidRecovered});
  return {processed:(attempts??[]).length,discarded,unresolved};
 }
