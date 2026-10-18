@@ -14,17 +14,29 @@ const exemptMaintenance = (path:string) =>
 
 async function maintenanceEnabled():Promise<boolean>{
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!url||!key)return process.env.NODE_ENV==="production";
+  const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if(!url||!key){
+    console.error("Maintenance status check unavailable: Supabase public config missing");
+    return process.env.NODE_ENV==="production";
+  }
   try{
-    const response=await fetch(`${url}/rest/v1/storefront_controls?id=eq.1&select=maintenance_enabled`,{
-      headers:{apikey:key,Authorization:`Bearer ${key}`},
-      cache:"no-store",signal:AbortSignal.timeout(4000)
+    const response=await fetch(`${url}/rest/v1/rpc/storefront_maintenance_status`,{
+      method:"POST",
+      headers:{apikey:key,Authorization:`Bearer ${key}`,"Content-Type":"application/json"},
+      body:"{}",
+      cache:"no-store",
+      signal:AbortSignal.timeout(4000)
     });
-    if(!response.ok)return true;
-    const data=await response.json() as {maintenance_enabled:boolean}[];
-    return data.length!==1 || data[0].maintenance_enabled!==false;
-  }catch{return true;}
+    if(!response.ok){
+      console.error("Maintenance status check failed:",response.status);
+      return true;
+    }
+    const enabled:unknown=await response.json();
+    return typeof enabled==="boolean"?enabled:true;
+  }catch(error){
+    console.error("Maintenance status check network failure",error);
+    return true;
+  }
 }
 
 function isMutation(request: NextRequest) {
