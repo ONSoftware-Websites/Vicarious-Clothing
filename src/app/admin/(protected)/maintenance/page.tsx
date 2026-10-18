@@ -1,3 +1,4 @@
+import {NotificationTestPanel} from "@/components/admin/notification-test-panel";
 import {MaintenanceModeControl} from "@/components/admin/maintenance-mode-control";
 import { requireRole } from "@/lib/server/admin-auth";
 import { redirect } from "next/navigation";
@@ -21,6 +22,7 @@ export default async function MaintenancePage() {
       </div>
 
       <MaintenanceModeControl />
+      <NotificationTestPanel />
       <ImageMigrationPanel />
     </div>
   );
