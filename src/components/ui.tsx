@@ -38,10 +38,10 @@ export function Button({
   ariaLabel?: string;
 }) {
   const classes = cn(
-    "inline-flex items-center justify-center gap-2 font-display font-medium uppercase tracking-[0.14em] transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none",
-    size === "sm" && "h-9 px-4 text-[11px]",
-    size === "md" && "h-12 px-7 text-xs",
-    size === "lg" && "h-14 px-9 text-sm",
+    "inline-flex min-w-0 items-center justify-center gap-2 text-center font-display font-semibold uppercase tracking-[0.14em] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-deep disabled:cursor-not-allowed disabled:opacity-40 disabled:pointer-events-none",
+    size === "sm" && "min-h-10 px-4 py-2 text-[11px]",
+    size === "md" && "min-h-12 px-7 py-3 text-xs",
+    size === "lg" && "min-h-14 px-9 py-3 text-sm",
     variant === "primary" && "bg-ink text-paper hover:bg-accent",
     variant === "outline" &&
       "border border-ink text-ink hover:bg-ink hover:text-paper",
@@ -111,7 +111,7 @@ export function SectionHeading({
   return (
     <div
       className={cn(
-        "mb-8 flex items-end justify-between gap-6 sm:mb-10",
+        "mb-8 flex flex-wrap items-end justify-between gap-4 sm:mb-10 sm:gap-6",
         className
       )}
     >
@@ -128,7 +128,7 @@ export function SectionHeading({
       {link && (
         <Link
           href={link}
-          className="shrink-0 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-soft underline underline-offset-4 transition-colors hover:text-accent-deep"
+          className="inline-flex min-h-11 shrink-0 items-center font-mono text-[11px] uppercase tracking-[0.18em] text-ink-soft underline underline-offset-4 transition-colors hover:text-accent-deep"
         >
           {linkLabel ?? "View all"} →
         </Link>
