@@ -17,27 +17,24 @@ function cookieOptions() {
   };
 }
 
+// A body-supplied UUID is not ownership evidence: it must match the
+// HttpOnly cookie minted for this browser. Never accept another browser's token.
 export async function readCheckoutHoldToken(candidate?: unknown) {
-  const supplied = normaliseCheckoutHoldToken(candidate);
-  if (supplied) return supplied;
-
   const store = await cookies();
-  const token = store.get(CHECKOUT_HOLD_COOKIE)?.value;
-  return normaliseCheckoutHoldToken(token);
+  const cookieToken = normaliseCheckoutHoldToken(store.get(CHECKOUT_HOLD_COOKIE)?.value);
+  const supplied = normaliseCheckoutHoldToken(candidate);
+  if (supplied && supplied !== cookieToken) return "";
+  return cookieToken;
 }
 
 export async function getOrCreateCheckoutHoldToken(candidate?: unknown) {
   const store = await cookies();
   const supplied = normaliseCheckoutHoldToken(candidate);
-  if (supplied) {
-    store.set(CHECKOUT_HOLD_COOKIE, supplied, cookieOptions());
-    return supplied;
-  }
-
-  const existing = store.get(CHECKOUT_HOLD_COOKIE)?.value;
-  const validExisting = normaliseCheckoutHoldToken(existing);
-  if (validExisting) return validExisting;
-
+  const cookieToken = normaliseCheckoutHoldToken(store.get(CHECKOUT_HOLD_COOKIE)?.value);
+  if (supplied && cookieToken && supplied !== cookieToken)
+    throw new Error("Checkout session does not match this browser");
+  if (cookieToken) return cookieToken;
+  // Delayed/missing cookies must never authorise an attacker-supplied token.
   const token = crypto.randomUUID();
   store.set(CHECKOUT_HOLD_COOKIE, token, cookieOptions());
   return token;
