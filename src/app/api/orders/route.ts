@@ -3,6 +3,7 @@ import type { SalesChannel } from "@/lib/types";
 import { createOrder, listOrders } from "@/lib/server/store";
 import { requireAdminApi } from "@/lib/server/admin-auth";
 import { getSupabaseUser } from "@/lib/supabase/server";
+import { getSupabase } from "@/lib/server/supabase";
 
 const CHANNELS: SalesChannel[] = ["website", "vinted", "depop", "ebay"];
 
@@ -68,5 +69,17 @@ export async function GET() {
   }
 
   const orders = await listOrders(user.email);
-  return Response.json({ orders: orders.filter(order => order.status !== "PENDING_PAYMENT") });
+  const db = getSupabase();
+  if (!db) return Response.json({error:"Order history unavailable"},{status:503});
+  const cancelledIds = orders.filter(o=>o.status==="CANCELLED").map(o=>o.id);
+  const {data:confirmed,error} = cancelledIds.length
+    ? await db.from("orders").select("id,payment_confirmed_at").in("id",cancelledIds)
+    : {data:[] as {id:string;payment_confirmed_at:string|null}[],error:null};
+  if(error)return Response.json({error:"Order history unavailable"},{status:503});
+  const paidCancelled = new Set((confirmed??[]).filter(o=>Boolean(o.payment_confirmed_at)).map(o=>o.id));
+  const visible = orders.filter(order =>
+    order.status!=="PENDING_PAYMENT" &&
+    (order.status!=="CANCELLED" || paidCancelled.has(order.id))
+  );
+  return Response.json({orders:visible},{headers:{"Cache-Control":"no-store"}});
 }
