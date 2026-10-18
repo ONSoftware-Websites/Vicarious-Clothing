@@ -82,17 +82,6 @@ async function recoverPaidOrderSideEffects(
   await syncOrderSaleToSellerHqSafely(order);
 }
 
-async function cancelPendingOrder(
-  order: NonNullable<Awaited<ReturnType<typeof getOrder>>>,
-  actor: string
-) {
-  if (order.status !== "PENDING_PAYMENT") return;
-  await updateOrderStatus(order.id, "CANCELLED", actor);
-  await releaseCheckoutStock(order.items.map((item) => item.sku), {
-    orderId: order.id,
-  });
-}
-
 async function refundExpiredPayment(
   stripe: Stripe,
   order: NonNullable<Awaited<ReturnType<typeof getOrder>>>,
@@ -158,7 +147,13 @@ export async function POST(request: NextRequest) {
           throw new Error(`Stripe payment mismatch for ${orderId}`);
         }
         if (existing.status === "CANCELLED") {
-          await refundExpiredPayment(stripe, existing, intent.id);
+          const {data:paidRecord,error:paidError}=await db.from("orders")
+            .select("payment_confirmed_at").eq("id",existing.id).single();
+          if(paidError)throw paidError;
+          // A legitimate cancellation after payment is not an expired unpaid attempt.
+          if(!paidRecord?.payment_confirmed_at) {
+            await refundExpiredPayment(stripe, existing, intent.id);
+          }
           break;
         }
 
@@ -241,11 +236,9 @@ export async function POST(request: NextRequest) {
       }
 
       case "checkout.session.expired": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const orderId = session.metadata?.orderId ?? session.client_reference_id;
-        if (!orderId) break;
-        const order = await getOrder(orderId);
-        if (order) await cancelPendingOrder(order, "stripe-session-expired");
+        // Hosted-session expiry is not a customer order cancellation.
+        // The Stripe-aware reconciler handles safe payment cancellation and
+        // disposal without producing a false CANCELLED order.
         break;
       }
 
