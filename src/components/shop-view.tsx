@@ -109,13 +109,11 @@ export async function ShopView({
             {activeFilterCount > 0 && ` · ${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active`}
           </p>
         </div>
-        <div className="hidden sm:block">
-          <SortMenu />
-        </div>
+
       </div>
 
       {chips.length>0&&<div className="mb-6 flex flex-wrap items-center gap-2" aria-label="Applied filters">{chips.map(chip=><Link key={`${chip.key}:${chip.value}`} href={removeChip(chip)} scroll={false} className="inline-flex min-h-10 items-center gap-2 border border-line bg-cream px-3 py-2 font-mono text-[11px] text-ink hover:border-ink">{chip.label}<span aria-hidden="true">×</span><span className="sr-only">Remove filter</span></Link>)}<Link href={clearHref()} scroll={false} className="inline-flex min-h-10 items-center px-3 font-mono text-[11px] underline underline-offset-4">Clear filters</Link></div>}
-      <div className="mb-6 flex gap-3 sm:hidden">
+      <div className="mb-6 flex flex-wrap gap-3 lg:hidden">
         <FilterSheet facets={facets} />
         <SortMenu />
       </div>
