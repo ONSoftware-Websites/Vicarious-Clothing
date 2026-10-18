@@ -1,3 +1,4 @@
+import { queueOrderNotificationRetry } from "@/lib/server/order-notification-outbox";
 import { recordOperationalEvent } from "@/lib/server/operational-events";
 import { completedWorkflowChecklist } from "@/lib/server/workflow-gates";
 import { ORDER_TRANSITIONS } from "@/lib/workflow-transitions";
@@ -162,6 +163,7 @@ export async function PATCH(
           emailSent = false;
           console.error(`Order ${order.id} ${template} email failed:`, emailError);
           await recordOperationalEvent("email","error","order_status_email_failed",{orderId:order.id,template});
+          await queueOrderNotificationRetry(order.id,template,emailError);
         }
       }
 
