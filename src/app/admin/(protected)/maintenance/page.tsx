@@ -1,3 +1,4 @@
+import {MaintenanceModeControl} from "@/components/admin/maintenance-mode-control";
 import { requireRole } from "@/lib/server/admin-auth";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -19,6 +20,7 @@ export default async function MaintenancePage() {
         </p>
       </div>
 
+      <MaintenanceModeControl />
       <ImageMigrationPanel />
     </div>
   );
