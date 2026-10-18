@@ -34,24 +34,23 @@ export function ShopUiProvider({ children }: { children: ReactNode }) {
     setMenuOpen(false);
   }, []);
 
+  const openSearch = useCallback(() => {setBagOpen(false);setMenuOpen(false);setSearchOpen(true);}, []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+  const openBag = useCallback(() => {setSearchOpen(false);setMenuOpen(false);setBagOpen(true);}, []);
+  const closeBag = useCallback(() => setBagOpen(false), []);
+  const toggleMenu = useCallback(() => setMenuOpen(m => !m), []);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
   const value: ShopUiState = {
     searchOpen,
     bagOpen,
     menuOpen,
-    openSearch: () => {
-      setBagOpen(false);
-      setMenuOpen(false);
-      setSearchOpen(true);
-    },
-    closeSearch: () => setSearchOpen(false),
-    openBag: () => {
-      setSearchOpen(false);
-      setMenuOpen(false);
-      setBagOpen(true);
-    },
-    closeBag: () => setBagOpen(false),
-    toggleMenu: () => setMenuOpen((m) => !m),
-    closeMenu: () => setMenuOpen(false),
+    openSearch,
+    closeSearch,
+    openBag,
+    closeBag,
+    toggleMenu,
+    closeMenu,
     closeAll,
   };
 
