@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Shop All Clothing",
+  alternates: {canonical:"/shop"},
   description:
     "Browse every piece currently in the Vicarious Clothing collection — pre-owned menswear and streetwear, each one measured, checked and photographed.",
 };
