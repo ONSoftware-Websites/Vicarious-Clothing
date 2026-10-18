@@ -280,6 +280,7 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
+    if (skus.length === 0) return;
     let cancelled=false;
     fetch("/api/checkout/resume",{cache:"no-store"})
       .then(async response => {
@@ -309,7 +310,7 @@ export default function CheckoutPage() {
       .catch(() => {})
       .finally(() => {if(!cancelled)setResumeChecked(true);});
     return () => {cancelled=true;};
-  }, [rememberCheckoutHoldToken]);
+  }, [rememberCheckoutHoldToken, skus.join(",")]);
 
   const markGoneAsReserved = useCallback((gone: string[] = []) => {
     if (!gone.length) return;
@@ -413,6 +414,7 @@ export default function CheckoutPage() {
       pendingOrderRef.current = "";
       skusRef.current = [];
       setCheckoutHoldToken("");
+      try {sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);} catch {}
       setPendingOrderId("");
       setReservationExpiresAt(null);
       setClientSecret("");
