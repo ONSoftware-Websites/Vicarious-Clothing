@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { listPosts, listProducts } from "@/lib/server/store";
 import { SITE_URL, SHOP_CATEGORIES, HELP_TOPICS, LEGAL_TOPICS } from "@/lib/site";
+import { isPublicProduct } from "@/lib/public-catalog";
 import { slugify } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -29,14 +30,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   ];
 
-  const journalRoutes: MetadataRoute.Sitemap = (await listPosts()).map((post) => ({
+  const journalRoutes: MetadataRoute.Sitemap = (await listPosts()).filter(post=>post.published).map((post) => ({
     url: `${SITE_URL}/journal/${post.slug}`,
     changeFrequency: "monthly" as const,
     priority: 0.4,
     lastModified: new Date(post.publishedAt),
   }));
 
-  const products = (await listProducts()).filter((p) => p.status !== "DRAFT");
+  const products = (await listProducts()).filter(p => isPublicProduct(p) && p.status !== "SOLD");
 
   const categoryRoutes: MetadataRoute.Sitemap = SHOP_CATEGORIES.map(
     (category) => ({
