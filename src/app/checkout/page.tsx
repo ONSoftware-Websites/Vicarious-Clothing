@@ -254,6 +254,31 @@ export default function CheckoutPage() {
     }));}catch{/* Storage is optional. */}
   },[draftRestored,email,name,line1,line2,city,postcode,delivery]);
 
+  const [discountCode, setDiscountCode] = useState("");
+  const [discount, setDiscount] = useState<{
+    code: string;
+    description: string;
+    amount: number;
+    type: string;
+  } | null>(null);
+  const [discountError, setDiscountError] = useState("");
+  const [checkingCode, setCheckingCode] = useState(false);
+
+  const skus = useMemo(() => lines.map((l) => l.sku), [lines]);
+  const isStripe = payConfig?.mode === "stripe";
+
+  useEffect(() => {
+    skusRef.current = skus;
+  }, [skus]);
+
+  const rememberCheckoutHoldToken = useCallback((value: unknown) => {
+    const token = validHoldToken(value);
+    if (!token) return "";
+    checkoutHoldTokenRef.current = token;
+    setCheckoutHoldToken(token);
+    return token;
+  }, []);
+
   useEffect(() => {
     let cancelled=false;
     fetch("/api/checkout/resume",{cache:"no-store"})
@@ -285,31 +310,6 @@ export default function CheckoutPage() {
       .finally(() => {if(!cancelled)setResumeChecked(true);});
     return () => {cancelled=true;};
   }, [rememberCheckoutHoldToken]);
-
-  const [discountCode, setDiscountCode] = useState("");
-  const [discount, setDiscount] = useState<{
-    code: string;
-    description: string;
-    amount: number;
-    type: string;
-  } | null>(null);
-  const [discountError, setDiscountError] = useState("");
-  const [checkingCode, setCheckingCode] = useState(false);
-
-  const skus = useMemo(() => lines.map((l) => l.sku), [lines]);
-  const isStripe = payConfig?.mode === "stripe";
-
-  useEffect(() => {
-    skusRef.current = skus;
-  }, [skus]);
-
-  const rememberCheckoutHoldToken = useCallback((value: unknown) => {
-    const token = validHoldToken(value);
-    if (!token) return "";
-    checkoutHoldTokenRef.current = token;
-    setCheckoutHoldToken(token);
-    return token;
-  }, []);
 
   const markGoneAsReserved = useCallback((gone: string[] = []) => {
     if (!gone.length) return;
