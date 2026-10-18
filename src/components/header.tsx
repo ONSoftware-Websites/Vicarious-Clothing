@@ -131,7 +131,7 @@ export function Header() {
           onClick={toggleMenu}
           aria-expanded={menuOpen}
           aria-controls="vc-mobile-menu"
-          aria-label={menuOpen ? "Close menu" : "Open menu"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
         >
           <IconMenu />
         </button>
