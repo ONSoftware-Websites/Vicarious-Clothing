@@ -174,6 +174,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
             </Link>
           </div>
         ) : (
+          <div>
           <div className="mb-4 flex items-center justify-between gap-3"><p role="status" className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-soft">{currentResults.length} matching pieces</p><Link href={`/search?q=${encodeURIComponent(currentQuery)}`} onClick={onClose} className="font-mono text-[11px] text-accent-deep underline underline-offset-4">View all results →</Link></div><ul className="divide-y divide-line">
             {currentResults.map((r) => (
               <li key={r.sku}>
@@ -207,6 +208,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
               </li>
             ))}
           </ul>
+          </div>
         )}
       </div>
     </div>
