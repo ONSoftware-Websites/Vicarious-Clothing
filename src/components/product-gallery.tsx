@@ -78,9 +78,10 @@ export function ProductGallery({ images }: { images: ProductImage[] }) {
             </span>
           </span>
         </button>
+        {images.length > 1 && <div className="flex items-center justify-between gap-3 py-1 sm:hidden"><button type="button" onClick={()=>step(-1)} aria-label="Previous product image" className="min-h-11 border border-line px-5 font-mono text-xs">← Previous</button><span aria-live="polite" className="font-mono text-[11px] text-ink-soft">{active+1} / {images.length}</span><button type="button" onClick={()=>step(1)} aria-label="Next product image" className="min-h-11 border border-line px-5 font-mono text-xs">Next →</button></div>}
         {images.length > 1 && (
-          <div className="grid grid-cols-4 gap-2">
-            {images.slice(0, 8).map((img, i) => (
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+            {images.map((img, i) => (
               <button
                 key={`${img.src}-${i}`}
                 type="button"
