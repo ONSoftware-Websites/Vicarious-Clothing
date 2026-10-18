@@ -44,26 +44,12 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Payment details do not match this order" }, { status: 409 });
     }
 
-    // Existing cancelled orders should not be resurrected by a late payment.
-    if (existing.status === "CANCELLED" || checkoutExpired(existing)) {
-      if (existing.status !== "CANCELLED") {
-        await updateOrderStatus(existing.id, "CANCELLED", "checkout-expiry");
-        await releaseCheckoutStock(existing.items.map((item) => item.sku), {
-          orderId: existing.id,
-        });
-      }
-      await stripe.refunds.create(
-        { payment_intent: intent.id },
-        { idempotencyKey: `expired-checkout-refund-${existing.id}` }
-      );
-      return Response.json(
-        {
-          error:
-            "This checkout is no longer active. The payment has been refunded automatically.",
-          refunded: true,
-        },
-        { status: 409 }
-      );
+    // A successful Stripe payment is authoritative. Complete it if this
+    // order still owns its reserved stock, even when the display window elapsed.
+    // The reconciliation worker is the only actor that may expire an unpaid
+    // attempt after confirming Stripe is cancelable.
+    if (existing.status === "CANCELLED") {
+      return Response.json({error:"Order is already cancelled; please contact support"},{status:409});
     }
 
     if (existing.status !== "PENDING_PAYMENT" && existing.status !== "PAID") {
