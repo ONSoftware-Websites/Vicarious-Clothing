@@ -1,3 +1,4 @@
+import {reconcileAbandonedCheckouts} from "@/lib/server/abandoned-checkout-reconciliation";
 import {recordOperationalEvent} from "@/lib/server/operational-events";
 import type { NextRequest } from "next/server";
 import { processSellerHqRetries } from "@/lib/server/sellerhq-retry-worker";
@@ -20,9 +21,10 @@ export async function GET(request: NextRequest) {
     return Response.json({error:"Checkout cleanup unavailable"}, {status:503});
   }
   try {
+    const checkout = await reconcileAbandonedCheckouts();
     const sellerHq = await processSellerHqRetries();
-    await recordOperationalEvent("cron",sellerHq.failed?"warning":"info","daily_job_completed",{expiredCheckoutHolds:Number(expired??0),processed:sellerHq.processed,delivered:sellerHq.delivered,failed:sellerHq.failed});
-    return Response.json({expiredCheckoutHolds:expired,sellerHq},{headers:{"Cache-Control":"no-store"}});
+    await recordOperationalEvent("cron",sellerHq.failed?"warning":"info","daily_job_completed",{expiredCheckoutHolds:Number(expired??0),processed:sellerHq.processed,delivered:sellerHq.delivered,failed:sellerHq.failed,checkout});
+    return Response.json({expiredCheckoutHolds:expired,checkout,sellerHq},{headers:{"Cache-Control":"no-store"}});
   } catch(error) {
     console.error("SellerHQ retry failed",error);
     await recordOperationalEvent("cron","error","daily_job_failed");
