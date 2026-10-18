@@ -1,3 +1,4 @@
+import { queueOrderNotificationRetry } from "@/lib/server/order-notification-outbox";
 import type { NextRequest } from "next/server";
 import { getStripe } from "@/lib/server/payments";
 import { paymentIntentMatchesOrder } from "@/lib/server/stripe-payment-validation";
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest) {
           // The Stripe webhook will also retry confirmation email delivery.
           console.error("Order confirmation email failed after payment:", emailError);
           emailSent = false;
+          await queueOrderNotificationRetry(order.id,"order-confirmed",emailError);
         }
       }
 
