@@ -27,6 +27,7 @@ export async function generateMetadata({
         : CATEGORY_LABELS[category as Category];
   return {
     title: `${label}`,
+    alternates: {canonical: `/shop/${category}`},
     description: `Browse pre-owned ${label.toLowerCase()} at Vicarious Clothing — every piece measured, checked against our condition scale and photographed properly.`,
   };
 }

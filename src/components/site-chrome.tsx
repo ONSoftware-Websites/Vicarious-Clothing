@@ -18,9 +18,10 @@ export function SiteChrome({ children }: { children: ReactNode }) {
   if (admin) return <>{children}</>;
 
   return <>
+    <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:bg-ink focus:px-5 focus:py-3 focus:text-paper">Skip to main content</a>
     <AnnouncementBar />
     <Header />
-    <main className="flex-1">{children}</main>
+    <main id="main-content" tabIndex={-1} className="flex-1">{children}</main>
     <Footer />
     <SearchOverlay />
     <BagDrawer />

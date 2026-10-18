@@ -42,13 +42,16 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
+  robots: {index:true,follow:true},
   openGraph: {
+    url: SITE_URL,
     siteName: SITE_NAME,
     type: "website",
     locale: "en_GB",
     title: `${SITE_NAME} | Curated Pre-Owned Clothing`,
     description: "Curated clothing, ready to go again.",
   },
+  twitter: {card:"summary_large_image",title:`${SITE_NAME} | Curated Pre-Owned Clothing`,description:"Curated clothing, ready to go again."},
 };
 
 export const viewport: Viewport = {

@@ -37,6 +37,8 @@ export async function generateMetadata({
   if (!product || !isPublicProductStatus(product.status)) return {};
   return {
     title: `${product.brand} ${product.name} - Size ${product.size}`,
+    alternates: { canonical: `/product/${product.slug}` },
+    robots: {index:product.status==="AVAILABLE",follow:true},
     description: `${product.brand} ${product.name} in ${product.colour}. Condition: ${conditionLabel(product.condition)}. Pre-owned and checked at Vicarious Clothing.`,
     openGraph: {
       title: `${product.brand} ${product.name}`,
