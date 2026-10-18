@@ -11,6 +11,7 @@ export default function OrdersPage() {
   const { profile, loading: accountLoading } = useAccount();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (accountLoading) return;
@@ -21,10 +22,11 @@ export default function OrdersPage() {
     }
     let cancelled = false;
     setLoading(true);
+    setLoadError(false);
     fetch("/api/orders")
-      .then((r) => r.json())
+      .then((r) => {if(!r.ok)throw new Error("Order history unavailable");return r.json();})
       .then((data) => { if (!cancelled) setOrders(data.orders ?? []); })
-      .catch(() => { if (!cancelled) setOrders([]); })
+      .catch(() => { if (!cancelled) {setOrders([]);setLoadError(true);} })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [profile?.email, accountLoading]);
@@ -38,7 +40,7 @@ export default function OrdersPage() {
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-faint">
           Loading…
         </p>
-      ) : orders.length === 0 ? (
+      ) : loadError ? (<div role="alert" className="border border-line p-6 text-sm text-red-700">We could not load your orders right now. Please refresh this page or contact support if the problem continues.</div>) : orders.length === 0 ? (
         <div className="border border-dashed border-line p-10 text-center">
           <p className="font-display text-sm font-semibold uppercase">
             No orders yet
@@ -68,7 +70,7 @@ export default function OrdersPage() {
                 </div>
                 <div className="text-right">
                   <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-                    {order.status.replaceAll("_", " ")}
+                    {order.status==="READY_TO_DISPATCH"?"Packed — awaiting dispatch":order.status==="PICKING"?"Preparing your parcel":order.status==="DISPATCHED"?"On its way":order.status==="RETURN_REQUESTED"?"Return under review":order.status.replaceAll("_", " ")}
                   </p>
                   <p className="font-mono text-sm">{formatPrice(order.total)}</p>
                 </div>
