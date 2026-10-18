@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   try {
     const checkout = await reconcileAbandonedCheckouts();
     const sellerHq = await processSellerHqRetries();
-    await recordOperationalEvent("cron",sellerHq.failed?"warning":"info","daily_job_completed",{expiredCheckoutHolds:Number(expired??0),processed:sellerHq.processed,delivered:sellerHq.delivered,failed:sellerHq.failed,checkout});
+    await recordOperationalEvent("cron",sellerHq.failed?"warning":"info","daily_job_completed",{expiredCheckoutHolds:Number(expired??0),processed:sellerHq.processed,delivered:sellerHq.delivered,failed:sellerHq.failed,checkoutProcessed:checkout.processed,checkoutDiscarded:checkout.discarded,checkoutUnresolved:checkout.unresolved});
     return Response.json({expiredCheckoutHolds:expired,checkout,sellerHq},{headers:{"Cache-Control":"no-store"}});
   } catch(error) {
     console.error("SellerHQ retry failed",error);
