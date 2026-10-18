@@ -1,3 +1,4 @@
+import { auditStripeOrderReconciliation } from "@/lib/server/financial-reconciliation";
 import { processOrderNotificationRetries } from "@/lib/server/order-notification-retry-worker";
 import {reconcileAbandonedCheckouts} from "@/lib/server/abandoned-checkout-reconciliation";
 import {recordOperationalEvent} from "@/lib/server/operational-events";
@@ -25,8 +26,9 @@ export async function GET(request: NextRequest) {
     const checkout = await reconcileAbandonedCheckouts();
     const sellerHq = await processSellerHqRetries();
     const notifications = await processOrderNotificationRetries();
-    await recordOperationalEvent("cron",sellerHq.failed?"warning":"info","daily_job_completed",{expiredCheckoutHolds:Number(expired??0),processed:sellerHq.processed,delivered:sellerHq.delivered,failed:sellerHq.failed,checkoutProcessed:checkout.processed,checkoutDiscarded:checkout.discarded,checkoutUnresolved:checkout.unresolved,notificationsSent:notifications.sent,notificationsFailed:notifications.failed});
-    return Response.json({expiredCheckoutHolds:expired,checkout,sellerHq,notifications},{headers:{"Cache-Control":"no-store"}});
+    const finance = await auditStripeOrderReconciliation();
+    await recordOperationalEvent("cron",sellerHq.failed?"warning":"info","daily_job_completed",{expiredCheckoutHolds:Number(expired??0),processed:sellerHq.processed,delivered:sellerHq.delivered,failed:sellerHq.failed,checkoutProcessed:checkout.processed,checkoutDiscarded:checkout.discarded,checkoutUnresolved:checkout.unresolved,notificationsSent:notifications.sent,notificationsFailed:notifications.failed,financialDiscrepancies:finance.exceptions});
+    return Response.json({expiredCheckoutHolds:expired,checkout,sellerHq,notifications,finance},{headers:{"Cache-Control":"no-store"}});
   } catch(error) {
     console.error("SellerHQ retry failed",error);
     await recordOperationalEvent("cron","error","daily_job_failed");
