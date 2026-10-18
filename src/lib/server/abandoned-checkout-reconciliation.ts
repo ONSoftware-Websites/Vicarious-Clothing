@@ -1,5 +1,7 @@
 import { getSupabase } from "@/lib/server/supabase";
 import { getStripe } from "@/lib/server/payments";
+import { getOrder, markOrderPaid, setOrderPayment } from "@/lib/server/store";
+import { paymentIntentMatchesOrder } from "@/lib/server/stripe-payment-validation";
 
 const CHECKOUT_WINDOW_MS = 45 * 60 * 1000;
 type Row = { id:string; payment_intent_id:string|null; created_at:string };
@@ -24,6 +26,15 @@ export async function reconcileAbandonedCheckouts() {
      if(tokens.length!==1){unresolved++;continue;}
      if(attempt.payment_intent_id){
        const intent=await stripe.paymentIntents.retrieve(attempt.payment_intent_id);
+       if(intent.status==="succeeded") {
+         const order=await getOrder(attempt.id);
+         if(!order || !paymentIntentMatchesOrder(intent,order)){unresolved++;continue;}
+         await setOrderPayment(order.id,intent.id);
+         const paid=await markOrderPaid(order.id);
+         if(!paid || paid.status!=="PAID"){unresolved++;continue;}
+         // Signed Stripe webhook independently retries confirmations and sync.
+         continue;
+       }
        if(intent.status!=="canceled"){
          if(!["requires_payment_method","requires_confirmation","requires_action","requires_capture"].includes(intent.status)){
            // Includes succeeded and processing: webhook is responsible for settlement/refund.
