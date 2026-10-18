@@ -433,18 +433,13 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (skus.length === 0) return;
     if (pendingOrderRef.current || checkoutFinishedRef.current) return;
-    let cancelled = false;
-
-    ensureCheckoutHold().then((token) => {
-      if (cancelled && token && skus.length) {
-        sendCheckoutCleanup("/api/release", { skus, checkoutHoldToken: token });
-      }
-    });
+    // A late reservation response must not release stock merely because the
+    // shopper refreshed or temporarily left the page.
+    void ensureCheckoutHold();
 
     return () => {
       // Refresh or a temporary browser disconnect is not a checkout cancellation.
       // The server's bounded hold expiry handles abandoned unlinked reservations.
-      cancelled = true;
     };
   }, [skus, ensureCheckoutHold]);
 
