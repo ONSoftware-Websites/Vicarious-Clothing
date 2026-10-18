@@ -1,3 +1,4 @@
+import { canSafelyCancelCheckoutIntent } from "@/lib/server/checkout-payment-state";
 import { getSupabase } from "@/lib/server/supabase";
 import { getStripe } from "@/lib/server/payments";
 import { getOrder, markOrderPaid, setOrderPayment } from "@/lib/server/store";
@@ -38,7 +39,7 @@ export async function reconcileAbandonedCheckouts() {
          continue;
        }
        if(intent.status!=="canceled"){
-         if(!["requires_payment_method","requires_confirmation","requires_action","requires_capture"].includes(intent.status)){
+         if(!canSafelyCancelCheckoutIntent(intent.status)){
            // Includes succeeded and processing: webhook is responsible for settlement/refund.
            unresolved++;continue;
          }
