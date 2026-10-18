@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useShopUi } from "@/hooks/use-shop-ui";
 import { useCart } from "@/hooks/use-cart";
 import { useWishlist } from "@/hooks/use-wishlist";
@@ -76,6 +76,8 @@ export function Header() {
   const { profile } = useAccount();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -87,6 +89,25 @@ export function Header() {
   useEffect(() => {
     closeAll();
   }, [pathname, closeAll]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { toggleMenu(); menuButtonRef.current?.focus(); }
+      if (event.key === "Tab" && menuPanelRef.current) {
+        const links = Array.from(menuPanelRef.current.querySelectorAll<HTMLAnchorElement>("a[href]"));
+        if (!links.length) return;
+        const first = links[0], last = links[links.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    const previous = document.body.style.overflow;
+    if (window.matchMedia("(max-width: 767px)").matches) document.body.style.overflow = "hidden";
+    menuPanelRef.current?.querySelector<HTMLAnchorElement>("a")?.focus();
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = previous; };
+  }, [menuOpen, toggleMenu]);
 
   return (
     <header
@@ -104,17 +125,20 @@ export function Header() {
         )}
       >
         <button
+          ref={menuButtonRef}
           type="button"
-          className="flex h-10 w-10 items-center justify-center md:hidden"
+          className="flex h-11 w-11 items-center justify-center md:hidden"
           onClick={toggleMenu}
-          aria-label="Open menu"
+          aria-expanded={menuOpen}
+          aria-controls="vc-mobile-menu"
+          aria-label={menuOpen ? "Close menu" : "Open menu"
         >
           <IconMenu />
         </button>
 
         <Link
           href="/"
-          className="flex items-center gap-2.5 font-display text-xl font-bold uppercase tracking-[0.08em] sm:text-2xl"
+          className="flex items-center gap-2 font-display text-lg font-bold uppercase tracking-[0.07em] sm:gap-2.5 sm:text-2xl"
         >
           <BrandMark size={36} className="h-8 w-8 sm:h-9 sm:w-9" />
           Vicarious
@@ -140,7 +164,7 @@ export function Header() {
         <div className="flex items-center gap-1 sm:gap-2">
           <button
             type="button"
-            className="flex h-10 w-10 items-center justify-center transition-colors hover:text-accent-deep"
+            className="flex h-11 w-11 items-center justify-center transition-colors hover:text-accent-deep"
             onClick={openSearch}
             aria-label="Open search"
           >
@@ -148,7 +172,7 @@ export function Header() {
           </button>
           <Link
             href="/account"
-            className="relative hidden h-10 w-10 items-center justify-center transition-colors hover:text-accent-deep sm:flex"
+            className="relative hidden h-11 w-11 items-center justify-center transition-colors hover:text-accent-deep sm:flex"
             aria-label={profile ? `Account, ${profile.name}` : "Sign in"}
           >
             <IconUser />
@@ -168,7 +192,7 @@ export function Header() {
           </Link>
           <button
             type="button"
-            className="relative flex h-10 w-10 items-center justify-center transition-colors hover:text-accent-deep"
+            className="relative flex h-11 w-11 items-center justify-center transition-colors hover:text-accent-deep"
             onClick={openBag}
             aria-label={`Open bag, ${count} items`}
           >
@@ -183,17 +207,19 @@ export function Header() {
       </div>
 
       {menuOpen && (
-        <div className="border-t border-line bg-paper md:hidden">
-          <nav className="mx-auto flex w-full max-w-[1440px] flex-col px-4 py-4" aria-label="Mobile">
+        <div ref={menuPanelRef} id="vc-mobile-menu" className="absolute inset-x-0 top-full max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-line bg-paper shadow-xl md:hidden">
+          <nav className="mx-auto flex w-full max-w-[1440px] flex-col px-5 py-5" aria-label="Mobile">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="border-b border-line py-3 font-display text-sm font-medium uppercase tracking-[0.18em]"
+                className="border-b border-line py-4 font-display text-base font-medium uppercase tracking-[0.14em]"
+                aria-current={pathname === link.href ? "page" : undefined}
               >
                 {link.label}
               </Link>
             ))}
+            <Link href="/account/wishlist" className="border-b border-line py-4 font-display text-sm font-medium uppercase tracking-[0.14em]">Wishlist {wishCount ? `(${wishCount})` : ""}</Link>
             <Link
               href="/account"
               className="border-b border-line py-3 font-display text-sm font-medium uppercase tracking-[0.18em]"
