@@ -147,8 +147,8 @@ async function sendViaResend(to: string, subject: string, html: string) {
   };
 }
 
-export async function sendAdminOrderAlertOnce(order: Order) {
-  const recipients = notificationRecipients();
+export async function sendAdminOrderAlertOnce(order: Order, testRecipient?: string) {
+  const recipients = testRecipient ? [testRecipient] : notificationRecipients();
   if (!recipients.length) return { notified: false, recipients: [], results: [] };
 
   const { subject, html } = orderAlertEmail(order);
