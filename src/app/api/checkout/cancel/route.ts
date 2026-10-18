@@ -1,3 +1,4 @@
+import { canSafelyCancelCheckoutIntent } from "@/lib/server/checkout-payment-state";
 import type { NextRequest } from "next/server";
 import { getOrder } from "@/lib/server/store";
 import { getSupabase } from "@/lib/server/supabase";
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
       if (!stripe) return Response.json({ error: "Payment service unavailable" }, { status: 503 });
       const intent = await stripe.paymentIntents.retrieve(order.paymentIntentId);
       if (intent.status !== "canceled") {
-        if (!["requires_payment_method", "requires_confirmation", "requires_action", "requires_capture"].includes(intent.status)) {
+        if (!canSafelyCancelCheckoutIntent(intent.status)) {
           return Response.json({ error: "Payment is processing; checkout cannot be discarded yet" }, { status: 409 });
         }
         await stripe.paymentIntents.cancel(intent.id);
