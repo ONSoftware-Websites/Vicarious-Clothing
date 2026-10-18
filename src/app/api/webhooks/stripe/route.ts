@@ -1,3 +1,4 @@
+import { recordOperationalEvent } from "@/lib/server/operational-events";
 import type { NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe, getWebhookSecret } from "@/lib/server/payments";
@@ -244,6 +245,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error(`Stripe webhook ${event.type} failed:`, error);
+    await recordOperationalEvent("cron","error","stripe_webhook_failed",{eventType:event.type,eventId:event.id,reason:error instanceof Error?error.message.slice(0,300):"Unknown error"});
     await db.from("stripe_webhook_events").delete().eq("event_id",event.id).eq("status","processing");
     // Non-2xx causes Stripe to retry transient failures rather than silently losing them.
     return Response.json({ error: "Webhook processing failed" }, { status: 500 });
