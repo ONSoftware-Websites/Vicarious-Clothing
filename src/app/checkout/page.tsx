@@ -442,23 +442,12 @@ export default function CheckoutPage() {
     });
 
     return () => {
+      // Refresh or a temporary browser disconnect is not a checkout cancellation.
+      // The server's bounded hold expiry handles abandoned unlinked reservations.
       cancelled = true;
-      if (checkoutFinishedRef.current || pendingOrderRef.current || paymentInProgressRef.current) return;
-      sendCheckoutCleanup("/api/release", {
-        skus,
-        checkoutHoldToken: checkoutHoldTokenRef.current || undefined,
-      });
     };
   }, [skus, ensureCheckoutHold]);
 
-  useEffect(() => {
-    const handlePageHide = () => releaseHeldCheckout();
-    window.addEventListener("pagehide", handlePageHide);
-    return () => {
-      window.removeEventListener("pagehide", handlePageHide);
-      releaseHeldCheckout();
-    };
-  }, [releaseHeldCheckout]);
 
   const items = lines
     .map((line) => ({ line, product: products[line.sku] }))
