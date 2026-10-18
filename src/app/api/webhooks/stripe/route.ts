@@ -76,6 +76,7 @@ async function recoverPaidOrderSideEffects(
   order: NonNullable<Awaited<ReturnType<typeof getOrder>>>
 ) {
   if (order.status !== "PAID") return;
+  await sendConfirmationOnceSafely(order);
   await sendAdminOrderAlertSafely(order);
   await syncOrderSaleToSellerHqSafely(order);
 }
