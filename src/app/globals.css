@@ -62,3 +62,18 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Release 14: consistent touch, keyboard and readable-content foundations. */
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: 3px;
+}
+:where(button, a) {
+  -webkit-tap-highlight-color: transparent;
+}
+:where(button):not(:disabled) { cursor: pointer; }
+:where(input, textarea, select) { accent-color: var(--color-accent-deep); }
+:where(p, li) { overflow-wrap: break-word; }
+@media (pointer: coarse) {
+  :where(button, a[role="button"]) { touch-action: manipulation; }
+}
