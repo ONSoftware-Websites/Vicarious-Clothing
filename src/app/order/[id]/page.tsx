@@ -49,12 +49,26 @@ export default async function OrderPage({
 
   if (!signedAccess && !accountAccess) notFound();
 
+  const trackingStages = ["PAID","PICKING","READY_TO_DISPATCH","DISPATCHED","DELIVERED"] as const;
+  const stageIndex = trackingStages.indexOf(order.status as (typeof trackingStages)[number]);
+  const hasTrackingProgress = stageIndex >= 0;
   const justPaid = raw.paid === "1";
   const pending = order.status === "PENDING_PAYMENT";
   const paymentJustCaptured = justPaid && pending;
 
   return (
     <Container className="py-12 sm:py-16">
+      {hasTrackingProgress && <section className="mx-auto mb-8 max-w-2xl border border-line bg-cream p-5" aria-label="Order progress">
+        <h2 className="font-display text-sm font-semibold uppercase tracking-wider">Your order progress</h2>
+        <ol className="mt-4 grid grid-cols-5 gap-1">
+          {trackingStages.map((stage,index)=><li key={stage} className="min-w-0 text-center">
+            <div className={index<=stageIndex?"h-2 bg-accent":"h-2 bg-line"} aria-hidden="true"/>
+            <span className={index===stageIndex?"mt-2 block text-[10px] font-semibold text-ink":"mt-2 block text-[10px] text-ink-soft"}>{stage==="READY_TO_DISPATCH"?"Packed":stage==="PICKING"?"Picking":stage==="DISPATCHED"?"Shipped":stage==="DELIVERED"?"Delivered":"Paid"}</span>
+          </li>)}
+        </ol>
+        {order.tracking && <p className="mt-4 text-xs text-ink-soft">Carrier: {order.carrier || "Delivery partner"} · Tracking reference: <span className="font-mono text-ink">{order.tracking}</span></p>}
+        <p className="mt-3 text-xs text-ink-soft">These updates reflect our order records. Check your courier directly for the latest parcel movements.</p>
+      </section>}
       <div className="mx-auto max-w-2xl text-center">
         {paymentJustCaptured ? (
           <>
