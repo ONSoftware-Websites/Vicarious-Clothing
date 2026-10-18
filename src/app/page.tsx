@@ -29,7 +29,7 @@ export default async function Home() {
 
   return (
     <div>
-      <section className="relative flex min-h-[82vh] items-end overflow-hidden bg-ink">
+      <section className="relative flex min-h-[68svh] items-end overflow-hidden bg-ink sm:min-h-[78vh]">
         <Image
           src="/optimized-images/Hero.jpg"
           alt="Vicarious Clothing campaign"
@@ -39,7 +39,7 @@ export default async function Home() {
           className="object-cover opacity-80"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/20 to-transparent" />
-        <Container className="relative z-10 pb-16 pt-40 sm:pb-24">
+        <Container className="relative z-10 pb-12 pt-32 sm:pb-24">
           <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.28em] text-paper/80">
             Curated clothing, ready to go again
           </p>
@@ -48,6 +48,7 @@ export default async function Home() {
             <br />
             Same clothes.
           </h1>
+          <p className="mt-5 max-w-md text-sm leading-relaxed text-paper/85 sm:text-base">One-of-one pieces, hand selected and ready for their next chapter.</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button href="/shop/new-in" size="lg" variant="inverse">
               Shop new in →
@@ -59,7 +60,15 @@ export default async function Home() {
         </Container>
       </section>
 
-      <section className="py-16 sm:py-20">
+      <section aria-label="Explore Vicarious collections" className="border-b border-line bg-paper">
+        <Container className="grid grid-cols-3 divide-x divide-line py-5 sm:py-7">
+          <Link href="/shop/new-in" className="group flex min-h-14 flex-col items-center justify-center gap-1 text-center hover:text-accent-deep"><span className="font-display text-xs font-semibold uppercase sm:text-base">New in</span><span className="hidden font-mono text-[10px] text-ink-soft sm:block">Freshly listed →</span></Link>
+          <Link href="/shop" className="group flex min-h-14 flex-col items-center justify-center gap-1 text-center hover:text-accent-deep"><span className="font-display text-xs font-semibold uppercase sm:text-base">Shop all</span><span className="hidden font-mono text-[10px] text-ink-soft sm:block">Find your piece →</span></Link>
+          <Link href="/shop?collection=under-25" className="group flex min-h-14 flex-col items-center justify-center gap-1 text-center hover:text-accent-deep"><span className="font-display text-xs font-semibold uppercase sm:text-base">Under £25</span><span className="hidden font-mono text-[10px] text-ink-soft sm:block">Explore value →</span></Link>
+        </Container>
+      </section>
+
+      <section className="py-12 sm:py-20">
         <Container>
           <SectionHeading
             eyebrow="Just landed"
@@ -78,7 +87,7 @@ export default async function Home() {
         </Container>
       </section>
 
-      <section className="bg-ink py-16 text-paper sm:py-24">
+      <section className="bg-ink py-14 text-paper sm:py-20">
         <Container>
           <SectionHeading
             eyebrow="Editorial"
@@ -122,32 +131,7 @@ export default async function Home() {
               </Link>
             ))}
           </div>
-          <div className="mt-10 grid grid-cols-2 gap-x-8 gap-y-10 lg:grid-cols-4 lg:gap-12">
-            {picks.map((pick) => (
-              <Link
-                key={pick.sku}
-                href={`/product/${pick.slug}`}
-                className="group block"
-              >
-                <div className="relative aspect-[4/5] overflow-hidden">
-                  <Image
-                    src={pick.images[0]?.src ?? ""}
-                    alt={pick.name}
-                    fill
-                    sizes="(min-width: 1024px) 25vw, 50vw"
-                    className="object-cover transition-opacity duration-300 group-hover:opacity-70"
-                  />
-                </div>
-                <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-paper/60">
-                  {pick.brand}
-                </p>
-                <p className="font-display text-sm font-medium">{pick.name}</p>
-                <p className="mt-1 font-mono text-xs text-paper/80">
-                  £{pick.price.toFixed(2)}
-                </p>
-              </Link>
-            ))}
-          </div>
+
         </Container>
       </section>
 
@@ -223,7 +207,7 @@ export default async function Home() {
             link="/shop"
             linkLabel="What's still here"
           />
-          <ProductGrid products={recentlySold} showSoldOverlay />
+          {recentlySold.length > 0 && <ProductGrid products={recentlySold.slice(0, 4)} showSoldOverlay />}
         </Container>
       </section>
 
