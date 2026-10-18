@@ -27,6 +27,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
   const [recent, setRecent] = useState<string[]>([]);
   const [searchError,setSearchError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -89,14 +90,16 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search brands, products, categories..."
+            placeholder="Search brands, clothing, sizes..."
             aria-label="Search brands, products, categories"
             className="w-full bg-transparent font-display text-lg font-medium uppercase tracking-wide placeholder:text-ink-faint focus:outline-none sm:text-2xl"
           />
           <button
+            ref={closeRef}
             type="button"
             onClick={onClose}
-            className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-soft hover:text-accent-deep"
+            aria-label="Close search"
+            className="min-h-11 px-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-soft hover:text-accent-deep"
           >
             Esc
           </button>
@@ -171,7 +174,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
             </Link>
           </div>
         ) : (
-          <ul className="divide-y divide-line">
+          <div className="mb-4 flex items-center justify-between gap-3"><p role="status" className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-soft">{currentResults.length} matching pieces</p><Link href={`/search?q=${encodeURIComponent(currentQuery)}`} onClick={onClose} className="font-mono text-[11px] text-accent-deep underline underline-offset-4">View all results →</Link></div><ul className="divide-y divide-line">
             {currentResults.map((r) => (
               <li key={r.sku}>
                 <Link
