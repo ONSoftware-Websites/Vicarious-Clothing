@@ -23,7 +23,7 @@ interface BagProduct {
 }
 
 export default function BagPage() {
-  const { lines, remove, setQty } = useCart();
+  const { lines, remove } = useCart();
   const mounted = useMounted();
   const [products, setProducts] = useState<Record<string, BagProduct>>({});
   const [loadedSkus,setLoadedSkus] = useState<string | null>(null);
@@ -140,28 +140,7 @@ export default function BagPage() {
                       </p>
                     )}
                     <div className="mt-auto flex items-center justify-between pt-3">
-                      <div className="flex items-center border border-line">
-                        <button
-                          type="button"
-                          onClick={() => setQty(line.sku, line.qty - 1)}
-                          className="h-9 w-9 hover:bg-cream"
-                          aria-label="Decrease quantity"
-                        >
-                          −
-                        </button>
-                        <span className="w-9 text-center font-mono text-xs">
-                          {line.qty}
-                        </span>
-                        <button
-                          type="button"
-                          disabled
-                          title="One-of-one — one per bag"
-                          className="h-9 w-9 cursor-not-allowed opacity-30"
-                          aria-label="Increase quantity"
-                        >
-                          +
-                        </button>
-                      </div>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">One-of-one piece</span>
                       <div className="flex items-center gap-4">
                         <p className="font-mono text-sm">
                           {formatPrice(product.price * line.qty)}
