@@ -27,14 +27,14 @@ export function ProductCard({
 
   return (
     <div
-      className="group relative"
+      className="group relative min-w-0"
       onPointerEnter={(event) => {
         if (event.pointerType === "mouse") setHoverIntent(true);
       }}
     >
       <Link
         href={`/product/${product.slug}`}
-        className="block"
+        className="block focus-visible:outline-offset-4"
         aria-label={`${product.brand} ${product.name}, ${formatPrice(product.price)}`}
       >
         <div className="relative aspect-[4/5] overflow-hidden bg-cream">
@@ -92,24 +92,24 @@ export function ProductCard({
 
       <WishlistButton
         sku={product.sku}
-        className="absolute right-3 top-3 bg-paper/90 p-2 transition-opacity hover:text-accent-deep sm:opacity-0 sm:group-hover:opacity-100"
+        className="absolute right-3 top-3 bg-paper/90 p-2 transition-opacity hover:text-accent-deep opacity-100"
         sold={sold || reserved}
       />
 
-      <div className="pt-3">
+      <div className="space-y-1 pt-3.5">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
           {product.brand}
         </p>
         <Link
           href={`/product/${product.slug}`}
-          className="mt-0.5 block font-display text-sm font-medium leading-snug hover:text-accent-deep"
+          className="block min-h-9 font-display text-sm font-semibold leading-snug hover:text-accent-deep sm:text-base"
         >
           {product.name}
         </Link>
-        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-soft">
           Size {product.size} · {conditionLabel(product.condition)}
         </p>
-        <p className="mt-1.5 font-mono text-sm">
+        <p className="pt-1 font-mono text-sm font-semibold">
           {formatPrice(product.price)}
           {product.compareAtPrice && !reserved && (
             <span className="ml-2 text-ink-faint line-through">
