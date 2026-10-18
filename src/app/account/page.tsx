@@ -50,6 +50,8 @@ export default function AccountPage() {
         </div>
       </div>
 
+      <nav aria-label="Account shortcuts" className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3"><Link href="/account/orders" className="flex min-h-14 items-center justify-between border border-line px-4 font-display text-xs font-semibold uppercase hover:border-ink">All orders <span aria-hidden="true">→</span></Link><Link href="/account/wishlist" className="flex min-h-14 items-center justify-between border border-line px-4 font-display text-xs font-semibold uppercase hover:border-ink">Saved pieces <span aria-hidden="true">→</span></Link><Link href="/help/contact" className="flex min-h-14 items-center justify-between border border-line px-4 font-display text-xs font-semibold uppercase hover:border-ink">Get help <span aria-hidden="true">→</span></Link></nav>
+
       <div className="mt-10">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-sm font-semibold uppercase tracking-[0.2em]">
@@ -73,7 +75,7 @@ export default function AccountPage() {
             </p>
             <p className="mt-2 text-sm text-ink-soft">
               When you order something, it&apos;ll show up here.
-            </p>
+            </p><Link href="/shop/new-in" className="mt-5 inline-flex min-h-11 items-center border border-ink px-5 font-display text-xs font-semibold uppercase hover:bg-ink hover:text-paper">Explore new pieces →</Link>
           </div>
         ) : (
           <ul className="divide-y divide-line border-t border-line">
