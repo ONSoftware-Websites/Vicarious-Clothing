@@ -340,26 +340,30 @@ export default function CheckoutPage() {
   }, []);
 
   const cancelCheckout = async () => {
-    if (checkoutFinishedRef.current) return;
+    if (checkoutFinishedRef.current || paymentInProgressRef.current) return;
     const orderId = pendingOrderRef.current;
     const currentSkus = skusRef.current;
     const holdToken = checkoutHoldTokenRef.current || undefined;
-
+    setError(null);
     try {
       if (orderId) {
-        await fetch("/api/checkout/cancel", {
+        const res = await fetch("/api/checkout/cancel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ orderId, checkoutHoldToken: holdToken }),
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? "The payment attempt could not safely be cancelled.");
+        }
       } else if (currentSkus.length) {
-        await fetch("/api/release", {
+        const res = await fetch("/api/release", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ skus: currentSkus, checkoutHoldToken: holdToken }),
         });
+        if (!res.ok) throw new Error("The checkout hold could not be released.");
       }
-    } finally {
       checkoutHoldTokenRef.current = "";
       pendingOrderRef.current = "";
       skusRef.current = [];
@@ -368,6 +372,8 @@ export default function CheckoutPage() {
       setClientSecret("");
       setStep("delivery");
       router.replace("/bag");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not safely cancel checkout. Please retry.");
     }
   };
 
