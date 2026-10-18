@@ -1,3 +1,4 @@
+import {recordOperationalEvent} from "@/lib/server/operational-events";
 import fs from "node:fs";
 import path from "node:path";
 import type { Order } from "@/lib/types";
@@ -389,12 +390,15 @@ export async function sendEmail(input: {
         return "sent";
       }
       console.error("Email provider error:", res.status, await res.text());
+      await recordOperationalEvent("email","error","provider_rejected",{template:input.template,status:res.status});
     } catch (err) {
       console.error("Email provider failure:", err);
+      await recordOperationalEvent("email","error","provider_unreachable",{template:input.template});
     }
   }
 
   if (process.env.NODE_ENV === "production") {
+    if(!apiKey)await recordOperationalEvent("email","error","provider_not_configured",{template:input.template});
     throw new Error("Transactional email could not be delivered");
   }
 
