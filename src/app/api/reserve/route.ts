@@ -1,3 +1,4 @@
+import { getSupabase } from "@/lib/server/supabase";
 import type { NextRequest } from "next/server";
 import { enforcePublicRateLimit } from "@/lib/server/public-rate-limit";
 import {
@@ -37,7 +38,24 @@ export async function POST(request: NextRequest) {
       await releaseCheckoutStock(claim.ok, { holdToken });
     }
 
+    // Expiry is server-issued and is never derived from the browser clock.
+    let expiresAt: string | null = null;
+    if (!claim.gone.length) {
+      const db = getSupabase();
+      if (db) {
+        const { data: rows } = await db.from("inventory_items")
+          .select("checkout_hold_started_at,checkout_hold_order_id")
+          .eq("checkout_hold_token", holdToken).in("sku", skus);
+        if (rows?.length === skus.length) {
+          const linked = rows.some(row => Boolean(row.checkout_hold_order_id));
+          const start = Math.min(...rows.map(row => Date.parse(row.checkout_hold_started_at ?? "")));
+          if (Number.isFinite(start)) expiresAt = new Date(start + (linked ? 45 : 30) * 60_000).toISOString();
+        }
+      }
+    }
+
     return Response.json({
+      expiresAt,
       ok: claim.gone.length ? [] : claim.ok,
       gone: claim.gone,
       held: claim.gone.length === 0,
