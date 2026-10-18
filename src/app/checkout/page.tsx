@@ -1033,25 +1033,25 @@ export default function CheckoutPage() {
 
   return (
     <Container className="py-10 sm:py-14">
-      <h1 className="mb-8 border-b border-line pb-6 font-display text-3xl font-semibold uppercase tracking-tight sm:text-4xl">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-6"><h1 className="font-display text-3xl font-semibold uppercase tracking-tight sm:text-4xl">
         Checkout
-      </h1>
+      </h1><Link href="/bag" className="inline-flex min-h-11 items-center font-mono text-xs uppercase text-ink-soft underline underline-offset-4">← Review bag</Link></div>
 
       <p className="sr-only" aria-live="polite">Checkout step {stepIndex+1} of {steps.length}: {step}</p>
-      <ol className="mb-10 flex flex-wrap gap-x-8 gap-y-2 font-mono text-[11px] uppercase tracking-[0.18em]">
+      <ol className="mb-10 grid grid-cols-3 gap-2 font-mono text-[11px] uppercase tracking-[0.12em]" aria-label="Checkout progress">
         {steps.map((s, i) => (
           <li
             key={s}
             className={
               i === stepIndex
-                ? "flex items-center gap-2 text-accent-deep"
+                ? "flex min-h-12 items-center justify-center gap-2 border-b-2 border-accent-deep bg-accent-tint px-2 text-accent-deep"
                 : i < stepIndex
-                  ? "flex items-center gap-2 text-ink"
-                  : "flex items-center gap-2 text-ink-faint"
+                  ? "flex min-h-12 items-center justify-center gap-2 border-b-2 border-ink px-2 text-ink"
+                  : "flex min-h-12 items-center justify-center gap-2 border-b-2 border-line px-2 text-ink-faint"
             }
           >
             <span>0{i + 1}</span> {s}
-            {i < steps.length - 1 && <span className="ml-8 text-ink-faint" aria-hidden>→</span>}
+
           </li>
         ))}
       </ol>
@@ -1083,9 +1083,7 @@ export default function CheckoutPage() {
 
         <aside className="lg:col-span-1">
           <div className="border border-line bg-cream p-6 lg:sticky lg:top-24">
-            <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.2em]">
-              Your bag
-            </h2>
+            <div className="mb-4 flex items-center justify-between gap-2"><h2 className="font-display text-sm font-semibold uppercase tracking-[0.2em]">Order summary</h2><Link href="/bag" className="font-mono text-[10px] underline underline-offset-4">Edit bag</Link></div>
             <ul className="divide-y divide-line">
               {items.map(({ line, product }) => (
                 <li key={line.sku} className="flex items-center gap-3 py-3">
