@@ -24,6 +24,9 @@ export default async function OperationsPage() {
   const db = getSupabase();
   const retry = db ? await db.from("sellerhq_retry_jobs")
     .select("id", {head:true,count:"exact"}).in("status",["pending","failed","processing"]) : null;
+  const recentEvents = db ? await db.from("operational_events").select("id,subsystem,severity,event,details,created_at").in("severity",["warning","error"]).order("created_at",{ascending:false}).limit(15) : null;
+  const deadLetters = db ? await db.from("sellerhq_retry_jobs").select("id,last_error,attempts,updated_at").eq("status","dead_letter").order("updated_at",{ascending:false}).limit(10) : null;
+  const pendingAttempts = orders.filter(o=>o.status==="PENDING_PAYMENT");
   const outstanding = orders.filter(o=>["PAID","PICKING","READY_TO_DISPATCH"].includes(o.status));
   const openLeads = leads.filter(l=>["NEW","REVIEWING","OFFER_SENT","ACCEPTED","RECEIVED","INSPECTED"].includes(l.status));
   const missingPhotos = products.filter(p=>p.status==="DRAFT" && !p.images.length);
@@ -37,6 +40,8 @@ export default async function OperationsPage() {
       <p className="mt-2 text-sm text-ink-soft">Prioritise fulfilment, seller offers, listing quality and SellerHQ integration health.</p>
     </header>
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      {canManageFinance && <Metric label="Pending checkout attempts" count={pendingAttempts.length} href="/admin/orders?status=PENDING_PAYMENT"/>}
+      {canManageFinance && <Metric label="SellerHQ dead letters" count={deadLetters?.data?.length??0} href="/admin/operations"/>}
       {canManageFinance && <Metric label="Orders to fulfil" count={outstanding.length} href="/admin/orders"/>}
       <Metric label="Open seller enquiries" count={openLeads.length} href="/admin/leads"/>
       {canManageFinance && <Metric label="Outstanding seller payments" count={unpaid.length} href="/admin/purchases"/>}
@@ -47,6 +52,12 @@ export default async function OperationsPage() {
       <Metric label="Products needing valid pricing" count={unpriced.length} href="/admin/inventory"/>
       {canManageFinance && <Metric label="SellerHQ deliveries outstanding" count={retry?.count??0} href="/admin/analytics"/>}
     </div>
+    {canManageFinance && <section className="border border-line p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-display text-lg font-bold uppercase">Integration and checkout alerts</h2><p className="mt-1 text-sm text-ink-soft">Recent operational warnings and failures. Investigate before retrying payment or stock operations.</p></div><Link href="/admin/operations" className="font-mono text-xs underline">Refresh page</Link></div>
+      <div className="mt-4 divide-y divide-line">{(recentEvents?.data??[]).map(event=><div key={event.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm"><div><span className={event.severity==="error"?"font-semibold text-red-700":"font-semibold text-amber-800"}>{event.severity.toUpperCase()}</span><span className="ml-3 font-mono text-xs">{event.subsystem} · {event.event}</span></div><span className="text-xs text-ink-soft">{event.created_at?new Date(event.created_at).toLocaleString("en-GB"):""}</span></div>)}{!recentEvents?.data?.length&&<p className="py-4 text-sm text-ink-soft">No recent integration alerts.</p>}</div>
+      {recentEvents?.error&&<p role="alert" className="text-sm text-red-700">Operational alerts could not be loaded.</p>}
+    </section>}
+    {canManageFinance && <section className="border border-line p-6"><h2 className="font-display text-lg font-bold uppercase">SellerHQ delivery exceptions</h2><p className="mt-2 text-sm text-ink-soft">Dead-letter jobs require investigation; the retry worker will not automatically resend them.</p><div className="mt-3 divide-y divide-line">{(deadLetters?.data??[]).map(job=><div key={job.id} className="py-3 text-xs"><strong className="font-mono">Job {job.id} · {job.attempts} attempts</strong><p className="mt-1 text-ink-soft">{job.last_error||"No error details available"}</p></div>)}{!deadLetters?.data?.length&&<p className="py-4 text-sm text-ink-soft">No dead-letter jobs.</p>}</div></section>}
     {canManageFinance && returns.length>0 && <section className="border border-line p-6"><h2 className="font-display text-lg font-bold uppercase">Customer returns awaiting action</h2><div className="mt-4 space-y-3">{returns.slice(0,10).map(order=><Link key={order.id} href={`/admin/orders/${order.id}`} className="flex justify-between border-b border-line py-3 text-sm hover:text-accent-deep"><span>{order.id} · {order.name}</span><span className="font-mono text-xs">Review →</span></Link>)}</div></section>}
     {canManageFinance && <section className="border border-line p-6">
       <h2 className="font-display text-lg font-bold uppercase">Fulfilment queue</h2>
