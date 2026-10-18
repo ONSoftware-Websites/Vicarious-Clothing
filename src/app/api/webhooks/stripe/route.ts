@@ -192,8 +192,13 @@ export async function POST(request: NextRequest) {
         const intent = event.data.object as Stripe.PaymentIntent;
         const orderId = intent.metadata?.orderId;
         if (!orderId) break;
+        // A declined card is not a cancelled order. Stripe PaymentIntents
+        // generally remain retryable after a failed attempt. Leave the
+        // reservation intact until the customer cancels or expiry reconciles it.
         const order = await getOrder(orderId);
-        if (order) await cancelPendingOrder(order, "stripe-payment-failed");
+        if (order?.status === "PENDING_PAYMENT") {
+          console.info("Retryable checkout payment failure", { orderId });
+        }
         break;
       }
 
