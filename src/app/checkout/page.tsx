@@ -265,6 +265,7 @@ export default function CheckoutPage() {
   const [checkingCode, setCheckingCode] = useState(false);
 
   const skus = useMemo(() => lines.map((l) => l.sku), [lines]);
+  const skusKey = skus.join(",");
   const isStripe = payConfig?.mode === "stripe";
 
   useEffect(() => {
@@ -310,7 +311,7 @@ export default function CheckoutPage() {
       .catch(() => {})
       .finally(() => {if(!cancelled)setResumeChecked(true);});
     return () => {cancelled=true;};
-  }, [rememberCheckoutHoldToken, skus.join(",")]);
+  }, [rememberCheckoutHoldToken, skusKey]);
 
   const markGoneAsReserved = useCallback((gone: string[] = []) => {
     if (!gone.length) return;
