@@ -170,12 +170,6 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        if (checkoutExpired(existing)) {
-          await cancelPendingOrder(existing, "checkout-expiry");
-          await refundExpiredPayment(stripe, existing, intent.id);
-          break;
-        }
-
         await setOrderPayment(orderId, intent.id);
         const order = await markOrderPaid(orderId);
         if (!order || order.status !== "PAID") throw new Error(`Order ${orderId} payment transition was not completed`);
@@ -231,14 +225,6 @@ export async function POST(request: NextRequest) {
         if (existing.status !== "PENDING_PAYMENT") {
           if (paymentIntentId) await setOrderPayment(orderId, paymentIntentId);
           await recoverPaidOrderSideEffects(existing);
-          break;
-        }
-
-        if (checkoutExpired(existing)) {
-          await cancelPendingOrder(existing, "checkout-expiry");
-          if (paymentIntentId) {
-            await refundExpiredPayment(stripe, existing, paymentIntentId);
-          }
           break;
         }
 
