@@ -10,7 +10,7 @@ import { Accordion } from "@/components/accordion";
 import { ProductGrid } from "@/components/product-grid";
 import { getSimilar } from "@/lib/catalog";
 import { getProductBySlug } from "@/lib/server/store";
-import { SITE_URL } from "@/lib/site";
+import { SITE_URL, STANDARD_DELIVERY_COST, FREE_DELIVERY_THRESHOLD } from "@/lib/site";
 import {
   conditionLabel,
   conditionTone,
@@ -158,7 +158,9 @@ export default async function ProductPage({
           </dl>
 
           {product.defects.length>0 && <div className="mt-5 border border-line bg-cream p-4"><p className="font-display text-xs font-bold uppercase tracking-widest">Condition disclosure</p><p className="mt-2 text-sm text-ink-soft">{product.defects.join(" · ")}</p><a href="#product-details" className="mt-2 inline-block font-mono text-[10px] uppercase text-accent-deep underline underline-offset-2">Read full details below</a></div>}
+          <div className="mt-4 border border-line bg-cream p-4" aria-label="Fit and condition summary"><p className="font-display text-xs font-bold uppercase tracking-widest">Know your piece</p><p className="mt-2 text-sm text-ink-soft">{product.conditionNotes || `${conditionLabel(product.condition)} pre-owned condition.`}</p>{product.measurements.length>0?<dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">{product.measurements.slice(0,4).map(m=><div key={m.label} className="border-t border-line pt-2"><dt className="font-mono text-[10px] uppercase text-ink-soft">{m.label}</dt><dd className="mt-1 text-sm font-medium">{m.value}</dd></div>)}</dl>:<p className="mt-2 text-xs text-ink-soft">Measurements not yet listed — please ask before ordering if fit is uncertain.</p>}<a href="#product-details" className="mt-3 inline-block font-mono text-[11px] text-accent-deep underline underline-offset-4">Full condition and measurements ↓</a></div>
           <div className="mt-3 flex flex-wrap gap-4 text-xs"><Link href="/help/condition-guide" className="text-accent-deep underline underline-offset-4">Condition guide</Link><Link href="/help/delivery" className="text-accent-deep underline underline-offset-4">Delivery information</Link><Link href="/help/returns" className="text-accent-deep underline underline-offset-4">Returns policy</Link></div>
+          <p className="mt-5 text-xs leading-5 text-ink-soft">UK delivery from £{STANDARD_DELIVERY_COST.toFixed(2)} · Free standard delivery over £{FREE_DELIVERY_THRESHOLD} · <Link href="/help/returns" className="underline underline-offset-2">Returns information</Link></p>
           <div className="mt-6 flex items-center gap-3">
             {sold ? (
               <p className="flex h-14 w-full items-center justify-center border border-ink font-display text-xs font-semibold uppercase tracking-[0.18em] text-ink">
