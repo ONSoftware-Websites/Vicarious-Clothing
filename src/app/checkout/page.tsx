@@ -181,7 +181,17 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [holdingStock, setHoldingStock] = useState(false);
+  const [reservationExpiresAt, setReservationExpiresAt] = useState<string | null>(null);
+  const [reservationSeconds, setReservationSeconds] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!reservationExpiresAt) { setReservationSeconds(null); return; }
+    const update = () => setReservationSeconds(Math.max(0, Math.ceil((Date.parse(reservationExpiresAt) - Date.now()) / 1000)));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [reservationExpiresAt]);
 
   const [payConfig, setPayConfig] = useState<PayConfig | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
@@ -305,6 +315,7 @@ export default function CheckoutPage() {
           return "";
         }
 
+        if (typeof data.expiresAt === "string") setReservationExpiresAt(data.expiresAt);
         setError((current) => (current === STOCK_HELD_ERROR ? null : current));
         return rememberCheckoutHoldToken(data.holdToken) || existingToken;
       } catch {
@@ -369,6 +380,7 @@ export default function CheckoutPage() {
       skusRef.current = [];
       setCheckoutHoldToken("");
       setPendingOrderId("");
+      setReservationExpiresAt(null);
       setClientSecret("");
       setStep("delivery");
       router.replace("/bag");
@@ -531,6 +543,7 @@ export default function CheckoutPage() {
       rememberCheckoutHoldToken(data.holdToken || activeHoldToken);
       setClientSecret(data.clientSecret);
       setPendingOrderId(data.order.id);
+      if (typeof data.order?.createdAt === "string") setReservationExpiresAt(new Date(Date.parse(data.order.createdAt) + 45 * 60_000).toISOString());
       setStep("review");
       window.scrollTo(0, 0);
     } catch {
@@ -589,6 +602,7 @@ export default function CheckoutPage() {
 
   const canContinue =
     !holdingStock &&
+    reservationSeconds !== 0 &&
     !error &&
     ((step === "contact" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) ||
       (step === "delivery" && name.trim().length>1 && line1.trim() && city.trim() && postcode.trim().length>=5) ||
@@ -1043,6 +1057,12 @@ export default function CheckoutPage() {
         Checkout
       </h1><Link href="/bag" className="inline-flex min-h-11 items-center font-mono text-xs uppercase text-ink-soft underline underline-offset-4">← Review bag</Link></div>
 
+      {reservationSeconds !== null && <div role="status" aria-live="off" className={reservationSeconds===0?"mb-6 border border-red-200 bg-red-50 p-4 text-sm text-red-800":"mb-6 border border-line bg-cream p-4 text-sm text-ink-soft"}>
+        {reservationSeconds===0
+          ? "Your checkout reservation window has ended. Do not submit payment. Return to your bag to check current availability."
+          : <>Your one-of-one pieces are reserved for this checkout. Time remaining: <strong className="font-mono text-ink">{String(Math.floor(reservationSeconds/60)).padStart(2,"0")}:{String(reservationSeconds%60).padStart(2,"0")}</strong>. Payment processing may continue beyond this timer.</>}
+      </div>}
+      {draftRestored && email && !pendingOrderId && <p className="mb-6 border border-line p-4 text-sm text-ink-soft">We restored your contact and delivery details from this tab. Your payment details are never stored here; reservation availability is checked again before continuing.</p>}
       <p className="sr-only" aria-live="polite">Checkout step {stepIndex+1} of {steps.length}: {step}</p>
       <ol className="mb-10 grid grid-cols-3 gap-2 font-mono text-[11px] uppercase tracking-[0.12em]" aria-label="Checkout progress">
         {steps.map((s, i) => (
