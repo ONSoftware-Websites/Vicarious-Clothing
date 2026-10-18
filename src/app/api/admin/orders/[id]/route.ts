@@ -1,3 +1,4 @@
+import { recordOperationalEvent } from "@/lib/server/operational-events";
 import { completedWorkflowChecklist } from "@/lib/server/workflow-gates";
 import { ORDER_TRANSITIONS } from "@/lib/workflow-transitions";
 import type { NextRequest } from "next/server";
@@ -31,10 +32,12 @@ async function syncOrderToSellerHqSafely(
     const result = await syncOrderSaleToSellerHq(order);
     if (!result.ok && !result.skipped) {
       console.error("SellerHQ order status sync failed:", result.error ?? result.data);
+      await recordOperationalEvent("sellerhq","warning","order_status_sync_failed",{orderId:order.id,status:order.status});
     }
     return result;
   } catch (error) {
     console.error("SellerHQ order status sync failed:", error);
+    await recordOperationalEvent("sellerhq","error","order_status_sync_exception",{orderId:order.id,status:order.status});
     return {
       ok: false,
       error: error instanceof Error ? error.message : "SellerHQ order status sync failed",
@@ -158,6 +161,7 @@ export async function PATCH(
         } catch (emailError) {
           emailSent = false;
           console.error(`Order ${order.id} ${template} email failed:`, emailError);
+          await recordOperationalEvent("email","error","order_status_email_failed",{orderId:order.id,template});
         }
       }
 
