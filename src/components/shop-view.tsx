@@ -121,9 +121,10 @@ export async function ShopView({
       </div>
 
       <div className="flex gap-10">
+        <aside className="hidden lg:block"><FilterSheet facets={facets} /></aside>
 
         <div className="flex-1 min-w-0">
-          <div className="mb-5 hidden lg:flex items-center justify-between border-y border-line py-3"><FilterSheet facets={facets} /><p className="font-mono text-[11px] uppercase text-ink-soft">{products.length} pieces found</p></div>
+          <div className="mb-5 hidden lg:flex items-center justify-between border-y border-line py-3"><p className="font-mono text-[11px] uppercase text-ink-soft">Showing {visibleProducts.length} of {products.length} pieces</p><SortMenu /></div>
           {visibleProducts.length ? <ProductGrid products={visibleProducts} /> : <div className="border border-line bg-cream px-6 py-12 text-center"><p className="font-display text-xl font-bold uppercase">No matching pieces</p><p className="mt-2 text-sm text-ink-soft">Try a broader search or remove some filters.</p><Link href="/shop" className="mt-5 inline-block border border-ink px-6 py-3 font-mono text-xs uppercase">Browse all clothing</Link></div>}
           {totalPages>1 && <nav aria-label="Catalogue pages" className="mt-10 flex flex-wrap items-center justify-center gap-3"><Link href={pageHref(Math.max(1,page-1))} aria-disabled={page===1} className={`border border-line px-4 py-2 font-mono text-xs uppercase ${page===1?"pointer-events-none opacity-40":""}`}>Previous</Link><span className="font-mono text-xs text-ink-soft">Page {page} of {totalPages}</span><Link href={pageHref(Math.min(totalPages,page+1))} aria-disabled={page===totalPages} className={`border border-line px-4 py-2 font-mono text-xs uppercase ${page===totalPages?"pointer-events-none opacity-40":""}`}>Next</Link></nav>}
         </div>
