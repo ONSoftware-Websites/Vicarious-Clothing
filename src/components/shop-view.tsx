@@ -32,7 +32,7 @@ export async function ShopView({
   params: ShopParams;
   mens?: boolean;
 }) {
-  const allProducts = (await listProducts()).filter(isPublicProduct).filter(product => product.tags.some(tag=>tag.trim().toLowerCase()==="mens") === mens);
+  const allProducts = (await listProducts()).filter(isPublicProduct).filter(product => !product.tags.some(tag=>tag.startsWith("mystery-unit:")) && product.tags.some(tag=>tag.trim().toLowerCase()==="mens") === mens);
   const facets = getFacets(allProducts);
 
   const filters = {
