@@ -26,11 +26,13 @@ export interface ShopParams {
 export async function ShopView({
   category,
   params,
+  mens = false,
 }: {
   category?: Category | "new-in" | "sale";
   params: ShopParams;
+  mens?: boolean;
 }) {
-  const allProducts = (await listProducts()).filter(isPublicProduct);
+  const allProducts = (await listProducts()).filter(isPublicProduct).filter(product => product.tags.some(tag=>tag.trim().toLowerCase()==="mens") === mens);
   const facets = getFacets(allProducts);
 
   const filters = {
@@ -72,7 +74,7 @@ export async function ShopView({
       : category === "sale"
         ? "Sale"
         : CATEGORY_LABELS[category]
-    : "Shop";
+    : mens ? "Men’s Clothing" : "Shop";
 
   const activeFilterCount =
     (params.brand?.split(",").filter(Boolean).length ?? 0) +
