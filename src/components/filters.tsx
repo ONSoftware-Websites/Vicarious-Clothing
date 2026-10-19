@@ -55,26 +55,24 @@ function FilterGroup({
 }) {
   if (options.length === 0) return null;
   return (
-    <fieldset className="border-b border-line py-5">
-      <legend className="mb-3 font-display text-xs font-semibold uppercase tracking-[0.18em]">
-        {title}
-      </legend>
-      <ul className="space-y-2">
+    <details className="group border-b border-line">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-4 font-display text-xs font-semibold uppercase tracking-[0.18em] [&::-webkit-details-marker]:hidden">
+        <span>{title}{selected.length > 0 && <span className="ml-2 font-mono text-[10px] text-accent-deep">({selected.length})</span>}</span>
+        <span aria-hidden="true" className="text-base transition-transform group-open:rotate-180">⌄</span>
+      </summary>
+      <ul className="max-h-64 space-y-2 overflow-y-auto pb-5">
         {options.map((option) => (
           <li key={option}>
             <label className="flex cursor-pointer items-center gap-2.5 text-sm text-ink-soft transition-colors hover:text-ink">
-              <input
-                type="checkbox"
-                checked={selected.includes(option)}
+              <input type="checkbox" checked={selected.includes(option)}
                 onChange={() => onToggle(option)}
-                className="h-3.5 w-3.5 accent-[#0097af]"
-              />
+                className="h-4 w-4 accent-[#0097af]" />
               {option}
             </label>
           </li>
         ))}
       </ul>
-    </fieldset>
+    </details>
   );
 }
 
