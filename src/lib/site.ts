@@ -80,6 +80,7 @@ export const NAV_LINKS = [
   { label: "New", href: "/shop/new-in" },
   { label: "Shop", href: "/shop" },
   { label: "Men", href: "/mens" },
+  { label: "Mystery Bags", href: "/mystery-bags" },
   { label: "Sale", href: "/shop/sale" },
   { label: "Brands", href: "/brands" },
   { label: "About", href: "/about" },
