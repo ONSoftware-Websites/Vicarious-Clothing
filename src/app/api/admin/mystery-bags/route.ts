@@ -18,7 +18,7 @@ export async function POST(request:Request){
   for(let i=0;i<quantity;i++){
    const unit=await duplicateProduct(sku,"Admin — mystery bag");
    if(!unit)throw new Error("Could not generate a unit");
-   await upsertProduct({...unit,tags:[...source.tags.filter(t=>!t.startsWith("mystery-unit:")),`mystery-unit:${sku}`],status:"AVAILABLE",isPick:false,featured:false},"Admin — mystery bag","Mystery bag saleable unit");
+   await upsertProduct({...unit,prdCode:undefined,tags:[...source.tags.filter(t=>!t.startsWith("mystery-unit:")),`mystery-unit:${sku}`],marketplace:unit.marketplace.map(m=>({channel:m.channel,status:m.channel==="website"?"LISTED":"NOT_LISTED",url:undefined})),status:"AVAILABLE",isPick:false,featured:false},"Admin — mystery bag","Mystery bag saleable unit");
    created.push(unit.sku);
   }
   return Response.json({ok:true,template:sku,units:created,count:created.length});
