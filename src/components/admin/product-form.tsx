@@ -716,10 +716,10 @@ export function ProductForm({ product }: { product?: Product }) {
               </div>
               <div className="border border-line bg-cream p-4">
                 <label className="flex items-center gap-3 text-sm font-medium">
-                  <input type="checkbox" checked={tagsText.split(/\\r?\\n/).some(tag=>tag.trim().toLowerCase()==="mens")}
+                  <input type="checkbox" checked={tagsText.split(/\r?\n/).some(tag=>tag.trim().toLowerCase()==="mens")}
                     onChange={event=>setTagsText(current=>{
-                      const tags=current.split(/\\r?\\n/).filter(tag=>tag.trim().toLowerCase()!=="mens");
-                      return [...tags,...(event.target.checked?["mens"]:[])].join("\\n");
+                      const tags=current.split(/\r?\n/).filter(tag=>tag.trim().toLowerCase()!=="mens");
+                      return [...tags,...(event.target.checked?["mens"]:[])].join("\n");
                     })} />
                   Men's section — show exclusively in the men's shop
                 </label>
