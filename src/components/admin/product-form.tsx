@@ -714,6 +714,17 @@ export function ProductForm({ product }: { product?: Product }) {
                   className={textarea}
                 />
               </div>
+              <div className="border border-line bg-cream p-4">
+                <label className="flex items-center gap-3 text-sm font-medium">
+                  <input type="checkbox" checked={tagsText.split(/\\r?\\n/).some(tag=>tag.trim().toLowerCase()==="mens")}
+                    onChange={event=>setTagsText(current=>{
+                      const tags=current.split(/\\r?\\n/).filter(tag=>tag.trim().toLowerCase()!=="mens");
+                      return [...tags,...(event.target.checked?["mens"]:[])].join("\\n");
+                    })} />
+                  Men's section — show exclusively in the men's shop
+                </label>
+                <p className="mt-2 text-xs text-ink-soft">This item will be excluded from the main shop and displayed in the dedicated men's section.</p>
+              </div>
               <div>
                 <label htmlFor="pf-tags" className={label}>
                   Tags
