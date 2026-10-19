@@ -1,3 +1,4 @@
+import {MysteryBagGenerator} from "@/components/admin/mystery-bag-generator";
 import { requireRole } from "@/lib/server/admin-auth";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -39,7 +40,8 @@ export default async function InventoryPage({
 
   return (
     <div>
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <MysteryBagGenerator />
+      <div className="mt-8 mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-accent-deep">Workspace / Catalogue</p>
           <h1 className="font-display text-3xl font-bold uppercase tracking-tight">
