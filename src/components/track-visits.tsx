@@ -19,6 +19,8 @@ export function TrackVisits() {
 
   useEffect(() => {
     const track = () => {
+      // A local opt-out excludes this browser profile across networks.
+      if (window.localStorage.getItem("vc_analytics_exclude_device") === "true") return;
       if (window.localStorage.getItem(CONSENT_KEY) !== "all") return;
       const sessionKey = "vc_analytics_session";
       const previousSession = window.sessionStorage.getItem(sessionKey);

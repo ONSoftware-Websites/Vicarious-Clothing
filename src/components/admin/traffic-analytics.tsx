@@ -25,6 +25,21 @@ export function TrafficAnalytics() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [deviceExcluded, setDeviceExcluded] = useState(false);
+
+  useEffect(() => {
+    setDeviceExcluded(window.localStorage.getItem("vc_analytics_exclude_device") === "true");
+  }, []);
+
+  function toggleDeviceExclusion() {
+    const next = !deviceExcluded;
+    if (next) window.localStorage.setItem("vc_analytics_exclude_device", "true");
+    else window.localStorage.removeItem("vc_analytics_exclude_device");
+    setDeviceExcluded(next);
+    setNotice(next
+      ? "This browser profile is excluded from analytics on every network."
+      : "This browser profile can be included in analytics again, subject to consent and administrator-session exclusion.");
+  }
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -104,7 +119,12 @@ export function TrafficAnalytics() {
       </div>
     </>}
     <section className="space-y-4 border border-line p-5 sm:p-6">
-      <div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-deep">Configuration</p><h2 className="mt-1 font-display text-xl font-bold uppercase">Excluded administrator IPs</h2><p className="mt-2 text-sm text-ink-soft">Matching traffic is discarded before an event is stored. IP addresses are not retained in page-view events. Use a public IP address for the network your device connects through.</p></div>
+      <div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-deep">Configuration</p><h2 className="mt-1 font-display text-xl font-bold uppercase">Device & administrator exclusions</h2><p className="mt-2 text-sm text-ink-soft">Administrator sessions are automatically excluded server-side, even when the network changes. You can also exclude this browser profile when viewing the public shop while signed out.</p></div>
+      <div className="flex flex-wrap items-center justify-between gap-4 border border-line bg-cream p-4">
+        <div><p className="font-display text-sm font-semibold uppercase">Exclude this browser profile</p><p className="mt-1 max-w-xl text-xs text-ink-soft">{deviceExcluded ? "Enabled — visits from this browser profile will not be sent to analytics, on any network." : "Disabled — public-shop visits may be counted when analytics consent is enabled and you are not signed in as an administrator."}</p></div>
+        <button type="button" onClick={toggleDeviceExclusion} className={`px-4 py-3 font-mono text-[10px] uppercase tracking-wider ${deviceExcluded ? "border border-line bg-paper hover:bg-cream" : "bg-ink text-paper hover:bg-accent-deep"}`}>{deviceExcluded ? "Include this browser" : "Exclude this browser"}</button>
+      </div>
+      <div><h3 className="font-display text-lg font-bold uppercase">Excluded administrator IPs</h3><p className="mt-2 text-sm text-ink-soft">Matching traffic is discarded before an event is stored. IP addresses are not retained in page-view events. Use a public IP address for the network your device connects through.</p></div>
       <form onSubmit={addIp} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <div><label htmlFor="exclude-ip" className="mb-1 block font-mono text-[10px] uppercase tracking-wider">IPv4 / IPv6 address</label><input id="exclude-ip" required value={ip} onChange={e=>setIp(e.target.value)} placeholder="e.g. 203.0.113.10" className="w-full border border-line bg-paper px-3 py-3 text-sm" /></div>
         <div><label htmlFor="exclude-label" className="mb-1 block font-mono text-[10px] uppercase tracking-wider">Description (optional)</label><input id="exclude-label" value={label} onChange={e=>setLabel(e.target.value)} maxLength={100} placeholder="e.g. Admin home network" className="w-full border border-line bg-paper px-3 py-3 text-sm" /></div>
@@ -114,7 +134,7 @@ export function TrafficAnalytics() {
         {addresses.map(address=><div key={address.ip_address} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-mono text-sm">{address.ip_address}</p><p className="mt-1 text-xs text-ink-soft">{address.label || "No description"}</p></div><button type="button" onClick={()=>void removeIp(address.ip_address)} className="border border-line px-3 py-2 font-mono text-[10px] uppercase tracking-wider hover:border-red-500 hover:text-red-700">Remove</button></div>)}
         {!addresses.length && <p className="py-4 text-sm text-ink-soft">No IP addresses excluded yet.</p>}
       </div>
-      <p className="text-xs text-ink-faint">Exclusions apply to new events after the IP is saved; existing reports are not retroactively changed. Tracking requires optional analytics consent.</p>
+      <p className="text-xs text-ink-faint">IP exclusions apply to new events after the address is saved; existing reports are not retroactively changed. Device exclusion is stored in this browser's local site data, so it remains active across networks but must be set again in another browser/profile or after clearing site data. Tracking also requires optional analytics consent.</p>
     </section>
   </div>;
 }
