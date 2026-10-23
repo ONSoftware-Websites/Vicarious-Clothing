@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 type Analytics = {
   days: number; pageViews: number; sessions: number; uniqueVisitors: number;
@@ -44,7 +44,7 @@ export function TrafficAnalytics() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function addIp(event: React.FormEvent<HTMLFormElement>) {
+  async function addIp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setError(""); setNotice("");
     try {
       const response = await fetch("/api/admin/traffic/excluded-ips", {
