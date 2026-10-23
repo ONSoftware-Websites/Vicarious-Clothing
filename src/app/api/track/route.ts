@@ -2,6 +2,7 @@ import { isIP } from "node:net";
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/server/supabase";
 import { recordVisit } from "@/lib/server/store";
+import { isAdminSession } from "@/lib/server/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,9 @@ export async function POST(request: NextRequest) {
   if (!path || !/^[a-zA-Z0-9_-]{8,80}$/.test(visitorId) || !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
+
+  // Authenticated staff/admin sessions are excluded regardless of the network or browser IP.
+  if (await isAdminSession()) return NextResponse.json({ ok: true, excluded: true, reason: "admin-session" });
 
   const db = getSupabase();
   if (!db) return NextResponse.json({ error: "Analytics storage unavailable" }, { status: 503 });
