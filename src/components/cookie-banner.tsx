@@ -46,7 +46,7 @@ export function CookieBanner() {
             </p>
             <p className="mt-2">
               Necessary cookies keep your bag, wishlist and consent choice working.
-              Optional analytics record a basic visit count only after you accept.
+              Optional analytics measure page views, sessions, unique browsers and referring websites only after you accept.
             </p>
           </div>
         )}
