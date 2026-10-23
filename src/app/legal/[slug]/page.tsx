@@ -368,8 +368,8 @@ const documents: Record<string, LegalDocument> = {
       {
         heading: "3. Optional analytics storage",
         paragraphs: [
-          "If you accept optional analytics, the site may use a short session marker, such as vc_tracked, so one browser session is counted once in the internal visit counter. This is used to understand basic site usage and does not involve third-party advertising trackers.",
-          "If you reject optional analytics, the visit counter does not run for that browser session.",
+          "If you accept optional analytics, the site uses browser storage to generate a pseudonymous browser identifier and session identifier. We record storefront page paths, page-view timestamps and referring website hostnames to report page views, sessions, unique browsers and popular pages. Raw visitor IP addresses are checked against the administrator exclusion list before recording and are not stored in page-view events. These first-party analytics do not use third-party advertising trackers.",
+          "If you reject optional analytics, these analytics events are not recorded. You can change your choice using the site's cookie controls."
         ],
       },
       {
