@@ -32,7 +32,7 @@ export function TrackVisits() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           path: window.location.pathname, visitorId, sessionId,
-          referrerHost: document.referrer || null, newSession,
+          referrerHost: newSession ? (document.referrer || null) : null, newSession,
         }),
         keepalive: true,
       }).catch(() => {});
