@@ -12,12 +12,19 @@ export async function GET(request: NextRequest) {
   const requestedDays = Number(request.nextUrl.searchParams.get("days") ?? "30");
   const days = [7, 30, 90].includes(requestedDays) ? requestedDays : 30;
   const since = new Date(Date.now() - days * 86400000).toISOString();
-  const { data: events, error } = await db.from("analytics_events")
-    .select("visitor_id,session_id,path,referrer_host,created_at")
-    .gte("created_at", since).order("created_at", { ascending: true }).limit(50000);
-  if (error) return NextResponse.json({ error: "Could not load traffic analytics. Apply the traffic analytics migration first." }, { status: 503 });
-
-  const rows = events ?? [];
+  const rows: { visitor_id: string; session_id: string; path: string; referrer_host: string | null; created_at: string }[] = [];
+  const pageSize = 1000;
+  let offset = 0;
+  while (offset < 50000) {
+    const { data: batch, error } = await db.from("analytics_events")
+      .select("visitor_id,session_id,path,referrer_host,created_at")
+      .gte("created_at", since).order("created_at", { ascending: true })
+      .range(offset, Math.min(offset + pageSize - 1, 49999));
+    if (error) return NextResponse.json({ error: "Could not load traffic analytics. Apply the traffic analytics migration first." }, { status: 503 });
+    rows.push(...(batch ?? []));
+    if (!batch || batch.length < pageSize) break;
+    offset += pageSize;
+  }
   const byDay = new Map<string, { pageViews: number; sessions: Set<string>; visitors: Set<string> }>();
   const pages = new Map<string, number>();
   const referrers = new Map<string, number>();
