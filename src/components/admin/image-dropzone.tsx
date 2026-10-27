@@ -182,12 +182,29 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
     onChange(images.filter((_, i) => i !== idx));
   };
 
-  const move = (idx: number, dir: -1 | 1) => {
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+
+  const reorder = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= images.length || to >= images.length) return;
     const next = [...images];
-    const target = idx + dir;
-    if (target < 0 || target >= next.length) return;
-    [next[idx], next[target]] = [next[target], next[idx]];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
     onChange(next);
+  };
+
+  const startImageDrag = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    e.stopPropagation();
+    setDraggingIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  };
+
+  const dropImage = (e: React.DragEvent<HTMLDivElement>, targetIndex: number) => {
+    if (draggingIndex === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    reorder(draggingIndex, targetIndex);
+    setDraggingIndex(null);
   };
 
   return (
@@ -231,7 +248,21 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
       {images.length > 0 && (
         <div className={single ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3 sm:grid-cols-3"}>
           {images.map((img, i) => (
-            <div key={`${img.src}-${i}`} className="group relative border border-line bg-paper">
+            <div
+              key={`${img.src}-${i}`}
+              draggable={!single}
+              onDragStart={(e) => startImageDrag(e, i)}
+              onDragOver={(e) => {
+                if (draggingIndex !== null) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.dataTransfer.dropEffect = "move";
+                }
+              }}
+              onDrop={(e) => dropImage(e, i)}
+              onDragEnd={() => setDraggingIndex(null)}
+              className={`group relative border border-line bg-paper transition-opacity ${draggingIndex === i ? "opacity-40" : ""} ${!single ? "cursor-grab active:cursor-grabbing" : ""}`}
+            >
               {img.src ? (
                 <Image
                   src={img.src}
@@ -247,10 +278,7 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
               <div className="absolute inset-x-0 top-0 flex justify-between bg-ink/70 p-1">
                 <div className="flex gap-1">
                   {!single && (
-                    <>
-                      <button type="button" disabled={i === 0} onClick={() => move(i, -1)} className="bg-paper px-1.5 py-0.5 font-mono text-[10px] disabled:opacity-40">←</button>
-                      <button type="button" disabled={i === images.length - 1} onClick={() => move(i, 1)} className="bg-paper px-1.5 py-0.5 font-mono text-[10px] disabled:opacity-40">→</button>
-                    </>
+                    <span aria-label={`Drag to reorder image ${i + 1}`} title="Drag to reorder" className="select-none bg-paper px-2 py-0.5 font-mono text-xs cursor-grab">⠿</span>
                   )}
                   <span className="bg-paper px-1.5 py-0.5 font-mono text-[10px]">{i + 1}</span>
                 </div>
@@ -272,7 +300,7 @@ export function ImageDropzone({ images, onChange, bucket = "product-images", max
           ))}
         </div>
       )}
-      {!single && images.length > 0 && <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">{images.length}/{max} images — first is the cover</p>}
+      {!single && images.length > 0 && <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">{images.length}/{max} images — drag to reorder; first is the cover</p>}
     </div>
   );
 }
